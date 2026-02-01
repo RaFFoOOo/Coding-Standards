@@ -14,6 +14,16 @@
 - **Performance:**
   - **Change Detection:** Use `ChangeDetectionStrategy.OnPush` by default for all components to maximize rendering efficiency.
   - **Parallel Loading:** When a page needs multiple data sources, use `forkJoin` (RxJS) to load them in parallel. Never chain independent subscriptions (Waterfall effect).
+- **Visual Performance:** Avoid Layout thrashing. Use `CSS` transitions instead of JS animations where possible.
+
+## 2a. Modern Angular Standards [STRICT]
+- **Control Flow:**
+  - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
+  - *Reason:* Better type checking, performance, and readability.
+- **File Structure:**
+  - **Inline Templates/Styles forbidden:** Components must have separate `.html` and `.scss` files unless they display static text < 3 lines.
+  - *Reason:* Maintainability and SoC.
+- **Standalone Components:** All components must be `standalone: true`.
 
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
