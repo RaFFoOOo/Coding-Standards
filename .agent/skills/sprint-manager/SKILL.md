@@ -13,7 +13,7 @@ This skill enables the Agent to act as a Technical Team Lead, interpreting high-
 When the User provides a Sprint Plan or User Story:
 1.  **Analyze:** Read the requirements and identify dependencies.
 2.  **Breakdown:** Decompose User Stories into technical **Tasks**.
-3.  **Validate:** Check if the requested Feature conflicts with existing `ARCHITECTURAL_CONSTITUTION.md` rules.
+3.  **Validate:** Check against the **Global Constitution** (in `GEMINI.md`) and **Project Rules** (e.g., `stack-angular.md`).
 4.  **Plan:** Update the `PLAN.md` artifact with the new tasks before writing any code.
 
 ## Critical Instruction
