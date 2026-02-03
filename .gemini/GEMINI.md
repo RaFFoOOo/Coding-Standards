@@ -15,6 +15,9 @@
   - `private`: For all internal logic.
 - **The "Clean Surface" Rule:** A public method acts as a gateway. It should validate inputs and delegate work to private methods. It must NOT call other public methods within the same instance.
 - **Zero Redundancy (DRY):** Never repeat logic. Extract to private methods or static utilities.
+- **Immutability Strategy:** - Variables that are not intended to change must be explicitly locked.
+  - Use `const` (JS/TS/C# locals) or `readonly` (C# fields) by default.
+  - Only use mutable variables (`let`, non-readonly fields) if the logic *explicitly* requires state modification.
 - **Method Size:** Optimize for readability. A method should fit on a standard screen (approx. 20-30 lines).
 
 ## 3. Reliability & Security
