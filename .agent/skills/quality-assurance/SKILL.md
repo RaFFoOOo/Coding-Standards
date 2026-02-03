@@ -21,11 +21,20 @@ This skill governs the verification, debugging, and usability auditing of the we
     -   Local/Session Storage.
     -   Angular Component State (if accessible via debug tools).
     -   Network Request/Response payload (if API related).
-3.  **Root Cause Analysis:** -   Map the stack trace line number to the actual source file.
+3.  **Root Cause Analysis:**
+    -   Map the stack trace line number to the actual source file.
     -   Cross-reference with the most recent changes in the Sprint.
 
-## 3. Usability & UX Verification Standards
+## 3. Navigation Test Confirmation (INTERACTIVE STEP)
 **Protocol:**
+Before proceeding to Usability Standards, ask the User:
+> "Do you want to proceed with a complete navigation and usability test for this task? (Yes/No)"
+
+-   **If NO:** Skip Section 4 and proceed immediately to Reporting.
+-   **If YES:** Execute Section 4 fully.
+
+## 4. Usability & UX Verification Standards (Conditional)
+**Protocol (Execute only if confirmed in Step 3):**
 1.  **Responsiveness Check:**
     -   Render page at **375px** (Mobile) and **1920px** (Desktop).
     -   *Verification:* Check for horizontal scrolling on mobile (Forbidden).
@@ -37,9 +46,10 @@ This skill governs the verification, debugging, and usability auditing of the we
     -   Verify the Font Family is strictly 'Montserrat' or 'Malone Clemettine Script'.
     -   Verify primary colors match `#79C1B0` or `#4A4A4A`.
 
-## 4. Reporting
+## 5. Reporting
 Generate a `QA_REPORT.md` in the artifact folder containing:
 -   [ ] Console Cleanliness Status.
--   [ ] Mobile Viewport Validation.
--   [ ] Desktop Viewport Validation.
+-   [ ] Navigation Test Status (Skipped/Passed).
+-   [ ] Mobile Viewport Validation (if tested).
+-   [ ] Desktop Viewport Validation (if tested).
 -   [ ] List of interaction paths tested.
