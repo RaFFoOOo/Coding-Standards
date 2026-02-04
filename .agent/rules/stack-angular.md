@@ -1,7 +1,8 @@
 # FRONTEND SPECIFICATIONS (Angular / TypeScript)
 
 ## 1. TypeScript Strictness
-- **Type Safety:** - `strict: true` is mandatory.
+- **Type Safety:**
+  - `strict: true` is mandatory.
   - **[ARCHITECT REQUIRED]** The `any` keyword is forbidden. If a type is unknown, use `unknown` and type-guard it, or create a `Generic<T>` interface.
 - **Interfaces:** Define explicit interfaces for all Input props (`@Input`), API responses, and Domain models.
 
@@ -38,6 +39,10 @@
 - **Styling:**
   - Use CSS Variables (`var(--primary-color)`) defined in a global file.
   - Never use `!important`. Fix the specificity hierarchy instead.
+- **Iconography:**
+  - **Strict Ban on Textual Icons:** Never use text characters (e.g., "x", "<", ">", "+") to represent UI controls or icons.
+  - **System Alignment:** Use a professional icon library aligned with the chosen Design System (e.g., FontAwesome, Material Icons, Bootstrap Icons).
+  - **Implementation:** Render icons using the framework's dedicated component (e.g., `<fa-icon>`, `<mat-icon>`) or optimized SVGs.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
