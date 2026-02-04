@@ -25,6 +25,10 @@
   - **Inline Templates/Styles forbidden:** Components must have separate `.html` and `.scss` files unless they display static text < 3 lines.
   - *Reason:* Maintainability and SoC.
 - **Standalone Components:** All components must be `standalone: true`.
+- **Template Purity:**
+  - **No Logic/Mutation in HTML:** Direct property assignment (e.g., `(click)="isOpen = false"`) or direct method calls on objects (e.g., `(mouseleave)="isOpen.set(false)"`) are forbidden.
+  - **Explicit Handlers:** All event bindings must invoke a dedicated public method in the component class (e.g., `(mouseleave)="onMouseLeave()"`).
+  - *Reason:* Enables proper debugging (breakpoints), unit testing of the handler logic, and clear separation of concerns.
 
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
