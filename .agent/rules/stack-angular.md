@@ -26,9 +26,12 @@
   - *Reason:* Maintainability and SoC.
 - **Standalone Components:** All components must be `standalone: true`.
 - **Template Purity:**
-  - **No Logic/Mutation in HTML:** Direct property assignment (e.g., `(click)="isOpen = false"`) or direct method calls on objects (e.g., `(mouseleave)="isOpen.set(false)"`) are forbidden.
-  - **Explicit Handlers:** All event bindings must invoke a dedicated public method in the component class (e.g., `(mouseleave)="onMouseLeave()"`).
-  - *Reason:* Enables proper debugging (breakpoints), unit testing of the handler logic, and clear separation of concerns.
+  - **No Inline Logic:** Direct property assignment or Signal mutation in templates is forbidden.
+    - ❌ `(click)="isOpen = false"` 
+    - ❌ `(click)="isOpen.set(false)"`
+  - **Explicit Handlers:** Always invoke a dedicated method that encapsulates the logic.
+    - ✅ `(click)="closeDropdown()"` where method contains `this.isOpen.set(false)`
+  - *Reason:* Enables debugging, testing, and clear separation of concerns.
 
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
