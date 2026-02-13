@@ -45,6 +45,9 @@
   - Use a centralized translation/label file (JSON or Constant Object) to separate content from structure.
 - **Styling:**
   - Use CSS Variables (`var(--primary-color)`) defined in a global file.
+  - **[BEST PRACTICE] Centralized Responsive Variables:** Layout constants (e.g., `--section-padding`, `--section-title-size`) must be defined globally and remapped within a global media query.
+    - *Component usage:* Use the context variable `var(--section-padding)` directly.
+    - *Benefit:* Avoids clashing/redundant media queries in feature-level SCSS files and maintains a DRY codebase.
   - Never use `!important`. Fix the specificity hierarchy instead.
 - **Iconography:**
   - **Strict Ban on Textual Icons:** Never use text characters (e.g., "x", "<", ">", "+") to represent UI controls or icons.

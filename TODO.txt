@@ -1,0 +1,4 @@
+- check warning in console while build
+- update lesson learned in rules/skills after each implementation
+- create workflows, enable git management
+- refactor all coding standards
