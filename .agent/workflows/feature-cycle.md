@@ -54,11 +54,13 @@ Execute each step sequentially for every Feature in the sprint.
 ## Documentation / Recursive Improvement
 14. Update `task.md` artifact: mark the Feature as `[x]`.
 15. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
+16. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 
 ## Deploy (optional)
-16. Ask the user: **"Would you like to deploy to Azure?"**
+17. Ask the user: **"Would you like to deploy to Azure?"**
     - If yes, execute the `/deploy-azure` workflow.
     - If no, skip and continue.
 
 ## Repeat
-17. Move to the next Feature and start from step 1.
+18. Move to the next Feature and start from step 1.
+
