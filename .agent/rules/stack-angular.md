@@ -61,3 +61,20 @@
   - Implement a global `HttpInterceptor` to catch errors.
   - Log errors to the console with specific "Reproduction Steps":
     `console.error("Context: [BookingForm]", "Input:", inputData, "Error:", error);`
+
+## 6. Memory Safety & Subscriptions
+- **Automatic Cleanup:** Use `takeUntilDestroyed()` on all manual RxJS subscriptions.
+- **Declarative over Imperative:** Always prefer the `async` pipe or the `toSignal()` function over manually calling `.subscribe()`.
+- **Subscription Ban:** It is strictly forbidden to use `.subscribe()` without an explicit cleanup strategy (e.g. `takeUntilDestroyed`, `DestroyRef`, or async pipe).
+
+## 7. Reactive State Management
+- **Local State:** Use `signal()` for all mutable component local state.
+- **Derived State:** Use `computed()` for values derived from other signals.
+- **Side Effects:** Use `effect()` strictly for side-effects (e.g., syncing to local storage, logging, external DOM manipulation) and never for state derivation.
+- **Component API:** Use `input()`, `output()`, and `model()` for component communication.
+- **Derived overrides:** Use `linkedSignal()` when you need state that is derived from props/inputs but can also be explicitly overridden by the user.
+
+## 8. File & Folder Structure
+- **Feature Modules:** Organize code by business feature rather than technical type (e.g., `features/auth/` containing its own components, services, models).
+- **Naming Convention:** All Angular files must follow standard `kebab-case` naming (e.g., `user-profile.component.ts`).
+- **Barrel Exports:** Use `index.ts` files inside feature folders to explicitly expose only the public API of that feature, preventing deep imports.

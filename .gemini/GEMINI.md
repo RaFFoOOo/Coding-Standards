@@ -24,7 +24,7 @@
 - **Zero Redundancy (DRY):** Never repeat logic. Extract to private methods or static utilities.
 - **Immutability Strategy:**
   - Variables that are not intended to change must be explicitly locked.
-  - Use `const` (JS/TS/C# locals) or `readonly` (C# fields) by default.
+  - Use the strongest immutability construct available in the language by default.
 - **Modernity & Efficiency:**
   - **Deprecation Zero-Tolerance:** Never use deprecated methods or libraries. Check the latest LTS documentation before implementation.
   - **Standard-Compliant Performance:** Always prefer the native, modern idiom over legacy workarounds (e.g., use `Span<T>` in C# for slicing, use `Signals` in Angular for reactivity where appropriate). Maximize efficiency using the language's latest standard features.
@@ -41,3 +41,24 @@
   - **STOP** the agent/process immediately using `terminate`.
   - **Analyze** the last few lines of terminal output to find the root cause (e.g., network timeout, lockfile contention).
   - Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
+
+## 5. Naming Conventions
+- **PascalCase:** For Classes, Interfaces, Types, and Enums.
+- **camelCase:** For Methods, Variables, and Parameters.
+- **UPPER_SNAKE_CASE:** For global Constants.
+- **File Naming:** Delegated to stack-specific rules (e.g., `kebab-case` for Angular).
+
+## 6. Documentation Policy
+- **Public APIs:** All public methods MUST have formal doc-comments (JSDoc/XMLDoc) explaining their purpose, parameters, and return types.
+- **Private Logic:** Only comment if the logic is non-obvious or contains a complex algorithm. Code must primarily be self-documenting through clear naming.
+- **TODOs:** Any `TODO` comment must include a reference to a ticket, issue, or specific context (e.g., `TODO [Auth-123]: ...`).
+
+## 7. Dependency Governance
+- **Native over Third-Party:** Prefer standard language features over bringing in external dependencies.
+- **Justification:** Every new dependency requires explicit justification and comparison against an alternative.
+- **Security & Activity:** Do NOT use dependencies that have known critical CVEs or have not seen a release in >1 year.
+
+## 8. Git Conventions
+- **Branch Naming:** Branches must be prefixed logically (e.g., `feature/`, `bugfix/`, `refactor/`, `chore/`).
+- **Conventional Commits:** Commit messages must follow the format `type(scope): description` (e.g., `feat(auth): add login form`).
+- **PR Process:** Direct commits to `main` or `develop` are forbidden. All work must be merged via Pull Requests.
