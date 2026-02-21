@@ -42,9 +42,9 @@ Before proceeding to Usability Standards, ask the User:
 2.  **Interaction Integrity:**
     -   Click every interactive element (Buttons, Links, Inputs) created in the current Feature.
     -   Verify "Active" and "Hover" states provide visual feedback.
-3.  **"Cementine" Aesthetic Check:**
-    -   Verify the Font Family is strictly 'Montserrat' or 'Malone Clemettine Script'.
-    -   Verify primary colors match `#79C1B0` or `#4A4A4A`.
+3.  **Design System Compliance:**
+    -   Verify the Font Family aligns strictly with the defined Project Design Tokens.
+    -   Verify primary colors match the defined CSS variables or design constants.
 
 ## 5. Reporting
 Generate a `QA_REPORT.md` in the artifact folder containing:

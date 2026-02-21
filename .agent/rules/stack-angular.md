@@ -4,11 +4,11 @@
 - **Type Safety:**
   - `strict: true` is mandatory.
   - **[ARCHITECT REQUIRED]** The `any` keyword is forbidden. If a type is unknown, use `unknown` and type-guard it, or create a `Generic<T>` interface.
-- **Interfaces:** Define explicit interfaces for all Input props (`@Input`), API responses, and Domain models.
+- **Interfaces:** Define explicit interfaces for all input properties (`input()`), API responses, and Domain models.
 
 ## 2. Component Architecture (The "Building Block" Strategy)
 - **Smart vs. Dumb Components:**
-  - **Dumb (Presentation):** Receive data via `@Input`, emit actions via `@Output`. No dependency on API Services.
+  - **Dumb (Presentation):** Receive data via `input()` / `model()`, emit actions via `output()`. No dependency on API Services.
   - **Smart (Container):** Orchestrate data fetching and pass it down to Dumb components.
 - **Config-Driven UI:**
   - Complex components (Tables, Forms) must accept a `Config` object (e.g., `TableColumnDefinition[]`) rather than hardcoded HTML structures.
@@ -18,6 +18,8 @@
 - **Visual Performance:** Avoid Layout thrashing. Use `CSS` transitions instead of JS animations where possible.
 
 ## 2a. Modern Angular Standards [STRICT]
+- **Dependency Injection:**
+  - **MUST** use the `inject()` function instead of constructor injection for all services and tokens.
 - **Control Flow:**
   - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
   - *Reason:* Better type checking, performance, and readability.
