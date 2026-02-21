@@ -27,6 +27,29 @@ Execute each step sequentially for every Feature in the sprint.
 11. Then commit: `git commit -m "feat(feature-name): description"` from the project root.
 12. Push branch to remote: `git push -u origin feature/[name]`
 13. Create a Pull Request (PR) for the feature.
+    - **Description Requirements**:
+        - **Summary**: Brief overview of the implementations and changes.
+        - **Lessons Learned**: Any insights or technical hurdles overcome.
+        - **Warnings/Pending Actions**: Critical notes for reviewers or future tasks.
+    - **Primary Approach (gh CLI) [RECOMMENDED]**:
+        - Use the following command:
+        ```bash
+        gh pr create --title "feat(scope): your title" --body "Your detailed description following requirements"
+        ```
+    - **Fallback Approach (curl)**:
+        - If `gh` is unavailable or authentication fails, use the GitHub REST API:
+        ```bash
+        curl -X POST \
+          -H "Authorization: token YOUR_GITHUB_PAT" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/RaFFoOOo/Coding-Standards/pulls \
+          -d '{
+            "title": "feat(scope): your title",
+            "body": "Your detailed description following requirements",
+            "head": "feature/your-branch-name",
+            "base": "main"
+          }'
+        ```
 
 ## Documentation
 14. Update `task.md` artifact: mark the Feature as `[x]`.
