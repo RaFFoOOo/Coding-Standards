@@ -42,9 +42,9 @@ Before proceeding to Usability Standards, ask the User:
 2.  **Interaction Integrity:**
     -   Click every interactive element (Buttons, Links, Inputs) created in the current Feature.
     -   Verify "Active" and "Hover" states provide visual feedback.
-3.  **"Cementine" Aesthetic Check:**
-    -   Verify the Font Family is strictly 'Montserrat' or 'Malone Clemettine Script'.
-    -   Verify primary colors match `#79C1B0` or `#4A4A4A`.
+3.  **Design System Compliance:**
+    -   Verify the Font Family aligns strictly with the defined Project Design Tokens.
+    -   Verify primary colors match the defined CSS variables or design constants.
 
 ## 5. Reporting
 Generate a `QA_REPORT.md` in the artifact folder containing:
@@ -53,3 +53,17 @@ Generate a `QA_REPORT.md` in the artifact folder containing:
 -   [ ] Mobile Viewport Validation (if tested).
 -   [ ] Desktop Viewport Validation (if tested).
 -   [ ] List of interaction paths tested.
+
+## 6. Backend Verification (If Applicable)
+-   **API Responses:** Verify all implemented API endpoints return the expected HTTP 2xx or HTTP 4xx (handled properly) status codes.
+-   **Payload Validation:** Verify JSON payloads for structure and missing fields.
+-   **Error Formats:** Ensure expected Domain Exceptions map precisely to standard ProblemDetails or the standard API envelope.
+
+## 7. Accessibility Baseline (a11y)
+-   **Color Contrast:** Text and interactive elements must have sufficient contrast.
+-   **Keyboard Navigation:** Verify that it is possible to tab through all newly created interactive elements and that they have visible focus states.
+-   **Semantic HTML & ARIA:** Verify that appropriate HTML5 elements are used (nav, main, article) and ARIA labels exist on pure icon buttons.
+
+## 8. Performance Budget
+-   **Bundle Size:** Ensure no unexpected large third-party dependencies were leaked into the frontend bundle.
+-   **Lighthouse Target:** Any new page must visually target a Lighthouse Performance score > 90 on Desktop.

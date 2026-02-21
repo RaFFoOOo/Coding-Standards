@@ -1,5 +1,0 @@
-- check warning in console while build
-- update lesson learned in rules/skills after each implementation
-- create workflows, enable git management (checkout new branches, commit, PRs)
-- refactor all coding standards
-- avoid memory leaks, unsubscribed observables, closures etc. in Angular code

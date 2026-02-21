@@ -12,13 +12,15 @@ This skill enables the Agent to act as a Technical Team Lead, interpreting high-
 ## Operating Procedure
 When the User provides a Sprint Plan or User Story:
 1.  **Analyze:** Read the requirements and identify dependencies.
-2.  **Breakdown:** Decompose User Stories into technical **Tasks**.
+2.  **Breakdown & Estimate:** Decompose User Stories into technical **Tasks**.
+    - **Complexity Tags:** Tag each task in `PLAN.md` with an estimation size (`[S]`, `[M]`, `[L]`, `[XL]`).
+    - **Priority & Ordering:** Order the tasks in a strict Dependency-First sequence (e.g., Schema -> API -> Service -> UI).
 3.  **Visualize (The "Mockup Gate"):**
     - For any UI/Frontend task, you **MUST** use the `generate_image` tool to create a high-fidelity visual representation of the expected output.
     - The prompt for the image verification must include specific details about:
         - Layout structure (Grid, Flex, Sidebar, etc.).
-        - "Cementine" color palette (`#79C1B0`, etc.).
-        - Typography (`Montserrat`, Script fonts).
+        - Color palette defined in the project's Design System.
+        - Typography according to project standards.
     - Save the generated image as an artifact and embed it in `implementation_plan.md`.
 4.  **Validate:** Check dependencies against the **Global Constitution** (in `GEMINI.md`) and **Project Rules** (e.g., `stack-angular.md`).
 5.  **Plan:** Update the `PLAN.md` artifact with the new tasks only *after* the Visual Mockup is approved.

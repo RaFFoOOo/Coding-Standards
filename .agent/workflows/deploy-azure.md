@@ -14,27 +14,37 @@ This workflow builds the Angular app for production and uploads it to the Azure 
 
 // turbo
 1. Verify that `.env.deploy` exists:
-```powershell
-if (-not (Test-Path "r:\Projects\le-cementine\.env.deploy")) { Write-Error "Missing .env.deploy — create it with AZURE_STORAGE_SAS_URL"; exit 1 }
+```bash
+if [ ! -f "./.env.deploy" ]; then
+  echo "Error: Missing .env.deploy — create it with AZURE_STORAGE_SAS_URL"
+  exit 1
+fi
 ```
 
 // turbo
 2. Load the SAS URL from `.env.deploy`:
-```powershell
-$sasUrl = (Get-Content "r:\Projects\le-cementine\.env.deploy" | Where-Object { $_ -match "^AZURE_STORAGE_SAS_URL=" }) -replace "^AZURE_STORAGE_SAS_URL=", ""
+```bash
+export SAS_URL=$(grep "^AZURE_STORAGE_SAS_URL=" ./.env.deploy | cut -d '=' -f2-)
 ```
 
 // turbo
 3. Build the application for production:
-```powershell
+```bash
 npx ng build --configuration production
 ```
-Run from `r:\Projects\le-cementine\lc-webapp`.
+Run this step from the root application directory.
 
-4. Upload `dist/lc-webapp/browser` to Azure using `azcopy sync`:
-```powershell
-azcopy sync "r:\Projects\le-cementine\lc-webapp\dist\lc-webapp\browser" "$sasUrl" --delete-destination=true
+4. Upload `dist/` output to Azure using `azcopy sync`:
+```bash
+azcopy sync "./dist/browser" "$SAS_URL" --delete-destination=true
 ```
-This syncs the build output to the `$web` container, removing any files in the destination that are no longer in the source.
+*(Note: update `./dist/browser` if your build output path differs).*
 
-5. Verify. The site should be available at the Azure static website URL. Ask the user to confirm deployment.
+5. Verify: The site should be available at the Azure static website URL. Execute a basic health check:
+```bash
+curl -I https://YOUR_STORAGE_ACCOUNT.z1.web.core.windows.net/ | grep "HTTP/1.1 200 OK"
+```
+*(Replace the URL with the actual project static website endpoint).* Ask the user to confirm deployment.
+
+## Rollback Plan
+If deployment fails or the health check does not pass, you can rollback by deploying the previous build artifact if available, or reverting the latest code changes and re-running this workflow.
