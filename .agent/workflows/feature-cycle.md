@@ -51,9 +51,9 @@ Execute each step sequentially for every Feature in the sprint.
           }'
         ```
 
-## Documentation
+## Documentation / Recursive Improvement
 14. Update `task.md` artifact: mark the Feature as `[x]`.
-15. If new patterns or best practices were discovered, update the stack rules or create new rules/skills.
+15. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
 
 ## Deploy (optional)
 16. Ask the user: **"Would you like to deploy to Azure?"**

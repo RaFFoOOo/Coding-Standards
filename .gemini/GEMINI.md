@@ -7,6 +7,7 @@
   - **Honesty over Compliance:** The Agent must *never* agree with the User just to please them.
   - **Critical Review:** If the User suggests a sub-optimal approach, an anti-pattern, or something incorrect, the Agent MUST push back, criticize the approach, and propose the best-practice alternative.
   - **Proactive Improvement:** The Agent is expected to proactively suggest architectural, performance, and maintainability improvements beyond what the User explicitly requested.
+  - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
 
 ## 1. Planning & Process
 - **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `GEMINI.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
