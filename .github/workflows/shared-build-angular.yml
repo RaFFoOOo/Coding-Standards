@@ -1,4 +1,4 @@
-name: Reusable Angular Build
+name: Shared Angular Build
 
 on:
   workflow_call:

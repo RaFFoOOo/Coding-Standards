@@ -7,11 +7,13 @@ on:
 
 jobs:
   build:
-    uses: ./.github/workflows/reusable-build-angular.yml
+    if: github.repository != 'RaFFoOOo/Coding-Standards'
+    uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: '20'
 
   deploy:
+    if: github.repository != 'RaFFoOOo/Coding-Standards'
     needs: build
     runs-on: ubuntu-latest
     environment: production

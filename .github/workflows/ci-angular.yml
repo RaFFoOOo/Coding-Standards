@@ -10,6 +10,7 @@ on:
 
 jobs:
   validate-build:
-    uses: ./.github/workflows/reusable-build-angular.yml
+    if: github.repository != 'RaFFoOOo/Coding-Standards'
+    uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: '20'

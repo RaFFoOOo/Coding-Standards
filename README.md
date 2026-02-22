@@ -20,7 +20,7 @@ The most important configurations do not live in standard project files, but ins
 | `.github/workflows/` | **CI/CD Pipelines.** Automated build, test, and deployment definitions using GitHub Actions. |
 
 ## 🚀 CI/CD Pipelines Overview
-This repository uses a **"build once, deploy multiple"** methodology using GitHub Reusable Workflows. All pipelines are YAML-based and deeply parameterized so they remain portable across different projects.
+This repository uses a **"build once, deploy multiple"** methodology using GitHub Shared Workflows. All pipelines are YAML-based and deeply parameterized so they remain portable across different projects.
 
 ### Active Pipelines
 1. **CI - Angular Build Validations (`ci-angular.yml`)**
