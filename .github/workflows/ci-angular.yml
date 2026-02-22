@@ -1,0 +1,15 @@
+name: CI - Angular Build Validations
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-build:
+    uses: ./.github/workflows/reusable-build-angular.yml
+    with:
+      node-version: '20'

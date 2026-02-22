@@ -1,0 +1,30 @@
+name: CD - Deploy Angular to Azure Storage
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build-angular.yml
+    with:
+      node-version: '20'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: angular-build-output
+          path: ./dist
+
+      - name: Deploy to Azure Blob Storage
+        env:
+          SAS_URL: ${{ secrets.AZURE_STORAGE_SAS_URL }}
+        run: |
+          # The azcopy tool is pre-installed on the ubuntu-latest runner
+          azcopy sync "./dist/browser" "$SAS_URL" --delete-destination=true
