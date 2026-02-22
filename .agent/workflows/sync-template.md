@@ -1,50 +1,46 @@
 ---
-description: Synchronize the Coding-Standards templates to a target project repository
+description: Synchronize the Coding-Standards templates into the current project repository (Pull Model)
 ---
 # Template Synchronization Workflow
 
-This workflow automates the process of copying the master configurations, rules, skills, and CI/CD pipelines from the central `Coding-Standards` repository into another project repository. It uses a state file (`.agent/sync-state.json`) in the target repository to remember which files the user explicitly excluded in previous syncs.
+This workflow automates the process of pulling standard configurations, rules, skills, and CI/CD pipelines from the central `Coding-Standards` repository into the **current** repository. It leverages the standard `feature-cycle.md` steps and maintains a local `.agent/sync-state.json` file to remember explicit exclusions.
 
 ## Prerequisites
-Ensure there are no uncommitted changes in the `Coding-Standards` repository before beginning.
+- This workflow must be executed from **inside the target project repository**.
+- For the very first execution in a new project, this file (`.agent/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
-## Configuration & Target Identification
+## Execution Sequence
 
-1. **Ask for Target Project:** Ask the user: "Please provide the absolute path to the target project repository where you want to apply the standards."
-2. **Validate Target Path:** Ensure the path exists and is a valid directory.
-3. **Global Rules Sync:** Ask the user: "Do you want to update the global `GEMINI.md` file in your standard `~/.gemini/` directory?"
-    - If yes, execute: `cp /home/raffoooo/Projects/Coding-Standards/.gemini/GEMINI.md ~/.gemini/GEMINI.md`
-    - *(Note: Ensure paths are accurate based on the user's OS and home directory).*
+1. **Invoke Feature Cycle Validation:**
+    - Run `gh pr list`. If there are any open, unmerged PRs in the current repository, **STOP and warn the user**.
+    - If clear, checkout a new branch: `git checkout -b chore/sync-standards`
 
-## State Management and Diffing
+2. **Identify Source:**
+    - Ask the user: "Please provide the absolute path to your local `Coding-Standards` repository."
+    - Verify the provided path contains the `.agent/` and `.gemini/` directories.
 
-4. **Load Exclusion State:** In the target project repository, look for the file `.agent/sync-state.json`.
-    - If it exists, read its contents. It should contain an array of relative file paths that the user previously chose to `[SKIP]`.
-    - If it does not exist, assume the exclusion list is empty.
+3. **Global Rules Sync:**
+    - Ask the user: "Do you want to update your global `~/.gemini/GEMINI.md` file using the latest version from your standards repository?"
+    - If yes: Execute the copy command from the user-provided Coding-Standards `.gemini/GEMINI.md` to `~/.gemini/GEMINI.md`.
 
-5. **Compare Repositories:** Use terminal commands (e.g., recursive `fd` or `find`) to identify all relevant standards files in the `Coding-Standards` repository. Relevant files are everything inside:
-    - `.agent/` (excluding `workflows/deploy-azure.md` if unnecessary, but default to all)
-    - `.github/workflows/`
-    - `README.md`
-    - `.gemini/` (if targeting a project-level override, though usually global)
+4. **Load Local State:**
+    - Look for `./.agent/sync-state.json` in the current repository.
+    - If it exists, read the array of paths under the `skipList` key. These files must be completely ignored during the diff/sync phase.
 
-    Compare these files against the target repository structure, paying close attention to the paths loaded in the exclusion list from Step 4.
+5. **Diff & Plan Review:**
+    - Recursively compare the contents of the *Source* repository (`.agent/`, `.github/`, `README.md`) against the current *Target* repository.
+    - Filter out any files present in the `skipList`.
+    - Present a categorization to the user:
+        - `[ADD]`: Standard file missing in current repo.
+        - `[MODIFY]`: Current file differs from the standard.
+        - `[SKIP]`: Skipped due to `.agent/sync-state.json`.
+    - Ask the user: "Do you approve this synchronization plan? Respond 'yes' to proceed, or list specific files to add to the `[SKIP]` list permanently."
+        - If new skills provided: update internal list, recalculate, repeat Review.
 
-## Review and Approval
+6. **Execution:**
+    - For all `[ADD]` and `[MODIFY]` files, copy them from the *Source* repository into the exact corresponding relative path in the *Current* repository (using `mkdir -p` where needed).
+    - Write the final, approved array of skipped relative paths securely to `./.agent/sync-state.json`.
 
-6. **Present Synchronisation Plan:** Display a categorized list to the user showing what will happen to each file:
-    - `[ADD]`: New standard file missing in the target.
-    - `[MODIFY]`: Existing file in target differs from the standard.
-    - `[SKIP]`: File is ignored because it is listed in the `.agent/sync-state.json` exclusion list.
-
-7. **Ask for User Feedback:** Ask the user: "Do you approve this synchronization plan? You can reply with 'yes' to proceed, or you can list specific files you want to add to the `[SKIP]` list to ignore them permanently."
-    - If the user provides new files to skip, update the internal exclusion list, recalculate the plan, and repeat Step 6.
-
-## Execution
-
-8. **Execute Synchronization:** For every file marked as `[ADD]` or `[MODIFY]`, copy the file from the `Coding-Standards` repository to the exact corresponding path in the target repository. Use `mkdir -p` to create any necessary parent directories in the target.
-9. **Save Exclusion State:** Write the final, approved array of excluded relative paths back to the `.agent/sync-state.json` file in the target repository. This guarantees that `[SKIP]` preferences are remembered for the next execution.
-
-## Finalization
-
-10. **Confirm Success:** Inform the user that the synchronization was successful, summarizing how many files were copied. Point out that the target repository now has an updated `.agent/sync-state.json` tracking their preferences.
+7. **Finalization:**
+    - Commit all staged additions and modifications (including `sync-state.json`) with the message `chore(standards): sync template updates`.
+    - Push the branch and instruct the user to open a Pull Request to merge the updated standards.
