@@ -1,0 +1,16 @@
+name: CI - Angular Build Validations
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-build:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    uses: ./.github/workflows/shared-build-angular.yml
+    with:
+      node-version: ${{ vars.NODE_VERSION || '20' }}

@@ -7,11 +7,12 @@ description: Standard workflow for implementing a feature from PLAN.md
 Execute each step sequentially for every Feature in the sprint.
 
 ## Pre-Flight
-1. Read the Feature tasks from the project `PLAN.md`.
-2. Mark the Feature and its first task as `[/]` in `PLAN.md`.
-3. Checkout a new feature branch: `git checkout -b feature/[name]`
-4. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
-5. Read rules: `.agent/rules/stack-angular.md` and `GEMINI.md` (user global rules).
+1. **Open PR Check**: Run `gh pr list`. If there are any open, unmerged PRs, **STOP and warn the user** before starting a new feature.
+2. Read the Feature tasks from the project `PLAN.md`.
+3. Mark the Feature and its first task as `[/]` in `PLAN.md`.
+4. Checkout a new feature branch: `git checkout -b feature/[name]`
+5. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
+6. Read rules: `.agent/rules/stack-angular.md` and `GEMINI.md` (user global rules).
 
 ## Implementation Loop (per task)
 // turbo-all
@@ -52,15 +53,14 @@ Execute each step sequentially for every Feature in the sprint.
         ```
 
 ## Documentation / Recursive Improvement
-14. Update `task.md` artifact: mark the Feature as `[x]`.
-15. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
-16. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
+15. Update `task.md` artifact: mark the Feature as `[x]`.
+16. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
+17. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
+18. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 
-## Deploy (optional)
-17. Ask the user: **"Would you like to deploy to Azure?"**
-    - If yes, execute the `/deploy-azure` workflow.
-    - If no, skip and continue.
+## Deploy (Automated)
+19. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**
 
 ## Repeat
-18. Move to the next Feature and start from step 1.
+20. Move to the next Feature and start from step 1.
 
