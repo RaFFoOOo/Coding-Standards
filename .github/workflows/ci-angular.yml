@@ -13,4 +13,4 @@ jobs:
     if: github.repository != 'RaFFoOOo/Coding-Standards'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
-      node-version: '20'
+      node-version: ${{ vars.NODE_VERSION || '20' }}

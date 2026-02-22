@@ -38,10 +38,11 @@ Because the pipelines are designed to be environment-agnostic, **all secrets and
 Ensure you have created the following **Environments** in your GitHub repository settings:
 - `production`
 
-#### Secrets Map
-| Secret Name | Level | Required For | Description |
-| ----------- | ----- | ------------ | ----------- |
-| `AZURE_STORAGE_SAS_URL` | Repository OR Environment | `cd-angular-azure-storage.yml` | The full SAS URL of the Azure Blob Storage `$web` container, including the token (e.g., `https://<account>.blob.core.windows.net/$web?<token>`). Used by `azcopy` for syncing the `dist/` folder. |
+#### Secrets and Variables Map
+| Name | Type | Level | Required For | Description |
+| ---- | ---- | ----- | ------------ | ----------- |
+| `NODE_VERSION` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The Node.js version to use for the build (e.g., `20` or `22.x`). Defaults to `20` if completely omitted, ensuring backend stability. |
+| `AZURE_STORAGE_SAS_URL` | Secret | Environment | `cd-angular-azure-storage.yml` | The full SAS URL of the Azure Blob Storage `$web` container, including the token (e.g., `https://<account>.blob.core.windows.net/$web?<token>`). Used by `azcopy` for syncing the `dist/` folder. |
 
 ## 🔄 Updating this Documentation
 As part of the `feature-cycle.md` workflow, the Agent is mandated to keep this `README.md` updated. If you add a new pipeline, a new secret, or a major new rule category, this file will be updated synchronously to reflect the new state of our templates.
