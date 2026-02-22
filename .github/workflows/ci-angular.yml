@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate-build:
-    if: github.repository != 'RaFFoOOo/Coding-Standards'
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: ${{ vars.NODE_VERSION || '20' }}

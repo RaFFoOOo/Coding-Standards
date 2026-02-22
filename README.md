@@ -41,6 +41,7 @@ Ensure you have created the following **Environments** in your GitHub repository
 #### Secrets and Variables Map
 | Name | Type | Level | Required For | Description |
 | ---- | ---- | ----- | ------------ | ----------- |
+| `DISABLE_PIPELINES_FOR_TEMPLATE` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | If set to `true`, completely disables the GitHub Actions. Used by the source template repository to prevent unnecessary billing while remaining fully active for any project it is copied to. |
 | `NODE_VERSION` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The Node.js version to use for the build (e.g., `20` or `22.x`). Defaults to `20` if completely omitted, ensuring backend stability. |
 | `AZURE_STORAGE_SAS_URL` | Secret | Environment | `cd-angular-azure-storage.yml` | The full SAS URL of the Azure Blob Storage `$web` container, including the token (e.g., `https://<account>.blob.core.windows.net/$web?<token>`). Used by `azcopy` for syncing the `dist/` folder. |
 
