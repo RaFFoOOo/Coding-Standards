@@ -6,7 +6,7 @@ description: Synchronize the Coding-Standards templates into the current project
 This workflow automates the process of pulling standard configurations, rules, skills, and CI/CD pipelines from the central `Coding-Standards` repository into the **current** repository. It leverages the standard `feature-cycle.md` steps and maintains a local `.agent/sync-state.json` file to remember explicit exclusions.
 
 ## Prerequisites
-- This workflow must be executed from **inside the target project repository**.
+- This workflow must be executed from **the root directory of the target project repository** (verify with `git rev-parse --show-toplevel`).
 - For the very first execution in a new project, this file (`.agent/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
@@ -28,7 +28,7 @@ This workflow automates the process of pulling standard configurations, rules, s
     - If it exists, read the array of paths under the `skipList` key. These files must be completely ignored during the diff/sync phase.
 
 5. **Diff & Plan Review:**
-    - Recursively compare the contents of the *Source* repository (`.agent/`, `.github/`, `README.md`) against the current *Target* repository.
+    - Recursively compare the contents of the *Source* repository (`.agent/`, `.github/`) against the current *Target* repository root.
     - Filter out any files present in the `skipList`.
     - Present a categorization to the user:
         - `[ADD]`: Standard file missing in current repo.
