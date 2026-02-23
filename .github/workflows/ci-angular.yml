@@ -14,4 +14,4 @@ jobs:
     uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: ${{ vars.NODE_VERSION || '20' }}
-      working-directory: ${{ vars.WORKING_DIRECTORY || '.' }}
+      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
