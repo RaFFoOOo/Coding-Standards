@@ -46,5 +46,13 @@ curl -I https://YOUR_STORAGE_ACCOUNT.z1.web.core.windows.net/ | grep "HTTP/1.1 2
 ```
 *(Replace the URL with the actual project static website endpoint).* Ask the user to confirm deployment.
 
+// turbo
+6. Create and push a production release tag:
+```bash
+TAG_NAME="prod-$(date +'%Y%m%d-%H%M')"
+git tag "$TAG_NAME"
+git push origin "$TAG_NAME"
+```
+
 ## Rollback Plan
 If deployment fails or the health check does not pass, you can rollback by deploying the previous build artifact if available, or reverting the latest code changes and re-running this workflow.

@@ -18,7 +18,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: write
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
@@ -31,3 +36,11 @@ jobs:
         run: |
           # The azcopy tool is pre-installed on the ubuntu-latest runner
           azcopy sync "./dist/browser" "$SAS_URL" --delete-destination=true
+
+      - name: Create and Push Release Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG_NAME="prod-$(date +'%Y%m%d-%H%M')"
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
