@@ -34,8 +34,17 @@ jobs:
         env:
           SAS_URL: ${{ secrets.AZURE_STORAGE_SAS_URL }}
         run: |
+          # Use the repository variable to route to the correct artifact subdirectory
+          if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
+            BROWSER_DIR="./dist/${{ vars.ANGULAR_WORKING_DIRECTORY }}/browser"
+          else
+            BROWSER_DIR="./dist/browser"
+          fi
+          
+          echo "Syncing from directory: $BROWSER_DIR"
+          
           # The azcopy tool is pre-installed on the ubuntu-latest runner
-          azcopy sync "./dist/browser" "$SAS_URL" --delete-destination=true
+          azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
 
       - name: Create and Push Release Tag
         run: |

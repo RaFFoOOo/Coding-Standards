@@ -36,9 +36,14 @@ Run this step from the root application directory.
 
 4. Upload `dist/` output to Azure using `azcopy sync`:
 ```bash
-azcopy sync "./dist/browser" "$SAS_URL" --delete-destination=true
+if [ -n "$ANGULAR_WORKING_DIRECTORY" ] && [ "$ANGULAR_WORKING_DIRECTORY" != "." ]; then
+  BROWSER_DIR="./dist/$ANGULAR_WORKING_DIRECTORY/browser"
+else
+  BROWSER_DIR="./dist/browser"
+fi
+
+azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
 ```
-*(Note: update `./dist/browser` if your build output path differs).*
 
 5. Verify: The site should be available at the Azure static website URL. Execute a basic health check:
 ```bash
