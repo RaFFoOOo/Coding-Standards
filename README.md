@@ -27,7 +27,7 @@ This repository uses a **"build once, deploy multiple"** methodology using GitHu
    - **Trigger:** Push to `feature/**` branches, or Pull Requests against `main`.
    - **Purpose:** Compiles the application and asserts baseline integrity before a merge is allowed. It halts bad code at the PR boundary.
 2. **CD - Deploy Angular to Azure Storage (`cd-angular-azure-storage.yml`)**
-   - **Trigger:** Push to `main` (typically a merged PR).
+   - **Trigger:** Manual execution (`workflow_dispatch`) from any branch (typically `main` or `feature/**`).
    - **Target Environment:** `production`
    - **Purpose:** Downloads the verified build artifacts from the unified build step and deploys them to an Azure Blob Storage Static Website.
 
