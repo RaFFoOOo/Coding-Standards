@@ -29,6 +29,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -47,12 +48,22 @@ jobs:
         run: npm ci
 
       - name: Replace Environment Tokens
+        env:
+          BLOB_URL: ${{ secrets.AZURE_STORAGE_BASE_URL }}
+          IMG_PATH: ${{ secrets.AZURE_STORAGE_IMG_BASE_PATH }}
+          SAS_TOKEN: ${{ secrets.AZURE_STORAGE_IMG_SAS_TOKEN }}
         run: |
           ENV_FILE="src/environments/environment.${{ inputs.environment }}.ts"
           if [ -f "$ENV_FILE" ]; then
-            sed -i "s|__AZURE_STORAGE_BASE_URL__|${{ secrets.AZURE_STORAGE_BASE_URL }}|g" "$ENV_FILE"
-            sed -i "s|__AZURE_STORAGE_IMG_BASE_PATH__|${{ secrets.AZURE_STORAGE_IMG_BASE_PATH }}|g" "$ENV_FILE"
-            sed -i "s|__AZURE_STORAGE_IMG_SAS_TOKEN__|${{ secrets.AZURE_STORAGE_IMG_SAS_TOKEN }}|g" "$ENV_FILE"
+            node -e "
+              const fs = require('fs');
+              const file = '$ENV_FILE';
+              let content = fs.readFileSync(file, 'utf8');
+              content = content.replace('__AZURE_STORAGE_BASE_URL__', process.env.BLOB_URL || '');
+              content = content.replace('__AZURE_STORAGE_IMG_BASE_PATH__', process.env.IMG_PATH || '');
+              content = content.replace('__AZURE_STORAGE_IMG_SAS_TOKEN__', process.env.SAS_TOKEN || '');
+              fs.writeFileSync(file, content);
+            "
           else
             echo "Environment file not found at $ENV_FILE"
             exit 1

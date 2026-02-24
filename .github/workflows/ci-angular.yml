@@ -15,7 +15,5 @@ jobs:
     with:
       node-version: ${{ vars.NODE_VERSION || '20' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
-    secrets:
-      AZURE_STORAGE_BASE_URL: ${{ secrets.AZURE_STORAGE_BASE_URL }}
-      AZURE_STORAGE_IMG_BASE_PATH: ${{ secrets.AZURE_STORAGE_IMG_BASE_PATH }}
-      AZURE_STORAGE_IMG_SAS_TOKEN: ${{ secrets.AZURE_STORAGE_IMG_SAS_TOKEN }}
+      environment: development
+    secrets: inherit
