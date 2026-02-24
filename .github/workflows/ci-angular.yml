@@ -15,3 +15,5 @@ jobs:
     with:
       node-version: ${{ vars.NODE_VERSION || '20' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
+      environment: development
+    secrets: inherit
