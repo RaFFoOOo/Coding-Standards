@@ -13,6 +13,18 @@ on:
         required: false
         type: string
         default: '.'
+      environment:
+        description: 'Angular environment configuration to build (e.g., production, development)'
+        required: false
+        type: string
+        default: 'production'
+    secrets:
+      AZURE_STORAGE_BASE_URL:
+        required: false
+      AZURE_STORAGE_IMG_BASE_PATH:
+        required: false
+      AZURE_STORAGE_IMG_SAS_TOKEN:
+        required: false
 
 jobs:
   build:
@@ -34,8 +46,20 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Replace Environment Tokens
+        run: |
+          ENV_FILE="src/environments/environment.${{ inputs.environment }}.ts"
+          if [ -f "$ENV_FILE" ]; then
+            sed -i "s|__AZURE_STORAGE_BASE_URL__|${{ secrets.AZURE_STORAGE_BASE_URL }}|g" "$ENV_FILE"
+            sed -i "s|__AZURE_STORAGE_IMG_BASE_PATH__|${{ secrets.AZURE_STORAGE_IMG_BASE_PATH }}|g" "$ENV_FILE"
+            sed -i "s|__AZURE_STORAGE_IMG_SAS_TOKEN__|${{ secrets.AZURE_STORAGE_IMG_SAS_TOKEN }}|g" "$ENV_FILE"
+          else
+            echo "Environment file not found at $ENV_FILE"
+            exit 1
+          fi
+
       - name: Build Application
-        run: npm run build
+        run: npm run build -- --configuration ${{ inputs.environment }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
