@@ -10,24 +10,28 @@ Execute each step sequentially for every Feature in the sprint.
 1. **Open PR Check**: Run `gh pr list`. If there are any open, unmerged PRs, **STOP and warn the user** before starting a new feature.
 2. Read the Feature tasks from the project `PLAN.md`.
 3. Mark the Feature and its first task as `[/]` in `PLAN.md`.
-4. Checkout a new feature branch: `git checkout -b feature/[name]`
-5. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
-6. Read rules: `.agent/rules/stack-angular.md` and `GEMINI.md` (user global rules).
+4. **Sync main [MANDATORY]:** Before creating the feature branch, ensure you are on the latest `main`: `git checkout main && git pull origin main`
+5. Checkout a new feature branch from the updated main: `git checkout -b feature/[name]`
+6. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
+7. Read rules: `.agent/rules/stack-angular.md` and `GEMINI.md` (user global rules).
 
 ## Implementation Loop (per task)
 // turbo-all
 
-5. **Mockup Gate** (UI tasks only): Use `generate_image` to create a visual mockup. Save as artifact. Skip for backend/service tasks.
-6. Implement the code changes following all rules.
-7. Mark the task as `[x]` in `PLAN.md`.
+8. **Mockup Gate** (UI tasks only): Use `generate_image` to create a visual mockup. Save as artifact. Skip for backend/service tasks.
+9. Implement the code changes following all rules.
+10. **Development Checklist [MANDATORY]:** Run the `/development-checklist` workflow. If any item fails, fix the issue and re-run the checklist until all items pass.
+11. Mark the task as `[x]` in `PLAN.md`.
 
 ## Post-Feature Verification
-8. Run build: `npx ng build --configuration development`
-9. Check build output for errors and warnings. Fix any issues.
-10. If build passes, stage changes: `git add -A` from the project root.
-11. Then commit: `git commit -m "feat(feature-name): description"` from the project root.
-12. Push branch to remote: `git push -u origin feature/[name]`
-13. Create a Pull Request (PR) for the feature.
+12. Run build: `npx ng build --configuration development`
+13. Check build output for errors and warnings. Fix any issues.
+14. **Browser Test [OPTIONAL]:** Ask the user if they want to execute structured browser tests. If confirmed, run the `/browser-test` workflow. Write a test plan based on the feature's Acceptance Criteria, execute it in the browser using the `browser_subagent`, and fix any failures. If skipped, proceed to the next step.
+15. **PLAN.md Full Sync Gate [MANDATORY]:** Before staging, verify that ALL checkboxes related to the completed Feature are marked `[x]` in EVERY section of `PLAN.md` (Acceptance Criteria in Section 2, Technical Implementation in Section 3, AND Task Progress in Section 4). This is a hard gate — do NOT proceed to staging until all sections are consistent.
+16. Stage all changes: `git add -A` from the project root.
+17. Commit: `git commit -m "feat(feature-name): description"` from the project root.
+18. Push branch to remote: `git push -u origin feature/[name]`
+19. Create a Pull Request (PR) for the feature.
     - **Description Requirements**:
         - **Summary**: Brief overview of the implementations and changes.
         - **Lessons Learned**: Any insights or technical hurdles overcome.
@@ -53,14 +57,14 @@ Execute each step sequentially for every Feature in the sprint.
         ```
 
 ## Documentation / Recursive Improvement
-15. Update `task.md` artifact: mark the Feature as `[x]`.
-16. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
-17. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
-18. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
+20. Update `task.md` artifact: mark the Feature as `[x]`.
+21. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
+22. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
+23. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 
 ## Deploy (Automated)
-19. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**
+24. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**
 
 ## Repeat
-20. Move to the next Feature and start from step 1.
+25. Move to the next Feature and start from step 1.
 
