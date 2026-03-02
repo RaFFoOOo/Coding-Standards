@@ -43,7 +43,12 @@ Ensure you have created the following **Environments** in your GitHub repository
 | ---- | ---- | ----- | ------------ | ----------- |
 | `DISABLE_PIPELINES_FOR_TEMPLATE` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | If set to `true`, completely disables the GitHub Actions. Used by the source template repository to prevent unnecessary billing while remaining fully active for any project it is copied to. |
 | `NODE_VERSION` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The Node.js version to use for the build (e.g., `20` or `22.x`). Defaults to `20` if completely omitted, ensuring backend stability. |
-| `AZURE_STORAGE_SAS_URL` | Secret | Environment | `cd-angular-azure-storage.yml` | The full SAS URL of the Azure Blob Storage `$web` container, including the token (e.g., `https://<account>.blob.core.windows.net/$web?<token>`). Used by `azcopy` for syncing the `dist/` folder. |
+| `ANGULAR_WORKING_DIRECTORY` | Variable | Repository | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The directory where the Angular app lives (e.g. `.` or `frontend`). Defaults to `.` if omitted. |
+| `AZURE_STORAGE_BASE_URL` | Secret | Environment | `cd-angular-azure-storage.yml` & `shared-build-angular.yml` | The base URL of the Azure Storage account. |
+| `AZURE_STORAGE_DEPLOY_BASE_PATH` | Secret | Environment | `cd-angular-azure-storage.yml` | The container/path to deploy to (e.g. `$web`). |
+| `AZURE_STORAGE_DEPLOY_SAS_TOKEN` | Secret | Environment | `cd-angular-azure-storage.yml` | The SAS token mapped specifically with write/delete permissions to deploy the static app. |
+| `AZURE_STORAGE_IMG_BASE_PATH` | Secret | Environment | `shared-build-angular.yml` | The base path to prepend for image blobs. |
+| `AZURE_STORAGE_IMG_SAS_TOKEN` | Secret | Environment | `shared-build-angular.yml` | The SAS token to append to image blobs (read permission). |
 
 ## 🔄 Updating this Documentation
 As part of the `feature-cycle.md` workflow, the Agent is mandated to keep this `README.md` updated. If you add a new pipeline, a new secret, or a major new rule category, this file will be updated synchronously to reflect the new state of our templates.
