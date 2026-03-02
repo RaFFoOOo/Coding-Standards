@@ -5,7 +5,7 @@ This repository serves as the master template and "brain" for all subsequent pro
 ## 🧠 The Agent Concept & Mission
 The core operational dynamic is defined in our internal ruleset (`.gemini/GEMINI.md`):
 - **Role:** The **User runs as the Tech Lead**. The **Agent runs as the Lead Assistant & Advisor**.
-- **Mission:** Write only high-quality work, zero zero-redundancy, with strict architectural push-back against sub-optimal solutions.
+- **Mission:** Write only high-quality work, zero redundancy, with strict architectural push-back against sub-optimal solutions.
 - **Recursive Evolution:** The Agent autonomously updates its own rules, workflows, and pipelines at the end of every feature cycle. This makes the standards evolve recursively.
 
 ## 📂 Repository Map
