@@ -42,12 +42,14 @@ Execute each step sequentially for every Feature in the sprint.
         gh pr create --title "feat(scope): your title" --body "Your detailed description following requirements"
         ```
     - **Fallback Approach (curl)**:
-        - If `gh` is unavailable or authentication fails, use the GitHub REST API:
+        - If `gh` is unavailable or authentication fails, use the GitHub REST API (extract the owner/repo dynamically):
         ```bash
+        REPO_URL=$(git config --get remote.origin.url)
+        OWNER_REPO=$(echo "$REPO_URL" | sed -E 's/.*github\.com[/:](.*)\.git/\1/')
         curl -X POST \
           -H "Authorization: token YOUR_GITHUB_PAT" \
           -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/RaFFoOOo/Coding-Standards/pulls \
+          https://api.github.com/repos/$OWNER_REPO/pulls \
           -d '{
             "title": "feat(scope): your title",
             "body": "Your detailed description following requirements",
