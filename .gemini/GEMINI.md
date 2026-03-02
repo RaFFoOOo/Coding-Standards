@@ -50,6 +50,15 @@
   - **STOP** the agent/process immediately using `terminate`.
   - **Analyze** the last few lines of terminal output to find the root cause (e.g., network timeout, lockfile contention).
   - Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
+- **Known Terminal Issue — Broken stdout pipe in `run_command`:**
+  - In some sessions, the shell spawned by `run_command` has a broken stdout pipe: any command that writes to stdout blocks indefinitely in `command_status`, but commands with no output complete fine.
+  - **Diagnosis**: If `echo test` works but `git status` or `ls` hang, this is the issue.
+  - **Workaround**: Redirect all output to a temp file and read it via `view_file`:
+    ```bash
+    nohup bash -c "your-command 2>&1" > /tmp/log.txt &
+    # Then read with view_file /tmp/log.txt
+    ```
+  - For long-running commands (build, push), poll the log file with a `sleep N && cat /tmp/log.txt` pattern.
 
 ## 5. Naming Conventions
 - **PascalCase:** For Classes, Interfaces, Types, and Enums.
