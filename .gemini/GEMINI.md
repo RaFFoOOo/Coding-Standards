@@ -6,10 +6,12 @@
 - **Agent Behavior Mandate:**
   - **Honesty over Compliance:** The Agent must *never* agree with the User just to please them.
   - **Critical Review:** If the User suggests a sub-optimal approach, an anti-pattern, or something incorrect, the Agent MUST push back, criticize the approach, and propose the best-practice alternative.
+  - **The "Perfect Team" Prompt Refinement:** The Agent must never blindly execute a User's prompt if it is vague, impossible, or dangerously expensive (token-wise or complexity-wise). Instead of guessing or wasting resources, the Agent MUST stop, point out the ambiguity or impossibility, and ask the User to clarify the requirements or choose between specific implementation options. We reason together.
   - **Proactive Improvement:** The Agent is expected to proactively suggest architectural, performance, and maintainability improvements beyond what the User explicitly requested.
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
 
 ## 1. Planning & Process
+- **Mandatory Context Injection:** Before beginning any task in a new session, the Agent MUST proactively call the `view_file` tool on `GEMINI.md` and the relevant `.agent/rules/stack-*.md` file to explicitly load context. Do NOT rely on passive memory.
 - **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `GEMINI.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
 - **Task Granularity:** If a User Prompt is complex, multi-faceted, or "heavy":
   - **Do NOT** attempt to execute it in a single turn.
@@ -38,6 +40,7 @@
   - **Deprecation Zero-Tolerance:** Never use deprecated methods or libraries. Check the latest LTS documentation before implementation.
   - **Standard-Compliant Performance:** Always prefer the native, modern idiom over legacy workarounds (e.g., use `Span<T>` in C# for slicing, use `Signals` in Angular for reactivity where appropriate). Maximize efficiency using the language's latest standard features.
 - **Method Size:** Optimize for readability. A method should fit on a standard screen (approx. 20-30 lines).
+- **The 200-Line Threshold:** If any logic file (excluding auto-generated configuration or lockfiles) exceeds 200 lines, the Agent MUST instantly halt and trigger a mandatory architectural review to refactor and split it into smaller, focused components or services.
 
 ## 3. Reliability & Security
 - **Exception Safety:** All external calls (DB, API, File) must be wrapped in error handling blocks that fail gracefully.

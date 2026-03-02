@@ -28,10 +28,11 @@ Execute each step sequentially for every Feature in the sprint.
 13. Check build output for errors and warnings. Fix any issues.
 14. **Browser Test [OPTIONAL]:** Ask the user if they want to execute structured browser tests. If confirmed, run the `/browser-test` workflow. Write a test plan based on the feature's Acceptance Criteria, execute it in the browser using the `browser_subagent`, and fix any failures. If skipped, proceed to the next step.
 15. **PLAN.md Full Sync Gate [MANDATORY]:** Before staging, verify that ALL checkboxes related to the completed Feature are marked `[x]` in EVERY section of `PLAN.md` (Acceptance Criteria in Section 2, Technical Implementation in Section 3, AND Task Progress in Section 4). This is a hard gate — do NOT proceed to staging until all sections are consistent.
-16. Stage all changes: `git add -A` from the project root.
-17. Commit: `git commit -m "feat(feature-name): description"` from the project root.
-18. Push branch to remote: `git push -u origin feature/[name]`
-19. Create a Pull Request (PR) for the feature.
+16. **QUALITY_ASSURANCE Strict Gate [MANDATORY]:** You are absolutely forbidden from staging files or creating a Pull Request unless the `QA_REPORT.md` artifact physically exists in your environment and explicitly contains the exact string `STATUS: PASS`. If it does not, run the `.agent/skills/quality-assurance/SKILL.md` immediately.
+17. Stage all changes: `git add -A` from the project root.
+18. Commit: `git commit -m "feat(feature-name): description"` from the project root.
+19. Push branch to remote: `git push -u origin feature/[name]`
+20. Create a Pull Request (PR) for the feature.
     - **Description Requirements**:
         - **Summary**: Brief overview of the implementations and changes.
         - **Lessons Learned**: Any insights or technical hurdles overcome.
@@ -59,14 +60,14 @@ Execute each step sequentially for every Feature in the sprint.
         ```
 
 ## Documentation / Recursive Improvement
-20. Update `task.md` artifact: mark the Feature as `[x]`.
-21. **Recursive Update:** Reflect on the implementations, lessons learned, and hurdles overcome. Update the relevant stack rules, global rules, skills, or workflows to incorporate this new knowledge. This makes our standards evolve recursively.
-22. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
-23. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
+21. Update `PLAN.md` artifact: mark the Feature as `[x]`.
+22. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail.
+23. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
+24. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 
 ## Deploy (Automated)
-24. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**
+25. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**
 
 ## Repeat
-25. Move to the next Feature and start from step 1.
+26. Move to the next Feature and start from step 1.
 

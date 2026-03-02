@@ -48,6 +48,7 @@ Before proceeding to Usability Standards, ask the User:
 
 ## 5. Reporting
 Generate a `QA_REPORT.md` in the artifact folder containing:
+-   **CRITICAL REQUIREMENT:** If all tests and the console pass cleanly, the report MUST begin with the exact string: `STATUS: PASS` to unlock the `feature-cycle.md` PR gate.
 -   [ ] Console Cleanliness Status.
 -   [ ] Navigation Test Status (Skipped/Passed).
 -   [ ] Mobile Viewport Validation (if tested).
