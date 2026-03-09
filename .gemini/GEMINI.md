@@ -53,15 +53,7 @@
   - **STOP** the agent/process immediately using `terminate`.
   - **Analyze** the last few lines of terminal output to find the root cause (e.g., network timeout, lockfile contention).
   - Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
-- **Known Terminal Issue — Broken stdout pipe in `run_command`:**
-  - In some sessions, the shell spawned by `run_command` has a broken stdout pipe: any command that writes to stdout blocks indefinitely in `command_status`, but commands with no output complete fine.
-  - **Diagnosis**: If `echo test` works but `git status` or `ls` hang, this is the issue.
-  - **Workaround**: Redirect all output to a temp file and read it via `view_file`:
-    ```bash
-    nohup bash -c "your-command 2>&1" > /tmp/log.txt &
-    # Then read with view_file /tmp/log.txt
-    ```
-  - For long-running commands (build, push), poll the log file with a `sleep N && cat /tmp/log.txt` pattern.
+- **Agent-Specific Workarounds:** See `.agent/rules/agent-workarounds.md` for platform-specific terminal issues.
 
 ## 5. Naming Conventions
 - **PascalCase:** For Classes, Interfaces, Types, and Enums.
@@ -82,4 +74,5 @@
 ## 8. Git Conventions
 - **Branch Naming:** Branches must be prefixed logically (e.g., `feature/`, `bugfix/`, `refactor/`, `chore/`).
 - **Conventional Commits:** Commit messages must follow the format `type(scope): description` (e.g., `feat(auth): add login form`).
-- **PR Process:** Direct commits to `main` or `develop` are forbidden. All work must be merged via Pull Requests.
+- **Protected Branch Safety:** Direct commits to `main`, `develop`, or any protected branch are **absolutely forbidden**. The Agent must always respect repository branch policies (e.g., required reviews, status checks). If branch policies prevent a push, report the policy restriction to the User instead of attempting to bypass it.
+- **PR Process:** All work must be merged via Pull Requests. No exceptions.

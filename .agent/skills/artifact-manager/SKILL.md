@@ -1,3 +1,9 @@
+---
+name: ARTIFACT_MANAGER
+scope: [angular, dotnet-core]
+description: Governs PLAN.md structure, artifact lifecycle, and README maintenance.
+---
+
 # SKILL: ARTIFACT_MANAGER
 
 ## Description

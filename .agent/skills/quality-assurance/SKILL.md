@@ -1,7 +1,39 @@
+---
+name: QUALITY_ASSURANCE
+scope: [angular, dotnet-core]
+description: Pre-merge verification, console audit, UX testing, and QA report generation.
+---
+
 # SKILL: QUALITY_ASSURANCE
 
 ## Description
 This skill governs the verification, debugging, and usability auditing of the web application. It must be invoked **before** any Feature is marked as "Done" in `PLAN.md`.
+
+## 0. Quick Pre-QA Scan
+Run this self-review **before** launching the full QA process. If any item fails, fix the issue before proceeding.
+
+### Correctness
+1. **Error Identification**: Are there any potential runtime errors, null references, or unhandled edge cases?
+2. **Logic Consistency**: Do all calculations, transformations, and data flows return consistent and correct results?
+
+### Performance
+3. **Performance Degradation**: Any obvious sources of performance issues? (e.g., unnecessary re-renders, missing `OnPush`, waterfall subscriptions)
+
+### Reliability & Security
+4. **Bug & Security Audit**: Are there potential bugs or security vulnerabilities? (e.g., unsanitized input, exposed secrets, missing error handling)
+
+### Architecture
+5. **Refactoring Check**: Do any components, services, or methods need refactoring? (e.g., methods exceeding 30 lines, duplicated logic)
+
+### UI / UX
+6. **Visual Polish**: Any graphical elements that could be improved? (e.g., alignment, spacing, responsiveness, missing transitions)
+7. **Optimistic Logic**: Did you use optimistic logic for all user interactions where applicable?
+8. **Design Consistency**: Is the UI and logic consistent with the PRD, product design, and established patterns?
+
+### Standards Compliance
+9. **Global Rules**: Did you comply with all global rules defined in `GEMINI.md`?
+10. **Stack Rules**: Did you comply with all stack-specific rules? (e.g., `.agent/rules/stack-angular.md`)
+11. **Skills**: Were all relevant skills followed? (e.g., `SPRINT_MANAGER`)
 
 ## 1. The Console Zero-Tolerance Policy
 **Protocol:**

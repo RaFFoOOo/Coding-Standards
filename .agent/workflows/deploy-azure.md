@@ -8,7 +8,9 @@ This workflow builds the Angular app for production and uploads it to the Azure 
 
 ## Prerequisites
 - `azcopy` must be installed and available on PATH ([Download](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10))
-- The file `/.env.deploy` must exist with the `AZURE_STORAGE_SAS_URL` variable (this file is gitignored)
+- The file `/.env.deploy` must exist with the following variables (this file is gitignored):
+  - `AZURE_STORAGE_SAS_URL` — Full SAS URL for deployment
+  - `AZURE_STATIC_WEBSITE_URL` — Static website endpoint for health checks
 
 ## Steps
 
@@ -47,9 +49,10 @@ azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
 
 5. Verify: The site should be available at the Azure static website URL. Execute a basic health check:
 ```bash
-curl -I https://YOUR_STORAGE_ACCOUNT.z1.web.core.windows.net/ | grep "HTTP/1.1 200 OK"
+SITE_URL=$(grep "^AZURE_STATIC_WEBSITE_URL=" ./.env.deploy | cut -d '=' -f2-)
+curl -I "$SITE_URL" | grep "HTTP/1.1 200 OK"
 ```
-*(Replace the URL with the actual project static website endpoint).* Ask the user to confirm deployment.
+*(Requires `AZURE_STATIC_WEBSITE_URL` in `.env.deploy`).* Ask the user to confirm deployment.
 
 // turbo
 6. Create and push a production release tag:

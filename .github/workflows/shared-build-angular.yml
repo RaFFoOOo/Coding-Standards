@@ -64,9 +64,11 @@ jobs:
               content = content.replaceAll('__AZURE_STORAGE_IMG_SAS_TOKEN__', process.env.SAS_TOKEN || '');
               fs.writeFileSync(file, content);
             "
-          else
-            echo "Environment file not found at $ENV_FILE"
+          elif [ "${{ inputs.environment }}" = "production" ]; then
+            echo "::error::Environment file not found at $ENV_FILE (required for production)"
             exit 1
+          else
+            echo "::warning::Environment file not found at $ENV_FILE — skipping token replacement for '${{ inputs.environment }}'"
           fi
 
       - name: Build Application

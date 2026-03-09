@@ -1,3 +1,9 @@
+---
+name: SPRINT_MANAGER
+scope: [angular, dotnet-core]
+description: Technical team lead skill for sprint decomposition, task estimation, and the Mockup Gate.
+---
+
 # SKILL: SPRINT_MANAGER
 
 ## Description

@@ -1,3 +1,9 @@
+---
+trigger: glob
+globs: ["**/*.ts", "**/*.html", "**/*.scss"]
+description: Frontend stack rules for Angular / TypeScript projects
+---
+
 # FRONTEND SPECIFICATIONS (Angular / TypeScript)
 
 ## 1. TypeScript Strictness
