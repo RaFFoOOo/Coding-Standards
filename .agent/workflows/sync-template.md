@@ -21,16 +21,12 @@ This workflow automates the process of pulling or pushing standard configuration
 2. **Identify Source & Target:**
     - Verify both Source and Target absolute paths contain the `.agent/` directory.
 
-3. **Global Rules Sync (Optional):**
-    - Ask the user: "Do you want to update your global `~/.gemini/GEMINI.md` file using the latest version from the Source repository?"
-    - If yes: Execute the copy command from the Source `.gemini/GEMINI.md` to `~/.gemini/GEMINI.md`.
-
-4. **Load Local State:**
+3. **Load Local State:**
     - Look for `<Target_Repo>/.agent/sync-state.json`.
     - If it exists, read the array of paths under the `skipList` key. These files must be completely ignored during the diff/sync phase.
 
-5. **Diff & Plan Review:**
-    - Recursively compare the contents of the *Source* repository (`.agent/`, `.github/`) against the *Target* repository root.
+4. **Diff & Plan Review:**
+    - Recursively compare the contents of the *Source* repository (`.gemini/`, `.agent/`, `.github/`) against the *Target* repository root.
     - Filter out any files present in the `skipList`.
     - Present a categorization to the user:
         - `[ADD]`: Source file missing in Target repo.
@@ -39,10 +35,10 @@ This workflow automates the process of pulling or pushing standard configuration
     - Ask the user: "Do you approve this synchronization plan? Respond 'yes' to proceed, or list specific files to add to the `[SKIP]` list permanently."
         - If new skips provided: update internal list, recalculate, repeat Review.
 
-6. **Execution:**
+5. **Execution:**
     - For all `[ADD]` and `[MODIFY]` files, copy them from the *Source* repository into the exact corresponding relative path in the *Target* repository. Use `mkdir -p` where directories are missing.
     - Write the final, approved array of skipped relative paths securely to `<Target_Repo>/.agent/sync-state.json`.
 
-7. **Finalization:**
+6. **Finalization:**
     - In the *Target* repository, commit all staged additions and modifications (including `sync-state.json`) with the message `chore(standards): sync template updates`.
     - Push the branch and instruct the user to open a Pull Request in the *Target* repository to merge the updated standards.
