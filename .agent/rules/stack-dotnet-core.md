@@ -1,3 +1,9 @@
+---
+trigger: glob
+globs: ["**/*.cs", "**/*.csproj"]
+description: Backend stack rules for ASP.NET Core / C# projects
+---
+
 # BACKEND SPECIFICATIONS (ASP.NET Core / C#)
 
 ## 1. Syntax & Formatting

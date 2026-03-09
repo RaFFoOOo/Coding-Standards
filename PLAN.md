@@ -1,27 +1,26 @@
 # PLAN.md
 
 ### 1. Current Sprint Context
-- **Goal:** Review the project files and fix any discrepancies with the `README.md` mission and internal rules to improve standards recursively.
+- **Goal:** [One sentence summary]
 - **Status:** Planning
 
 ### 2. Feature Specification
-#### Feature: Repository Maintenance
-- **User Story:** As the Technical Lead, I want the agent to review and align all project configuration files, CI/CD pipelines, and internal rules, so that the Coding Standards template remains consistent, up-to-date, and correct.
+#### Feature: [Name]
+- **User Story:** [As a... I want to... So that...]
 - **Acceptance Criteria:**
-  - [x] `README.md` correctly maps all Secrets and Variables used in the CI/CD pipeline.
-  - [x] `.agent/workflows/feature-cycle.md` has sequential numbering.
-  - [x] `.agent/workflows/feature-cycle.md` correctly references `PLAN.md` instead of the internal `task.md`.
+  - [ ] Criteria 1
+  - [ ] Criteria 2
 
 ### 3. Technical Implementation Plan
+*Must be approved before code generation starts.*
 - **Backend Changes:**
-  - [ ] None
+  - [ ] `Class.method()`: Description of logic.
 - **Frontend Changes:**
-  - [ ] None
+  - [ ] `Component`: Description of behavior/config.
 - **Documentation Changes:**
-  - [x] `README.md`: Update "Secrets and Variables Map" table.
-  - [x] `.agent/workflows/feature-cycle.md`: Re-number list and fix artifact reference.
-- **Risks/Notes:** Ensures templates generated from this repo will have correct secrets context.
+  - [ ] None
+- **Risks/Notes:** [Any architectural concerns]
 
 ### 4. Task Progress
-- [x] Task 1: Update `README.md` environment mapping.
-- [x] Task 2: Update `.agent/workflows/feature-cycle.md` numbering and references.
+- [ ] Task 1
+- [ ] Task 2

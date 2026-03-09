@@ -13,14 +13,14 @@ Execute each step sequentially for every Feature in the sprint.
 4. **Sync main [MANDATORY]:** Before creating the feature branch, ensure you are on the latest `main`: `git checkout main && git pull origin main`
 5. Checkout a new feature branch from the updated main: `git checkout -b feature/[name]`
 6. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
-7. Read rules: `.agent/rules/stack-angular.md` and `GEMINI.md` (user global rules).
+7. Read rules: the relevant `.agent/rules/stack-*.md` file for the current tech stack and `GEMINI.md` (user global rules).
 
 ## Implementation Loop (per task)
 // turbo-all
 
 8. **Mockup Gate** (UI tasks only): Use `generate_image` to create a visual mockup. Save as artifact. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
-10. **Development Checklist [MANDATORY]:** Run the `/development-checklist` workflow. If any item fails, fix the issue and re-run the checklist until all items pass.
+10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agent/skills/quality-assurance/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
 11. Mark the task as `[x]` in `PLAN.md`.
 
 ## Post-Feature Verification
