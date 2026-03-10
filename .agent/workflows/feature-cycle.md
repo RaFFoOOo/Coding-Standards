@@ -1,4 +1,5 @@
 ---
+name: Feature Cycle
 description: Standard workflow for implementing a feature from PLAN.md
 ---
 
