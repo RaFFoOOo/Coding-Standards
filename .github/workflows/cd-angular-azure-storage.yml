@@ -17,7 +17,8 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     needs: build
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
     permissions:
       contents: write
     steps:

@@ -14,9 +14,9 @@ The most important configurations do not live in standard project files, but ins
 | Path | Purpose |
 | ---- | ------- |
 | `AGENTS.md` | **Global Rules.** The absolute baseline rules for architecture, security, and agent behavior that apply to every project. Follows the open [AGENTS.md standard](https://agents.md). |
-| `.agent/rules/` | **Stack & Agent Rules.** Stack-specific constraints (e.g., `stack-angular.md`) and agent-level workarounds, loaded via glob or always-on triggers. |
-| `.agent/skills/` | **Specialized Capabilities.** Detailed instructions for the agent to perform complex reviews (e.g., `QUALITY_ASSURANCE`, `SPRINT_MANAGER`). |
-| `.agent/workflows/` | **Standard Operating Procedures.** Explicit step-by-step procedures the agent must follow (e.g., `feature-cycle.md` for sprint execution). Contains `sync-template.md` which is designed to be **copied to new projects** to allow them to "pull" standards updates dynamically. |
+| `.agents/rules/` | **Stack & Agent Rules.** Stack-specific constraints (e.g., `stack-angular.md`) and agent-level workarounds, loaded via glob or always-on triggers. |
+| `.agents/skills/` | **Specialized Capabilities.** Detailed instructions for the agent to perform complex reviews (e.g., `QUALITY_ASSURANCE`, `SPRINT_MANAGER`). |
+| `.agents/workflows/` | **Standard Operating Procedures.** Explicit step-by-step procedures the agent must follow (e.g., `feature-cycle.md` for sprint execution). Contains `sync-template.md` which is designed to be **copied to new projects** to allow them to "pull" standards updates dynamically. |
 | `.github/workflows/` | **CI/CD Pipelines.** Automated build, test, and deployment definitions using GitHub Actions. |
 
 ## 🚀 CI/CD Pipelines Overview
