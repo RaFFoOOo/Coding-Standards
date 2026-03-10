@@ -1,6 +1,5 @@
 ---
 name: QUALITY_ASSURANCE
-scope: [angular, dotnet-core]
 description: Pre-merge verification, console audit, UX testing, and QA report generation.
 ---
 
