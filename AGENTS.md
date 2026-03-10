@@ -53,7 +53,6 @@
   - **Analyze** the last few lines of terminal output to find the root cause (e.g., network timeout, lockfile contention).
   - Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
 - **Agent-Specific Workarounds:** See `.agent/rules/agent-workarounds.md` for platform-specific terminal issues.
-- **Agent-Specific Workarounds:** See `.agent/rules/agent-workarounds.md` for platform-specific terminal issues.
 
 ## 5. Naming Conventions
 - **PascalCase:** For Classes, Interfaces, Types, and Enums.

@@ -38,19 +38,8 @@ Because the pipelines are designed to be environment-agnostic, **all secrets and
 Ensure you have created the following **Environments** in your GitHub repository settings:
 - `production`
 - `development`
-- `development`
 
 #### Secrets and Variables Map
-| Name | Type | Level | Default | Required For | Description |
-| ---- | ---- | ----- | ------- | ------------ | ----------- |
-| `DISABLE_PIPELINES_FOR_TEMPLATE` | Variable | Repository | — | `ci-angular.yml` & `cd-angular-azure-storage.yml` | If set to `true`, completely disables the GitHub Actions. Used by the source template repository to prevent unnecessary billing while remaining fully active for any project it is copied to. |
-| `NODE_VERSION` | Variable | Repository | `20` | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The Node.js version to use for the build (e.g., `20` or `22.x`). |
-| `ANGULAR_WORKING_DIRECTORY` | Variable | Repository | `.` | `ci-angular.yml` & `cd-angular-azure-storage.yml` | The directory where the Angular app lives (e.g. `.` or `frontend`). |
-| `AZURE_STORAGE_BASE_URL` | Secret | Environment | — | `cd-angular-azure-storage.yml` & `shared-build-angular.yml` | The base URL of the Azure Storage account. |
-| `AZURE_STORAGE_DEPLOY_BASE_PATH` | Secret | Environment | — | `cd-angular-azure-storage.yml` | The container/path to deploy to (e.g. `$web`). |
-| `AZURE_STORAGE_DEPLOY_SAS_TOKEN` | Secret | Environment | — | `cd-angular-azure-storage.yml` | The SAS token mapped specifically with write/delete permissions to deploy the static app. |
-| `AZURE_STORAGE_IMG_BASE_PATH` | Secret | Environment | — | `shared-build-angular.yml` | The base path to prepend for image blobs. |
-| `AZURE_STORAGE_IMG_SAS_TOKEN` | Secret | Environment | — | `shared-build-angular.yml` | The SAS token to append to image blobs (read permission). |
 | Name | Type | Level | Default | Required For | Description |
 | ---- | ---- | ----- | ------- | ------------ | ----------- |
 | `DISABLE_PIPELINES_FOR_TEMPLATE` | Variable | Repository | — | `ci-angular.yml` & `cd-angular-azure-storage.yml` | If set to `true`, completely disables the GitHub Actions. Used by the source template repository to prevent unnecessary billing while remaining fully active for any project it is copied to. |
