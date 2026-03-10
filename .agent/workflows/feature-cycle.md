@@ -13,7 +13,7 @@ Execute each step sequentially for every Feature in the sprint.
 4. **Sync main [MANDATORY]:** Before creating the feature branch, ensure you are on the latest `main`: `git checkout main && git pull origin main`
 5. Checkout a new feature branch from the updated main: `git checkout -b feature/[name]`
 6. Read relevant skills: `.agent/skills/sprint-manager/SKILL.md`, `.agent/skills/quality-assurance/SKILL.md` (if exists).
-7. Read rules: the relevant `.agent/rules/stack-*.md` file for the current tech stack and `GEMINI.md` (user global rules).
+7. Read rules: the relevant `.agent/rules/stack-*.md` file for the current tech stack and `AGENTS.md` (global rules).
 
 ## Implementation Loop (per task)
 // turbo-all

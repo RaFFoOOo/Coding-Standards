@@ -31,7 +31,7 @@ Run this self-review **before** launching the full QA process. If any item fails
 8. **Design Consistency**: Is the UI and logic consistent with the PRD, product design, and established patterns?
 
 ### Standards Compliance
-9. **Global Rules**: Did you comply with all global rules defined in `GEMINI.md`?
+9. **Global Rules**: Did you comply with all global rules defined in `AGENTS.md`?
 10. **Stack Rules**: Did you comply with all stack-specific rules? (e.g., `.agent/rules/stack-angular.md`)
 11. **Skills**: Were all relevant skills followed? (e.g., `SPRINT_MANAGER`)
 
