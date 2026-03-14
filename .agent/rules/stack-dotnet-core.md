@@ -1,4 +1,5 @@
 ---
+name: Stack Dotnet Core
 trigger: glob
 globs: ["**/*.cs", "**/*.csproj"]
 description: Backend stack rules for ASP.NET Core / C# projects

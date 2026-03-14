@@ -1,4 +1,5 @@
 ---
+name: Agent Workarounds
 trigger: always_on
 description: Platform-specific terminal workarounds for agent environments
 ---

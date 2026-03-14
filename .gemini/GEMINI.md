@@ -11,7 +11,6 @@
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
 
 ## 1. Planning & Process
-- **Mandatory Context Injection:** Before beginning any task in a new session, the Agent MUST proactively call the `view_file` tool on `GEMINI.md` and the relevant `.agent/rules/stack-*.md` file to explicitly load context. Do NOT rely on passive memory.
 - **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `GEMINI.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
 - **Task Granularity:** If a User Prompt is complex, multi-faceted, or "heavy":
   - **Do NOT** attempt to execute it in a single turn.

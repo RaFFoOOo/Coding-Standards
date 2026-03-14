@@ -1,5 +1,6 @@
 ---
-description: Synchronize template artifacts (.agent/, .github/) between the current repository and a remote repository (Push or Pull Model)
+name: Sync Template
+description: Synchronize template artifacts (.agent/, .github/, .gemini/) between repositories current repository and a remote repository (Push or Pull Model)
 ---
 # Template Synchronization Workflow
 

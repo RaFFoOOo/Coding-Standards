@@ -1,4 +1,5 @@
 ---
+name: Stack Angular
 trigger: glob
 globs: ["**/*.ts", "**/*.html", "**/*.scss"]
 description: Frontend stack rules for Angular / TypeScript projects

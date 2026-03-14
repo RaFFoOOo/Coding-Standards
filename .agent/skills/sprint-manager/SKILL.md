@@ -1,6 +1,5 @@
 ---
 name: SPRINT_MANAGER
-scope: [angular, dotnet-core]
 description: Technical team lead skill for sprint decomposition, task estimation, and the Mockup Gate.
 ---
 
@@ -28,7 +27,7 @@ When the User provides a Sprint Plan or User Story:
         - Color palette defined in the project's Design System.
         - Typography according to project standards.
     - Save the generated image as an artifact and embed it in `implementation_plan.md`.
-4.  **Validate:** Check dependencies against the **Global Constitution** (in `GEMINI.md`) and **Project Rules** (e.g., `stack-angular.md`).
+4.  **Validate:** Check dependencies against the **Global Constitution** (in `.gemini/GEMINI.md`) and **Project Rules** (e.g., `stack-angular.md`).
 5.  **Plan:** Update the `PLAN.md` artifact with the new tasks only *after* the Visual Mockup is approved.
 
 ## Visualization Standards

@@ -1,4 +1,5 @@
 ---
+name: Browser Test
 description: Plan and execute structured browser tests for each completed feature before merging.
 ---
 
