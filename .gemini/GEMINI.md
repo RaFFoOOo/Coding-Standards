@@ -11,7 +11,7 @@
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
 
 ## 1. Planning & Process
-- **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `AGENTS.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
+- **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `GEMINI.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
 - **Task Granularity:** If a User Prompt is complex, multi-faceted, or "heavy":
   - **Do NOT** attempt to execute it in a single turn.
   - **Split** the prompt into smaller, sequential entries in `PLAN.md`.

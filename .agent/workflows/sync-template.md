@@ -1,6 +1,6 @@
 ---
 name: Sync Template
-description: Synchronize template artifacts (.agent/, .github/, AGENTS.md) between repositories current repository and a remote repository (Push or Pull Model)
+description: Synchronize template artifacts (.agent/, .github/, .gemini/) between repositories current repository and a remote repository (Push or Pull Model)
 ---
 # Template Synchronization Workflow
 
@@ -27,7 +27,7 @@ This workflow automates the process of pulling or pushing standard configuration
     - If it exists, read the array of paths under the `skipList` key. These files must be completely ignored during the diff/sync phase.
 
 4. **Diff & Plan Review:**
-    - Recursively compare the contents of the *Source* repository (`AGENTS.md`, `.agent/`, `.github/`) against the *Target* repository root.
+    - Recursively compare the contents of the *Source* repository (`.gemini/`, `.agent/`, `.github/`) against the *Target* repository root.
     - Filter out any files present in the `skipList`.
     - Present a categorization to the user:
         - `[ADD]`: Source file missing in Target repo.
