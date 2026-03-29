@@ -6,18 +6,38 @@ This repository serves as the master template and "brain" for all subsequent pro
 The core operational dynamic is defined in our internal ruleset (`AGENTS.md`):
 - **Role:** The **User runs as the Tech Lead**. The **Agent runs as the Lead Assistant & Advisor**.
 - **Mission:** Write only high-quality work, zero redundancy, with strict architectural push-back against sub-optimal solutions.
+- **Primary Agent:** [Claude Code](https://claude.ai/code) — the active coding agent for this repository.
 - **Recursive Evolution:** The Agent autonomously updates its own rules, workflows, and pipelines at the end of every feature cycle. This makes the standards evolve recursively.
 
 ## 📂 Repository Map
-The most important configurations do not live in standard project files, but inside specific directories intended for the AI Agent:
+The most important configurations live in directories intended for the AI Agent:
 
 | Path | Purpose |
 | ---- | ------- |
-| `AGENTS.md` | **Global Rules.** The absolute baseline rules for architecture, security, and agent behavior that apply to every project. |
-| `.agents/rules/` | **Stack & Agent Rules.** Stack-specific constraints (e.g., `stack-angular.md`) and agent-level workarounds, loaded via glob or always-on triggers. |
+| `AGENTS.md` | **Global Rules.** The absolute baseline rules for architecture, security, and agent behavior. Cross-agent standard (Claude Code, Gemini, etc.). |
+| `CLAUDE.md` | **Claude Code Entry Point.** Imports `AGENTS.md` and provides Claude Code-specific configuration: skills index, plan mode guidance, and remote execution notes. |
+| `.agents/rules/` | **Stack & Agent Rules.** Stack-specific constraints (e.g., `stack-angular.md`) and agent-level workarounds. The canonical cross-agent source. |
 | `.agents/skills/` | **Specialized Capabilities.** Detailed instructions for the agent to perform complex reviews (e.g., `QUALITY_ASSURANCE`, `SPRINT_MANAGER`). |
-| `.agents/workflows/` | **Standard Operating Procedures.** Explicit step-by-step procedures the agent must follow (e.g., `feature-cycle.md` or `pr-resolution.md`). Contains operations like `sync-template.md` which are designed to be **copied to new projects** to pull standards updates dynamically. |
+| `.agents/workflows/` | **Standard Operating Procedures.** Explicit step-by-step procedures the agent must follow (e.g., `feature-cycle.md` or `pr-resolution.md`). The `sync-template.md` workflow is designed to be **copied to new projects** to pull standards updates dynamically. |
+| `.claude/skills/` | **Claude Code Shims.** Thin wrapper `SKILL.md` files enabling `/slash-command` invocation of all skills and workflows within Claude Code. Delegates to `.agents/` source files. **Not synced to target projects.** |
 | `.github/workflows/` | **CI/CD Pipelines.** Automated build, test, and deployment definitions using GitHub Actions. |
+
+## 🤖 Agent Compatibility & Deployment Model
+
+This repository is **agent-agnostic** by design. The `.agents/` directory and `AGENTS.md` use the open cross-agent standard, readable by any AI coding assistant.
+
+### Working in this Repository (Claude Code)
+Claude Code loads `CLAUDE.md` at session start, which imports `AGENTS.md` and indexes all available skills. Skills and workflows are invocable via `/slash-commands` (handled by `.claude/skills/` shims that delegate to `.agents/`).
+
+### Deploying Standards to a New Project
+Use the `/sync-template` workflow. It supports both Push (template → project) and Pull (project ← template) directions, and performs **agent-aware transformation**:
+
+| Target Agent | Entry Point | Rules Path | Skills Path | Tools |
+|---|---|---|---|---|
+| **Claude Code** | `CLAUDE.md` generated | `.claude/rules/` | `.claude/skills/` | Antigravity tools replaced with CC equivalents |
+| **Gemini / Generic** | `AGENTS.md` (existing) | `.agents/rules/` | `.agents/skills/` | No transformation |
+
+The `.claude/` directory in this template repo is intentionally excluded from syncing (see `.agents/sync-state.json`).
 
 ## 🚀 CI/CD Pipelines Overview
 This repository uses a **"build once, deploy multiple"** methodology using GitHub Shared Workflows. All pipelines are YAML-based and deeply parameterized so they remain portable across different projects.

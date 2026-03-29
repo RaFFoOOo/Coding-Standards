@@ -10,7 +10,7 @@ Platform-specific issues and mitigations that do not belong in the global consti
 
 ## Known Terminal Issue — Broken stdout pipe in `run_command`
 
-Some agent platforms (e.g., Gemini Code Assist) spawn a shell where stdout is broken: commands that produce output block indefinitely in `command_status`, while commands with no output complete normally.
+Some agent platforms spawn a shell where stdout is broken: commands that produce output block indefinitely in `command_status`, while commands with no output complete normally.
 
 ### Diagnosis
 If `echo test` works but `git status` or `ls` hang, this is the issue.
@@ -24,17 +24,23 @@ nohup bash -c "your-command 2>&1" > /tmp/log.txt &
 
 For long-running commands (build, push), poll the log file with a `sleep N && cat /tmp/log.txt` pattern.
 
+**Claude Code note:** Claude Code uses the `Bash` tool for terminal commands, which does not have this stdout pipe issue. This workaround applies to other agent platforms only.
+
 ## Known IDE Issue — Ghost File Resurrections during Refactoring
 
 When an Agent performs a destructive mass-deletion of a structural directory via `rm -rf` (e.g., component consolidation), if the user accidentally has any of those targeted files focused natively in an active IDE tab, the IDE's automated persistence loop will instantly resurrect the deleted files immediately back into the system environment causing severe ghost compilation errors.
 
 ### Workaround
-- **Diagnostics:** If an Angular build fails explicitly citing an import mismatch inside a domain you just deleted, immediately assume IDE Resurrection. 
+- **Diagnostics:** If an Angular build fails explicitly citing an import mismatch inside a domain you just deleted, immediately assume IDE Resurrection.
 - **Agent Duty:** Warn the user to forcibly close those editor tabs, and re-execute the UNIX `rm -rf` command blindly before re-triggering compilers.
 
-## Known IDE Issue — Antigravity v1.20.6 "ECONNREFUSED" Customizations Bug
+**Claude Code note:** This issue applies identically in VSCode when using Claude Code. The `Bash` tool executes `rm -rf` correctly, but IDE tab resurrection can still occur. Follow the same workaround.
 
-Antigravity versions `1.20+` officially introduced support for the open `AGENTS.md` standard, but contain a significant regression where naming the workspace folder `.agents/` (plural) causes an `ECONNREFUSED` connect error, crashing the background indexing server.
+## Claude Code — Watchdog Rule for Bash Tool
 
-### Stance
-As per our Team Mission & Dynamics, we adhere strictly to the open `AGENTS.md` standard and prioritize absolute compliance over bending to specific buggy agent versions. We use the `.agents/` structure universally to ensure total cross-agent interoperability (Claude, Gemini, etc.), even if it temporarily breaks the UI in a specific version of Antigravity.
+If a `Bash` tool call produces no visible output change for **60+ seconds**:
+- **STOP** — terminate the command if possible (e.g., a hanging `npm install` or build).
+- **Analyze** — read the last few lines of output to identify the root cause (network timeout, lockfile, port conflict, etc.).
+- Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
+
+This is the Claude Code application of the global Watchdog Rule from AGENTS.md §4.

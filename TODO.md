@@ -7,10 +7,12 @@ This file contains tasks, ideas, and architectural improvements that are **not p
 ## 📌 Backlog / To Do
 *Items to be evaluated for future sprints. When starting a new `PLAN.md`, the Agent must review this list and move processable items into the active sprint plan.*
 
-- [ ] When migrating to Claude Code: add a `CLAUDE.md` symlink pointing to `AGENTS.md` so Claude natively loads global rules.
-- [ ] When migrating to Claude Code: verify that the `.agents/` folder (used for rules/skills/workflows) does not conflict with Claude Code's sub-agent system (`~/.claude/agents/`).
+- [ ] Configure Playwright MCP server (`.mcp.json`) to enable native browser testing via the `/browser-test` skill in Claude Code projects.
+- [ ] Evaluate adding a `hooks` section to `.claude/settings.json` in the sync-template output for Claude Code targets (e.g., PostToolUse linting hook on Write/Edit).
+- [ ] Consider adding a `Copilot` (GitHub Copilot) transformation path to `sync-template` once its agent file conventions stabilize.
 
 ## 📝 Ongoing Notes
 *Architectural notes or reminders for the agent/user.*
 
-- Upgraded to Antigravity v1.20.6. Global rules are read from `AGENTS.md` and workspace rules from `.agents/`. The Customizations Tab may be broken due to a known ECONNREFUSED bug with the plural `.agents/` folder — we accept this trade-off for cross-agent compliance.
+- Running on Claude Code. `CLAUDE.md` + `.claude/skills/` shims provide native Claude Code integration. `.agents/` remains the cross-agent source of truth and is never modified for agent-specific concerns.
+- When syncing standards to a new project, use `/sync-template` and select the target agent. Claude Code targets receive a full `.claude/` structure with `CLAUDE.md`, path-transformed skills, and Antigravity tool substitutions applied automatically.
