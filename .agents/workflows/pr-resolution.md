@@ -1,0 +1,34 @@
+---
+name: PR Resolution
+description: Workflow to check and resolve all PR comments before proceeding with PR approval
+---
+
+# PR Resolution Workflow
+
+Execute this workflow when a Pull Request has received review comments that need to be addressed before it can be merged.
+
+## 1. Context & Comment Retrieval
+1. **Identify the PR**: Ensure you are on the correct feature branch or know the PR number.
+2. **Fetch Comments**: Run `gh pr view <branch-name-or-pr-number> --comments` to retrieve all active review comments and threads.
+3. **Analyze Feedback**: Read through all the comments carefully to understand the reviewer's requests, raised issues, or suggestions.
+
+## 2. Planning the Resolution
+4. **Update Task Plan**: Add a new section in `PLAN.md` (e.g., "PR Review Refinements") specifically for addressing the retrieved comments. Break down each comment into an actionable task.
+5. **Acknowledge Trade-offs**: If a comment directly conflicts with `AGENTS.md` (e.g., requests to bypass Clean Surface or 200-Line rules), **STOP** and `notify_user` to discuss the architectural violation before implementing.
+
+## 3. Implementation Loop (per comment)
+// turbo-all
+
+6. Implement the requested code changes following standard rules.
+7. **Quick Pre-QA Scan [MANDATORY]**: Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/quality-assurance/SKILL.md` strictly on the modified files to ensure the new changes adhere to repo standards.
+8. **Atomic Commit [MANDATORY]**: Stage and commit the specific changes related to this comment/task securely. **You must separate commits for each comment, unless two or more comments are intimately related.** This is a global rule to preserve clean revert options.
+9. **Comment Resolution [MANDATORY]**: Using the GitHub CLI (`gh pr review` or `gh api`), reply directly to the specific PR comment thread with a concise explanation of the resolution. This enables the reviewer to quickly audit all fixes.
+10. Mark the corresponding task as `[x]` in `PLAN.md` once thoroughly addressed.
+
+## 4. Validation & Push
+9. **Build Verification**: Run `npx ng build --configuration development` (or the equivalent build command for the stack) to verify there are no compilation errors.
+11. **Push**: Push the updated branch to remote: `git push origin HEAD`.
+
+## 5. Notification & Approval
+12. **Inform the User**: Inform the user that the review comments have been integrated and pushed.
+13. **UI Resolution**: Ask the user to officially resolve the conversations in the GitHub UI and re-request review or proceed with the PR approval.

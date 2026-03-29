@@ -27,6 +27,8 @@ description: Frontend stack rules for Angular / TypeScript projects
 ## 2a. Modern Angular Standards [STRICT]
 - **Dependency Injection:**
   - **MUST** use the `inject()` function instead of constructor injection for all services and tokens.
+  - **Strict Interface Tokens:** When providing a concrete Mock class mapping to an abstract interface token in `app.config.ts`, components **MUST** strictly invoke `inject(ITokenInterface)`, never the concrete class directly.
+  - **Ambient Provider Ban:** Concrete Mock classes intentionally bound within `app.config.ts` providers MUST NOT declare `@Injectable({ providedIn: 'root' })`. This forces explicit dependency resolution failures over silent uninitialized dual-instantiations if developers accidentally breach token mappings.
 - **Control Flow:**
   - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
   - *Reason:* Better type checking, performance, and readability.
@@ -47,13 +49,17 @@ description: Frontend stack rules for Angular / TypeScript projects
   - **[ARCHITECT REQUIRED]** Every API Service (e.g., `BookingService`) must have a corresponding `MockBookingService`.
   - Use Angular's `environment` flag (`useMocks: true/false`) to switch the provider at the module level.
   - Mock services must return synthetic data with realistic delays (using `delay()` operator) to simulate network latency.
+- **Local Environment Secure Mocking:**
+  - Mock configuration payloads tracked in version control (e.g., `app-config.json`) **MUST NEVER** contain hardcoded secrets or SAS tokens.
+  - To mock backend-level secure payload injections natively during local development, the consuming Mock Service MUST intercept the parsed JSON structure and dynamically merge active secrets isolated securely within `environment.development.ts` into the configuration state prior to distribution.
 
 ## 4. Assets & Internationalization
 - **Text Content:**
   - No hardcoded text in HTML.
   - Use a centralized translation/label file (JSON or Constant Object) to separate content from structure.
 - **Styling:**
-  - Use CSS Variables (`var(--primary-color)`) defined in a global file.
+  - Use CSS Variables (`var(--primary)`) defined in a global theme file (e.g., `_theme-variables.scss`).
+  - **[BEST PRACTICE] Dual Token Pattern for Alpha Transparency:** When defining a theme color, always provide both the hex token and a companion `-rgb` token (e.g., `--primary: #79C1B0; --primary-rgb: 121, 193, 176;`). This enables `rgba(var(--primary-rgb), <alpha>)` without preprocessor functions.
   - **[BEST PRACTICE] Centralized Responsive Variables:** Layout constants (e.g., `--section-padding`, `--section-title-size`) must be defined globally and remapped within a global media query.
     - *Component usage:* Use the context variable `var(--section-padding)` directly.
     - *Benefit:* Avoids clashing/redundant media queries in feature-level SCSS files and maintains a DRY codebase.
@@ -85,3 +91,14 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Feature Modules:** Organize code by business feature rather than technical type (e.g., `features/auth/` containing its own components, services, models).
 - **Naming Convention:** All Angular files must follow standard `kebab-case` naming (e.g., `user-profile.component.ts`).
 - **Barrel Exports:** Use `index.ts` files inside feature folders to explicitly expose only the public API of that feature, preventing deep imports.
+- *Reason:* Encapsulation and faster build times.
+
+## 9. Multi-Tenant Architecture [STRICT]
+- **Resource Resolution:**
+  - **MUST** resolve all brand-specific brand assets (logos, favicons, primary images) dynamically via the `ITenantConfigService.getResourceUrl()` pattern.
+  - Hardcoded paths to tenant assets in the `assets/` directory are forbidden for multi-tenant features.
+- **Data Segregation:**
+  - **MUST** use tenant-segregated keys for all browser-side persistence (localStorage, sessionStorage).
+  - Implementation: Keys must be prefixed with a unique tenant identifier (e.g., `lc_{tenantId}_{key}`).
+- **Mode-Aware UI:**
+  - Standard components (Booking, Catalog) must adapt their behavior and terminology based on the `businessType` signal from `ITenantConfigService` to support diverse business models (e.g., Reservation vs. Order).

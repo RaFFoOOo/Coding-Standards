@@ -1,0 +1,48 @@
+name: CD - Deploy to Azure Static Web Apps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/shared-build-angular.yml
+    with:
+      node-version: ${{ vars.NODE_VERSION || '24' }}
+      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
+      environment: production
+    secrets: inherit
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: angular-build-output
+          path: ./dist
+
+      - name: Deploy to Azure Static Web Apps
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          skip_app_build: true
+          app_location: "./dist/lc-webapp/browser"
+          output_location: ""
+
+      - name: Create and Push Release Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG_NAME="prod-aswa-$(date +'%Y%m%d-%H%M')"
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"

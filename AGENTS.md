@@ -31,6 +31,7 @@
   - `protected`: For inheritance chains.
   - `private`: For all internal logic.
 - **The "Clean Surface" Rule:** A public method acts as a gateway. It should validate inputs and delegate work to private methods. It must NOT call other public methods within the same instance.
+- **The "Data-Driven State" Rule:** Never drive business logic, conditional rendering, or component behaviors by matching UI texts, labels, or localization keys (e.g., `labelKey === 'NAV.ORDER'`). You MUST use explicit object properties, enums, or configurations (e.g., `behavior: 'transactional'`) to forward behaviors through components.
 - **Zero Redundancy (DRY):** Never repeat logic. Extract to private methods or static utilities.
 - **Immutability Strategy:**
   - Variables that are not intended to change must be explicitly locked.
@@ -58,6 +59,7 @@
 - **PascalCase:** For Classes, Interfaces, Types, and Enums.
 - **camelCase:** For Methods, Variables, and Parameters.
 - **UPPER_SNAKE_CASE:** For global Constants.
+- **Environment Variables:** Must adhere strictly to the schema `<operation>_<cloud>_<resource>_<variable_name>` where `operation` is `ci|cd`, `cloud` is `azure`, and `resource` is `sta|swa`. Non-applicable segments must be omitted.
 - **File Naming:** Delegated to stack-specific rules (e.g., `kebab-case` for Angular).
 
 ## 6. Documentation Policy
@@ -69,9 +71,15 @@
 - **Native over Third-Party:** Prefer standard language features over bringing in external dependencies.
 - **Justification:** Every new dependency requires explicit justification and comparison against an alternative.
 - **Security & Activity:** Do NOT use dependencies that have known critical CVEs or have not seen a release in >1 year.
+- **Sprint Freshness Audit [MANDATORY]:** At the end of every sprint, the Agent MUST execute a full dependency audit covering:
+  - Application packages (`npm outdated` or equivalent).
+  - GitHub Actions versions (check for newer major releases with Node.js runtime compatibility).
+  - CI/CD runner defaults (Node.js LTS alignment).
+  - If upgrades are found, they MUST be logged with a `[SAFE]` or `[BREAKING]` classification and added as tasks to the next sprint's `PLAN.md`. Breaking changes require explicit migration steps documented before execution.
 
 ## 8. Git Conventions
 - **Branch Naming:** Branches must be prefixed logically (e.g., `feature/`, `bugfix/`, `refactor/`, `chore/`).
 - **Conventional Commits:** Commit messages must follow the format `type(scope): description` (e.g., `feat(auth): add login form`).
+- **Atomic Commits [GLOBAL RULE]:** For a set of different tasks or comments, commits must ALWAYS be separated for each distinct task. Do not aggregate unrelated changes into a single mega-commit. This preserves clean, granular revert options if required.
 - **Protected Branch Safety:** Direct commits to `main`, `develop`, or any protected branch are **absolutely forbidden**. The Agent must always respect repository branch policies (e.g., required reviews, status checks). If branch policies prevent a push, report the policy restriction to the User instead of attempting to bypass it.
 - **PR Process:** All work must be merged via Pull Requests. No exceptions.

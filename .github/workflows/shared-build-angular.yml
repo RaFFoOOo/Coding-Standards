@@ -7,7 +7,7 @@ on:
         description: 'Version of Node.js to use'
         required: false
         type: string
-        default: '20'
+        default: '24'
       working-directory:
         description: 'Directory containing the project package.json'
         required: false
@@ -19,11 +19,7 @@ on:
         type: string
         default: 'production'
     secrets:
-      AZURE_STORAGE_BASE_URL:
-        required: false
-      AZURE_STORAGE_IMG_BASE_PATH:
-        required: false
-      AZURE_STORAGE_IMG_SAS_TOKEN:
+      CI_DEFAULT_TENANT_ID:
         required: false
 
 jobs:
@@ -35,10 +31,10 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
           cache: 'npm'
@@ -49,9 +45,8 @@ jobs:
 
       - name: Replace Environment Tokens
         env:
-          BLOB_URL: ${{ secrets.AZURE_STORAGE_BASE_URL }}
-          IMG_PATH: ${{ secrets.AZURE_STORAGE_IMG_BASE_PATH }}
-          SAS_TOKEN: ${{ secrets.AZURE_STORAGE_IMG_SAS_TOKEN }}
+          ENV_TENANT_ID: ${{ vars.CI_DEFAULT_TENANT_ID }}
+          ENV_ENABLE_TENANT_SELECTOR: ${{ vars.CI_ENABLE_TENANT_SELECTOR }}
         run: |
           ENV_FILE="src/environments/environment.${{ inputs.environment }}.ts"
           if [ -f "$ENV_FILE" ]; then
@@ -59,9 +54,8 @@ jobs:
               const fs = require('fs');
               const file = '$ENV_FILE';
               let content = fs.readFileSync(file, 'utf8');
-              content = content.replaceAll('__AZURE_STORAGE_BASE_URL__', process.env.BLOB_URL || '');
-              content = content.replaceAll('__AZURE_STORAGE_IMG_BASE_PATH__', process.env.IMG_PATH || '');
-              content = content.replaceAll('__AZURE_STORAGE_IMG_SAS_TOKEN__', process.env.SAS_TOKEN || '');
+              content = content.replaceAll('__DEFAULT_TENANT_ID__', process.env.ENV_TENANT_ID || '');
+              content = content.replaceAll('__ENABLE_TENANT_SELECTOR__', process.env.ENV_ENABLE_TENANT_SELECTOR || 'false');
               fs.writeFileSync(file, content);
             "
           elif [ "${{ inputs.environment }}" = "production" ]; then
@@ -75,7 +69,7 @@ jobs:
         run: npm run build -- --configuration ${{ inputs.environment }}
 
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: angular-build-output
           path: ${{ inputs.working-directory }}/dist/
