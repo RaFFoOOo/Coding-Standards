@@ -132,6 +132,33 @@ Remote/scheduled agents load context directly from this repository.
 
 Write the final skipList to `<Target_Repo>/.claude/sync-state.json`.
 
+### Step 5c — Old Agent Configuration Cleanup
+
+Before staging, remove the **previous** agent's configuration from the target to ensure only **one** agent configuration is active at a time.
+
+**If `TARGET_AGENT = Claude Code`** (new config is `.claude/`):
+- Check if `.agents/` exists in the target repo.
+- If it does, count its files and present to the user:
+  > "The following old Gemini/Generic configuration will be removed from `<Target>`:
+  > - `.agents/rules/` (N files)
+  > - `.agents/skills/` (N files)
+  > - `.agents/workflows/` (N files)
+  > - `.agents/sync-state.json`
+  >
+  > Proceed with cleanup? (yes/no)"
+- On approval: `rm -rf <Target_Repo>/.agents/`
+- **`AGENTS.md` is always kept** — it is the cross-agent global standard, not agent-specific.
+- If `.agents/` is not found: skip silently.
+
+**If `TARGET_AGENT = Gemini / Generic`** (new config is `.agents/`):
+- Check if `.claude/` or `CLAUDE.md` exist in the target repo.
+- If they do, present to the user for approval, then:
+  - `rm -rf <Target_Repo>/.claude/`
+  - `rm -f <Target_Repo>/CLAUDE.md`
+- If neither is found: skip silently.
+
+Proceed to Step 6.
+
 ### Step 6 — Finalization
 - In the *Target* repository, stage all added and modified files (including the sync-state file).
 - Commit with message:
