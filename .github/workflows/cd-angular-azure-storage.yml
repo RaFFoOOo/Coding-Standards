@@ -8,7 +8,7 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
-      node-version: ${{ vars.NODE_VERSION || '20' }}
+      node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: production
     secrets: inherit
@@ -22,17 +22,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: angular-build-output
           path: ./dist
 
       - name: Deploy to Azure Blob Storage
         env:
-          SAS_URL: ${{ secrets.AZURE_STORAGE_BASE_URL }}/${{ secrets.AZURE_STORAGE_DEPLOY_BASE_PATH }}?${{ secrets.AZURE_STORAGE_DEPLOY_SAS_TOKEN }}
+          SAS_URL: ${{ vars.CD_AZURE_STA_BASE_URL }}/${{ vars.CD_AZURE_STA_BASE_PATH }}?${{ secrets.CD_AZURE_STA_SAS_TOKEN }}
         run: |
           # Use the repository variable to route to the correct artifact subdirectory
           if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
@@ -50,6 +50,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAG_NAME="prod-$(date +'%Y%m%d-%H%M')"
+          TAG_NAME="prod-blob-storage-$(date +'%Y%m%d-%H%M')"
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"

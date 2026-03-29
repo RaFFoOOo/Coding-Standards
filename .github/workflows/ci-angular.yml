@@ -13,7 +13,7 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
-      node-version: ${{ vars.NODE_VERSION || '20' }}
+      node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: development
     secrets: inherit

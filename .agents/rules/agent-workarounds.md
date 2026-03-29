@@ -24,6 +24,14 @@ nohup bash -c "your-command 2>&1" > /tmp/log.txt &
 
 For long-running commands (build, push), poll the log file with a `sleep N && cat /tmp/log.txt` pattern.
 
+## Known IDE Issue — Ghost File Resurrections during Refactoring
+
+When an Agent performs a destructive mass-deletion of a structural directory via `rm -rf` (e.g., component consolidation), if the user accidentally has any of those targeted files focused natively in an active IDE tab, the IDE's automated persistence loop will instantly resurrect the deleted files immediately back into the system environment causing severe ghost compilation errors.
+
+### Workaround
+- **Diagnostics:** If an Angular build fails explicitly citing an import mismatch inside a domain you just deleted, immediately assume IDE Resurrection. 
+- **Agent Duty:** Warn the user to forcibly close those editor tabs, and re-execute the UNIX `rm -rf` command blindly before re-triggering compilers.
+
 ## Known IDE Issue — Antigravity v1.20.6 "ECONNREFUSED" Customizations Bug
 
 Antigravity versions `1.20+` officially introduced support for the open `AGENTS.md` standard, but contain a significant regression where naming the workspace folder `.agents/` (plural) causes an `ECONNREFUSED` connect error, crashing the background indexing server.
