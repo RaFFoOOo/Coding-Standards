@@ -1,19 +1,23 @@
 ---
-name: Feature Cycle
+name: run-feature
 description: Standard workflow for implementing a feature from PLAN.md
 ---
 
 # Feature Implementation Cycle
 
+> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__list_pull_requests` for `gh pr list`, `mcp__github__create_pull_request` for `gh pr create`).
+
 Execute each step sequentially for every Feature in the sprint.
 
 ## Pre-Flight
 1. **Open PR Check**: Run `gh pr list`. If there are any open, unmerged PRs, **STOP and warn the user** before starting a new feature.
-2. Read the Feature tasks from the project `PLAN.md`.
+2. **Source → PLAN.md Promotion [MANDATORY]:** If the task was picked up from `TODO.md` (not already in `PLAN.md`), you MUST create a `PLAN.md` first — decompose the item into Acceptance Criteria, Technical Implementation steps, and Task Progress — and present it to the user for approval before any execution. Never execute directly from `TODO.md`.
+   Read the Feature tasks from the project `PLAN.md`.
 3. Mark the Feature and its first task as `[/]` in `PLAN.md`.
 4. **Sync main [MANDATORY]:** Before creating the feature branch, ensure you are on the latest `main`: `git checkout main && git pull origin main`
 5. Checkout a new feature branch from the updated main: `git checkout -b feature/[name]`
-6. Read relevant skills: `.agents/skills/sprint-manager/SKILL.md`, `.agents/skills/quality-assurance/SKILL.md` (if exists).
+6. Read relevant skills: `.agents/skills/plan-sprint/SKILL.md`, `.agents/skills/run-qa/SKILL.md` (if exists).
+   **Skill path integrity check:** If any skill referenced in this file was recently renamed, run `grep -rn "<old-name>" .agents/skills/ AGENTS.md` before proceeding to catch stale references.
 7. Read rules: the relevant `.agents/rules/stack-*.md` file for the current tech stack and `AGENTS.md` (user global rules).
 
 ## Implementation Loop (per task)
@@ -21,17 +25,16 @@ Execute each step sequentially for every Feature in the sprint.
 
 8. **Mockup Gate** (UI tasks only): Use `generate_image` to create a visual mockup. Save as artifact. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
-10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/quality-assurance/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
+10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
 11. **Atomic Commit [MANDATORY]:** Stage and commit the specific changes related strictly to this task. **You must separate commits for each task** (e.g., `git add <files> && git commit -m "feat(scope): complete task part"`). This creates clean revert options if required.
 12. Mark the task as `[x]` in `PLAN.md`.
 
 ## Post-Feature Verification
 12. Run build: `npx ng build --configuration development`
-13. Run build: `npx ng build --configuration development`
-14. Check build output for errors and warnings. Fix any issues.
-15. **Browser Test [OPTIONAL]:** Ask the user if they want to execute structured browser tests. If confirmed, run the `/browser-test` workflow. Write a test plan based on the feature's Acceptance Criteria, execute it in the browser using the `browser_subagent`, and fix any failures. If skipped, proceed to the next step.
+13. Check build output for errors and warnings. Fix any issues.
+14. **Browser Test [OPTIONAL]:** Ask the user if they want to execute structured browser tests. If confirmed, run the `/test-browser` workflow. Write a test plan based on the feature's Acceptance Criteria, execute it in the browser using the `browser_subagent`, and fix any failures. If skipped, proceed to the next step.
 16. **PLAN.md Full Sync Gate [MANDATORY]:** Before staging, verify that ALL checkboxes related to the completed Feature are marked `[x]` in EVERY section of `PLAN.md` (Acceptance Criteria in Section 2, Technical Implementation in Section 3, AND Task Progress in Section 4). This is a hard gate — do NOT proceed to staging until all sections are consistent.
-17. **QUALITY_ASSURANCE Strict Gate [MANDATORY]:** You are absolutely forbidden from staging files or creating a Pull Request unless the `QA_REPORT.md` artifact physically exists in your environment and explicitly contains the exact string `STATUS: PASS`. If it does not, run the `.agents/skills/quality-assurance/SKILL.md` immediately.
+17. **QUALITY_ASSURANCE Strict Gate [MANDATORY]:** You are absolutely forbidden from staging files or creating a Pull Request unless the `QA_REPORT.md` artifact physically exists in your environment and explicitly contains the exact string `STATUS: PASS`. If it does not, run the `.agents/skills/run-qa/SKILL.md` immediately.
 18. **Merge with origin/main [MANDATORY]:** Before staging, always pull and merge the latest `origin/main` into your feature branch: `git fetch origin && git merge origin/main`. Resolve any conflicts, verify the build still compiles cleanly, and only then proceed. This prevents merge conflicts from surfacing in the PR.
 19. **PR Review Gate [MANDATORY]:** Before staging any changes, call `notify_user` asking the user if they want to review the uncommitted code changes in the current branch. DO NOT proceed to staging and committing until the user explicitly approves.
 20. Push branch to remote: `git push -u origin feature/[name]`
@@ -65,8 +68,9 @@ Execute each step sequentially for every Feature in the sprint.
 ## Documentation / Recursive Improvement
 22. Update `PLAN.md` artifact: mark the Feature as `[x]`.
 23. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail.
-24. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
-25. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
+24. **TODO Audit [MANDATORY — End of Sprint]:** Run the `/todo-manager` skill § 6 audit. Cross-reference every `- [ ]` item in `TODO.md` against the recent git log (`git log --oneline -20`). Mark delivered items `[x]` with a PR reference comment and archive any fully-completed sections. This is not optional — stale TODO entries erode backlog trust.
+25. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
+26. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 
 ## Dependency Freshness Audit [MANDATORY — End of Sprint]
 Execute this section **once per sprint**, after the final Feature's PR has been merged.

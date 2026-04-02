@@ -1,5 +1,5 @@
 ---
-name: ARTIFACT_MANAGER
+name: manage-artifacts
 description: Governs PLAN.md structure, artifact lifecycle, and README maintenance.
 ---
 
@@ -52,3 +52,4 @@ The workspace relies on the following key artifacts:
 ## Artifact Lifecycle
 - **Planning & Backlog (TODO.md):** Every time you start a new `PLAN.md`, you MUST check the `TODO.md` file. Evaluate if any tasks in the TODO list are processable in the current sprint. If so, move them from `TODO.md` into `PLAN.md` with full specifications. You can also use `TODO.md` to keep ongoing notes. `TODO.md` is specific to each project.
 - **Archiving:** At the end of a sprint/milestone, do not let artifacts grow indefinitely. Move stale sprint plans or old QA logs to an `archive/` folder, or clear them to start a fresh `PLAN.md`.
+- **One Canonical Plan File [STRICT]:** A sprint has exactly one plan file. During active work it is `PLAN.md` at the project root. On completion it is moved to `archive/PLAN_<sprint-name>.md`. A separately named copy (e.g. `PLAN_sprint_7.5_quality.md`) must **never** coexist alongside `PLAN.md` — if one is found and is identical, delete the duplicate before archiving.

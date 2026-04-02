@@ -20,14 +20,15 @@ Invoke via slash commands (shims in `.claude/skills/`) or by reading the source 
 
 | Command | Source File | Purpose |
 |---|---|---|
-| `/quality-assurance` | `.agents/skills/quality-assurance/SKILL.md` | Pre-merge QA verification (mandatory gate) |
-| `/sprint-manager` | `.agents/skills/sprint-manager/SKILL.md` | Break sprint into estimated tasks + mockup gate |
-| `/artifact-manager` | `.agents/skills/artifact-manager/SKILL.md` | Manage PLAN.md structure and artifact lifecycle |
-| `/feature-cycle` | `.agents/workflows/feature-cycle.md` | Execute a full feature from PLAN.md to merged PR |
-| `/pr-resolution` | `.agents/workflows/pr-resolution.md` | Resolve PR review comments |
-| `/sync-template` | `.agents/workflows/sync-template.md` | Sync standards to/from a target project repo |
-| `/browser-test` | `.agents/workflows/browser-test.md` | Plan and execute browser tests |
+| `/run-qa` | `.agents/skills/run-qa/SKILL.md` | Pre-merge QA verification (mandatory gate) |
+| `/plan-sprint` | `.agents/skills/plan-sprint/SKILL.md` | Break sprint into estimated tasks + mockup gate |
+| `/manage-artifacts` | `.agents/skills/manage-artifacts/SKILL.md` | Manage PLAN.md structure and artifact lifecycle |
+| `/run-feature` | `.agents/workflows/run-feature.md` | Execute a full feature from PLAN.md to merged PR |
+| `/resolve-pr` | `.agents/workflows/resolve-pr.md` | Resolve PR review comments |
+| `/sync-templates` | `.agents/workflows/sync-templates.md` | Sync standards to/from a target project repo |
+| `/test-browser` | `.agents/workflows/test-browser.md` | Plan and execute browser tests |
 | `/deploy-azure` | `.agents/workflows/deploy-azure.md` | Build for production and deploy to Azure |
+| `/todo-manager` | `.agents/skills/todo-manager/SKILL.md` | Manage TODO.md lifecycle (append, mark done, archive, promote to PLAN.md) |
 
 ### Plan Mode
 Claude Code enters plan mode for complex tasks. You (Tech Lead) review and approve
@@ -38,7 +39,7 @@ All instructions are version-controlled. Remote/scheduled agents load from this 
 Never rely on machine-local `~/.claude/` files for project-critical rules.
 
 ### Agent-Specific Deployment
-When deploying standards to a real project, use `/sync-template`.
+When deploying standards to a real project, use `/sync-templates`.
 It will ask which agent the target project uses and transform paths, entry points,
 and tool references accordingly (Claude Code → `.claude/` + `CLAUDE.md`; Gemini → `.agents/` as-is).
 

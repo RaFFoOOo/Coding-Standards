@@ -1,5 +1,5 @@
 ---
-name: QUALITY_ASSURANCE
+name: run-qa
 description: Pre-merge verification, console audit, UX testing, and QA report generation.
 ---
 
@@ -35,6 +35,9 @@ Run this self-review **before** launching the full QA process. If any item fails
 11. **Skills**: Were all relevant skills followed? (e.g., `SPRINT_MANAGER`)
 
 ## 1. The Console Zero-Tolerance Policy
+
+> **Claude Code:** Sections §1-§2 require browser access. Use the `/test-browser` skill with Playwright MCP if available, or ask the user to perform manual browser verification and report console output.
+
 **Protocol:**
 1.  Launch the application in the browser.
 2.  Open the DevTools Console listener.
@@ -79,7 +82,7 @@ Before proceeding to Usability Standards, ask the User:
 
 ## 5. Reporting
 Generate a `QA_REPORT.md` in the artifact folder containing:
--   **CRITICAL REQUIREMENT:** If all tests and the console pass cleanly, the report MUST begin with the exact string: `STATUS: PASS` to unlock the `feature-cycle.md` PR gate.
+-   **CRITICAL REQUIREMENT:** If all tests and the console pass cleanly, the report MUST begin with the exact string: `STATUS: PASS` to unlock the `run-feature.md` PR gate.
 -   [ ] Console Cleanliness Status.
 -   [ ] Navigation Test Status (Skipped/Passed).
 -   [ ] Mobile Viewport Validation (if tested).
