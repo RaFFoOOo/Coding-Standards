@@ -1,9 +1,11 @@
 ---
-name: PR Resolution
+name: resolve-pr
 description: Workflow to check and resolve all PR comments before proceeding with PR approval
 ---
 
 # PR Resolution Workflow
+
+> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__pull_request_read` for `gh pr view`, `mcp__github__add_reply_to_pull_request_comment` for `gh api` comment replies).
 
 Execute this workflow when a Pull Request has received review comments that need to be addressed before it can be merged.
 
@@ -20,7 +22,7 @@ Execute this workflow when a Pull Request has received review comments that need
 // turbo-all
 
 6. Implement the requested code changes following standard rules.
-7. **Quick Pre-QA Scan [MANDATORY]**: Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/quality-assurance/SKILL.md` strictly on the modified files to ensure the new changes adhere to repo standards.
+7. **Quick Pre-QA Scan [MANDATORY]**: Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md` strictly on the modified files to ensure the new changes adhere to repo standards.
 8. **Atomic Commit [MANDATORY]**: Stage and commit the specific changes related to this comment/task securely. **You must separate commits for each comment, unless two or more comments are intimately related.** This is a global rule to preserve clean revert options.
 9. **Comment Resolution [MANDATORY]**: Using the GitHub CLI (`gh pr review` or `gh api`), reply directly to the specific PR comment thread with a concise explanation of the resolution. This enables the reviewer to quickly audit all fixes.
 10. Mark the corresponding task as `[x]` in `PLAN.md` once thoroughly addressed.

@@ -1,9 +1,11 @@
 ---
-name: Sync Template
+name: sync-templates
 description: Synchronize template artifacts (AGENTS.md, .agents/, .github/) between the current repository and a remote repository (Push or Pull Model), with agent-aware path and tool transformation for the target project.
 ---
 
 # Template Synchronization Workflow
+
+> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__list_pull_requests` for `gh pr list`).
 
 This workflow automates the process of pulling or pushing standard configurations, rules, skills, and CI/CD pipelines between the **current** repository and another local repository (e.g., the `Coding-Standards` template repository). It maintains `.agents/sync-state.json` (or `.claude/sync-state.json` for Claude Code targets) skip lists in the target repository to remember explicit exclusions.
 
@@ -11,7 +13,7 @@ It also handles **agent-aware transformation**: when the target project uses Cla
 
 ## Prerequisites
 - This workflow must be executed from **the root directory of the current project repository** (verify with `git rev-parse --show-toplevel`).
-- For the very first execution in a new project, this file (`.agents/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
+- For the very first execution in a new project, this file (`.agents/workflows/sync-templates.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
 
@@ -42,9 +44,43 @@ Store the selection as `TARGET_AGENT`.
   - Look for `<Target_Repo>/.agents/sync-state.json`.
 - If it exists, read the `skipList` array. Files matching these paths must be completely ignored during the diff/sync phase.
 
+### Step 3b — Sync History Verification [MANDATORY]
+
+Before proceeding with the diff, verify that this sync will not overwrite more recent changes by checking the **Sync History Ledger**.
+
+1. **Locate the ledger** in the **Target** repository:
+   - Claude Code targets: `<Target_Repo>/.claude/sync-history.json`
+   - Gemini / Generic targets: `<Target_Repo>/.agents/sync-history.json`
+
+2. **If the ledger exists**, read the `executions` array and find the **most recent entry** (last element).
+   - Compare the `sourceBranch` of the last entry against the **current** Source branch (`git rev-parse --abbrev-ref HEAD` in the Source repo).
+   - Compare the `targetBranch` of the last entry against the **current** Target branch being created/used.
+   - **Staleness Check:** If the last sync `date` is **more recent** than the latest commit date on the Source's current branch (`git log -1 --format=%aI`), the Source may contain stale content. **STOP** and warn the user:
+     > "The target was last synced on `<date>` from `<sourceRepo>@<sourceBranch>`, but the source branch's latest commit is older than that sync. This means the target may already have newer standards. Proceeding could overwrite more recent changes. Continue anyway? (yes/no)"
+   - If the user declines, abort the workflow.
+
+3. **If the ledger does not exist**, this is the first tracked sync — proceed normally.
+
+**Sync History Ledger schema** (`sync-history.json`):
+```json
+{
+  "executions": [
+    {
+      "date": "2026-03-30T14:30:00Z",
+      "direction": "PUSH",
+      "sourceRepo": "Coding-Standards",
+      "sourceBranch": "main",
+      "targetRepo": "le-cementine",
+      "targetBranch": "chore/sync-standards-claude-code",
+      "agent": "claude-code"
+    }
+  ]
+}
+```
+
 ### Step 4 — Diff & Plan Review
 - Determine the effective source file set based on `TARGET_AGENT`:
-  - **Claude Code**: Source files are `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.agents/workflows/`, `.agents/sync-state.json`, `.github/`
+  - **Claude Code**: Source files are `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.agents/workflows/`, `.agents/sync-state.json`, `.agents/sync-history.json`, `.github/`
   - **Gemini / Generic**: Source files are `AGENTS.md`, `.agents/`, `.github/`
 - For each source file, determine its **target path** (see Step 5b for Claude Code mapping).
 - Filter out any files matching the `skipList`.
@@ -73,6 +109,7 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
 | `.agents/workflows/X.md` | `.claude/skills/X/SKILL.md` |
 | `.agents/sync-state.json` | `.claude/sync-state.json` |
+| `.agents/sync-history.json` | `.claude/sync-history.json` |
 | `.github/` | `.github/` (copy as-is) |
 
 **Content Substitutions** (apply to every copied `.md` file going into `.claude/`):
@@ -84,7 +121,7 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 | `.agents/workflows/` | `.claude/skills/` |
 | `generate_image` tool calls | Text wireframe instruction: *"Create a markdown wireframe describing the layout, component hierarchy, interactions, and color tokens for this UI task. Save as `mockup_[feature].md` artifact and embed it in `implementation_plan.md`."* |
 | `notify_user` tool calls | *"Output a message to the user asking for explicit approval. Wait for the user's response before proceeding."* |
-| `browser_subagent` tool calls | *"Use the `/browser-test` skill. Note: requires the Playwright MCP server configured in `.mcp.json` (`@playwright/mcp`). If not available, perform browser testing manually and document results."* |
+| `browser_subagent` tool calls | *"Use the `/test-browser` skill. Note: requires the Playwright MCP server configured in `.mcp.json` (`@playwright/mcp`). If not available, perform browser testing manually and document results."* |
 | `// turbo-all` | *(remove the line entirely)* |
 
 **Workflow-to-Skill Frontmatter Injection** (for each `.agents/workflows/X.md`):
@@ -108,14 +145,15 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 ### Skills Available
 | Command | Purpose |
 |---|---|
-| `/quality-assurance` | Pre-merge QA verification (mandatory gate) |
-| `/sprint-manager` | Break sprint into estimated tasks + mockup gate |
-| `/artifact-manager` | Manage PLAN.md structure and artifact lifecycle |
-| `/feature-cycle` | Execute a full feature from PLAN.md to merged PR |
-| `/pr-resolution` | Resolve PR review comments |
-| `/sync-template` | Sync standards to/from a target project repo |
-| `/browser-test` | Plan and execute browser tests |
+| `/run-qa` | Pre-merge QA verification (mandatory gate) |
+| `/plan-sprint` | Break sprint into estimated tasks + mockup gate |
+| `/manage-artifacts` | Manage PLAN.md structure and artifact lifecycle |
+| `/run-feature` | Execute a full feature from PLAN.md to merged PR |
+| `/resolve-pr` | Resolve PR review comments |
+| `/sync-templates` | Sync standards to/from a target project repo |
+| `/test-browser` | Plan and execute browser tests |
 | `/deploy-azure` | Build for production and deploy to Azure |
+| `/todo-manager` | Manage TODO.md lifecycle (append, mark done, archive, promote to PLAN.md) |
 
 ### Plan Mode
 Claude Code enters plan mode for complex tasks. You (Tech Lead) review and approve the
@@ -160,7 +198,30 @@ Before staging, remove the **previous** agent's configuration from the target to
 Proceed to Step 6.
 
 ### Step 6 — Finalization
-- In the *Target* repository, stage all added and modified files (including the sync-state file).
+
+#### Step 6a — Update Sync History Ledger [MANDATORY]
+Before staging, append a new execution record to the **Sync History Ledger** in the Target repository.
+
+- **Locate** (or create) the ledger file:
+  - Claude Code targets: `<Target_Repo>/.claude/sync-history.json`
+  - Gemini / Generic targets: `<Target_Repo>/.agents/sync-history.json`
+- **Append** a new entry to the `executions` array:
+  ```json
+  {
+    "date": "<current ISO 8601 UTC timestamp>",
+    "direction": "<PUSH or PULL>",
+    "sourceRepo": "<Source repository name>",
+    "sourceBranch": "<Source branch name at time of sync>",
+    "targetRepo": "<Target repository name>",
+    "targetBranch": "<Target branch name>",
+    "agent": "<TARGET_AGENT lowercase, e.g. claude-code, gemini>"
+  }
+  ```
+- If the file did not exist, create it with the `executions` array containing this single entry.
+- Include the ledger file in the staged changes.
+
+#### Step 6b — Commit & Push
+- In the *Target* repository, stage all added and modified files (including the sync-state and sync-history files).
 - Commit with message:
   - Gemini / Generic: `chore(standards): sync template updates`
   - Claude Code: `chore(standards): sync template updates (claude-code)`
@@ -190,7 +251,7 @@ After the PR is merged in the target project, present the user with the followin
   - `CD_AZURE_SWA_DEPLOYMENT_TOKEN` — Token for Azure Static Web Apps deployment
 
 **[OPTIONAL] Claude Code — Browser Testing**
-- [ ] Create `.mcp.json` in the project root to enable the `/browser-test` skill:
+- [ ] Create `.mcp.json` in the project root to enable the `/test-browser` skill:
   ```json
   {
     "mcpServers": {

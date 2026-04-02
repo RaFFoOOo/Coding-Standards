@@ -1,5 +1,5 @@
 ---
-name: Deploy Azure
+name: deploy-azure
 description: Build for production and deploy to Azure Blob Storage ($web container)
 ---
 

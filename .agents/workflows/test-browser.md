@@ -1,5 +1,5 @@
 ---
-name: Browser Test
+name: test-browser
 description: Plan and execute structured browser tests for each completed feature before merging.
 ---
 
@@ -52,7 +52,7 @@ nohup bash -c "cd [project]/[webapp-dir] && npx ng serve --port 4200 2>&1" > /tm
 
 ## Step 4 — Execute in the Browser
 
-Use the `browser_subagent` tool. Open the local dev URL and execute each test case from the sprint test plan.
+Use the `browser_subagent` tool (or the `playwright` MCP tool for Claude Code — requires Playwright MCP server configured in `.mcp.json`). Open the local dev URL and execute each test case from the sprint test plan. If neither tool is available, describe the test steps to the user for manual execution.
 
 For each test case, mark ✅ PASS or ❌ FAIL (with description of actual vs expected behavior).
 

@@ -1,5 +1,5 @@
 ---
-name: SPRINT_MANAGER
+name: plan-sprint
 description: Technical team lead skill for sprint decomposition, task estimation, and the Mockup Gate.
 ---
 
