@@ -35,12 +35,3 @@ When an Agent performs a destructive mass-deletion of a structural directory via
 - **Agent Duty:** Warn the user to forcibly close those editor tabs, and re-execute the UNIX `rm -rf` command blindly before re-triggering compilers.
 
 **Claude Code note:** This issue applies identically in VSCode when using Claude Code. The `Bash` tool executes `rm -rf` correctly, but IDE tab resurrection can still occur. Follow the same workaround.
-
-## Claude Code — Watchdog Rule for Bash Tool
-
-If a `Bash` tool call produces no visible output change for **60+ seconds**:
-- **STOP** — terminate the command if possible (e.g., a hanging `npm install` or build).
-- **Analyze** — read the last few lines of output to identify the root cause (network timeout, lockfile, port conflict, etc.).
-- Do **not** blindly retry. Report the specific "Stuck Reason" to the User.
-
-This is the Claude Code application of the global Watchdog Rule from AGENTS.md §4.

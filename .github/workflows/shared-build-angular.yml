@@ -18,9 +18,18 @@ on:
         required: false
         type: string
         default: 'production'
+      deploy-tag-prefix:
+        description: 'Prefix for the generated build version tag (e.g., cd-azure-sta, cd-azure-swa). Defaults to build.'
+        required: false
+        type: string
+        default: 'build'
     secrets:
       CI_DEFAULT_TENANT_ID:
         required: false
+    outputs:
+      build-tag:
+        description: 'The generated build version tag (e.g., cd-azure-sta-20260330-1430)'
+        value: ${{ jobs.build.outputs.build-tag }}
 
 jobs:
   build:
@@ -29,6 +38,8 @@ jobs:
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
+    outputs:
+      build-tag: ${{ steps.generate-tag.outputs.build-tag }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -43,6 +54,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Generate Build Tag
+        id: generate-tag
+        run: |
+          BUILD_TAG="${{ inputs.deploy-tag-prefix }}-$(date +'%Y%m%d-%H%M')"
+          echo "build-tag=$BUILD_TAG" >> "$GITHUB_OUTPUT"
+          echo "BUILD_TAG=$BUILD_TAG" >> "$GITHUB_ENV"
+
       - name: Replace Environment Tokens
         env:
           ENV_TENANT_ID: ${{ vars.CI_DEFAULT_TENANT_ID }}
@@ -56,6 +74,7 @@ jobs:
               let content = fs.readFileSync(file, 'utf8');
               content = content.replaceAll('__DEFAULT_TENANT_ID__', process.env.ENV_TENANT_ID || '');
               content = content.replaceAll('__ENABLE_TENANT_SELECTOR__', process.env.ENV_ENABLE_TENANT_SELECTOR || 'false');
+              content = content.replaceAll('__BUILD_VERSION__', process.env.BUILD_TAG || 'unknown');
               fs.writeFileSync(file, content);
             "
           elif [ "${{ inputs.environment }}" = "production" ]; then
