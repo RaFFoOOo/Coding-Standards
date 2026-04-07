@@ -17,7 +17,6 @@ description: Frontend stack rules for Angular / TypeScript projects
   - For Angular signals, always declare the full generic form: `Signal<T>`, `InputSignal<T>`, `WritableSignal<T>`, `ModelSignal<T>`.
   - ❌ `readonly isReady = computed(() => true)`
   - ✅ `readonly isReady: Signal<boolean> = computed(() => true)`
-  - *Reason:* Inference is fragile across refactors. Explicit types serve as living documentation and catch type drift early at the declaration site.
 
 ## 2. Component Architecture (The "Building Block" Strategy)
 - **Smart vs. Dumb Components:**
@@ -40,7 +39,6 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Expose named `readonly` component properties (computed signals or direct signal aliases) that delegate to the service internally. Templates bind only to component properties.
   - ❌ `[value]="myService.someSignal()"` in template
   - ✅ `readonly someValue = this.myService.someSignal;` in component, then `[value]="someValue()"` in template
-  - *Reason:* Decouples the template from the service's API shape. Renaming or refactoring a service requires updating only the component class, not the template.
 - **Control Flow:**
   - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
 - **File Structure:**
@@ -106,7 +104,6 @@ description: Frontend stack rules for Angular / TypeScript projects
     this.route.paramMap.subscribe(params => this.catalogType.set(params.get('catalogType') ?? ''));
   }
   ```
-  *Reason:* `toSignal()` is cleanup-free (tied to the injection context), propagates reactively, and avoids splitting state across field declaration and `ngOnInit`.
 
 ## 7. Reactive State Management
 - **Local State:** Use `signal()` for all mutable component local state.
@@ -133,4 +130,3 @@ description: Frontend stack rules for Angular / TypeScript projects
   - When a config value drives conditional behavior across multiple components (e.g., a `businessType`, `userRole`, or `featureFlag`), create a dedicated injectable service that exposes named boolean signals and config methods derived from that value.
   - Direct string comparisons against config values (e.g., `config.type === 'x'`) are **forbidden** in components and templates. Components consume named signals from the centralized service instead.
   - Config methods on the service (e.g., `getDatePickerConfig()`, `getFormValidators()`) return typed config objects — templates bind to their properties rather than containing inline conditional expressions.
-  - *Reason:* Adding or renaming a mode value only requires updating the centralized service, not auditing every component. Templates remain declarative and free of domain string literals.
