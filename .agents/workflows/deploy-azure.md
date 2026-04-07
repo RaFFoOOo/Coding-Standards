@@ -15,7 +15,6 @@ This workflow builds the Angular app for production and uploads it to the Azure 
 
 ## Steps
 
-// turbo
 1. Verify that `.env.deploy` exists:
 ```bash
 if [ ! -f "./.env.deploy" ]; then
@@ -24,13 +23,11 @@ if [ ! -f "./.env.deploy" ]; then
 fi
 ```
 
-// turbo
 2. Load the SAS URL from `.env.deploy`:
 ```bash
 export SAS_URL=$(grep "^AZURE_STORAGE_SAS_URL=" ./.env.deploy | cut -d '=' -f2-)
 ```
 
-// turbo
 3. Build the application for production:
 ```bash
 npx ng build --configuration production
@@ -55,7 +52,6 @@ curl -I "$SITE_URL" | grep "HTTP/1.1 200 OK"
 ```
 *(Requires `AZURE_STATIC_WEBSITE_URL` in `.env.deploy`).* Ask the user to confirm deployment.
 
-// turbo
 6. Create and push a production release tag:
 ```bash
 TAG_NAME="prod-$(date +'%Y%m%d-%H%M')"

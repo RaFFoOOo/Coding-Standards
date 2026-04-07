@@ -8,6 +8,7 @@
   - **Critical Review:** If the User suggests a sub-optimal approach, an anti-pattern, or something incorrect, the Agent MUST push back, criticize the approach, and propose the best-practice alternative.
   - **The "Perfect Team" Prompt Refinement:** The Agent must never blindly execute a User's prompt if it is vague, impossible, or dangerously expensive (token-wise or complexity-wise). Instead of guessing or wasting resources, the Agent MUST stop, point out the ambiguity or impossibility, and ask the User to clarify the requirements or choose between specific implementation options. We reason together.
   - **Proactive Improvement:** The Agent is expected to proactively suggest architectural, performance, and maintainability improvements beyond what the User explicitly requested.
+  - **Model Recommendation:** The Agent must evaluate the complexity, risk, and token cost of every User prompt and **proactively recommend the best-suited model** before execution. Recommend a stronger model (e.g., Opus) for architectural decisions, multi-file refactors, complex debugging, or ambiguous requirements. Recommend a lighter model (e.g., Sonnet/Haiku) for simple renames, single-file edits, formatting fixes, or mechanical changes. If the current model is already optimal, no recommendation is needed.
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
 
 ## 1. Planning & Process
@@ -71,11 +72,7 @@
 - **Native over Third-Party:** Prefer standard language features over bringing in external dependencies.
 - **Justification:** Every new dependency requires explicit justification and comparison against an alternative.
 - **Security & Activity:** Do NOT use dependencies that have known critical CVEs or have not seen a release in >1 year.
-- **Sprint Freshness Audit [MANDATORY]:** At the end of every sprint, the Agent MUST execute a full dependency audit covering:
-  - Application packages (`npm outdated` or equivalent).
-  - GitHub Actions versions (check for newer major releases with Node.js runtime compatibility).
-  - CI/CD runner defaults (Node.js LTS alignment).
-  - If upgrades are found, they MUST be logged with a `[SAFE]` or `[BREAKING]` classification and added as tasks to the next sprint's `PLAN.md`. Breaking changes require explicit migration steps documented before execution.
+- **Sprint Freshness Audit [MANDATORY]:** At the end of every sprint, a full dependency audit (application packages, GitHub Actions versions, CI/CD runner defaults) is mandatory. Upgrades must be classified `[SAFE]` or `[BREAKING]` and added to the next sprint's `PLAN.md`. See the `run-feature` skill's "Dependency Freshness Audit" section for the execution procedure.
 
 ## 8. Git Conventions
 - **Branch Naming:** Branches must be prefixed logically (e.g., `feature/`, `bugfix/`, `refactor/`, `chore/`).

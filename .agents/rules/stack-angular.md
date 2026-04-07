@@ -12,6 +12,12 @@ description: Frontend stack rules for Angular / TypeScript projects
   - `strict: true` is mandatory.
   - **[ARCHITECT REQUIRED]** The `any` keyword is forbidden. If a type is unknown, use `unknown` and type-guard it, or create a `Generic<T>` interface.
 - **Interfaces:** Define explicit interfaces for all input properties (`input()`), API responses, and Domain models.
+- **[STRICT] Explicit Property Types:** Every class property (component or service) **MUST** carry an explicit type annotation — no reliance on TypeScript inference alone.
+  - This applies to all `readonly` fields, injected service aliases, `computed()` signals, `toSignal()` results, and any other class-level declaration.
+  - For Angular signals, always declare the full generic form: `Signal<T>`, `InputSignal<T>`, `WritableSignal<T>`, `ModelSignal<T>`.
+  - ❌ `readonly isReady = computed(() => true)`
+  - ✅ `readonly isReady: Signal<boolean> = computed(() => true)`
+  - *Reason:* Inference is fragile across refactors. Explicit types serve as living documentation and catch type drift early at the declaration site.
 
 ## 2. Component Architecture (The "Building Block" Strategy)
 - **Smart vs. Dumb Components:**
@@ -29,12 +35,16 @@ description: Frontend stack rules for Angular / TypeScript projects
   - **MUST** use the `inject()` function instead of constructor injection for all services and tokens.
   - **Strict Interface Tokens:** When providing a concrete Mock class mapping to an abstract interface token in `app.config.ts`, components **MUST** strictly invoke `inject(ITokenInterface)`, never the concrete class directly.
   - **Ambient Provider Ban:** Concrete Mock classes intentionally bound within `app.config.ts` providers MUST NOT declare `@Injectable({ providedIn: 'root' })`. This forces explicit dependency resolution failures over silent uninitialized dual-instantiations if developers accidentally breach token mappings.
+- **[STRICT] Service Decoupling from Templates:**
+  - Injected services **MUST** always be declared `private`. Templates must never call service methods or access service signals directly (e.g., `myService.someSignal()` in HTML is forbidden).
+  - Expose named `readonly` component properties (computed signals or direct signal aliases) that delegate to the service internally. Templates bind only to component properties.
+  - ❌ `[value]="myService.someSignal()"` in template
+  - ✅ `readonly someValue = this.myService.someSignal;` in component, then `[value]="someValue()"` in template
+  - *Reason:* Decouples the template from the service's API shape. Renaming or refactoring a service requires updating only the component class, not the template.
 - **Control Flow:**
   - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
-  - *Reason:* Better type checking, performance, and readability.
 - **File Structure:**
   - **Inline Templates/Styles forbidden:** Components must have separate `.html` and `.scss` files unless they display static text < 3 lines.
-  - *Reason:* Maintainability and SoC.
 - **Standalone Components:** All components must be `standalone: true`.
 - **Template Purity:**
   - **No Inline Logic:** Direct property assignment or Signal mutation in templates is forbidden.
@@ -42,7 +52,6 @@ description: Frontend stack rules for Angular / TypeScript projects
     - ❌ `(click)="isOpen.set(false)"`
   - **Explicit Handlers:** Always invoke a dedicated method that encapsulates the logic.
     - ✅ `(click)="closeDropdown()"` where method contains `this.isOpen.set(false)`
-  - *Reason:* Enables debugging, testing, and clear separation of concerns.
 
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
@@ -64,6 +73,10 @@ description: Frontend stack rules for Angular / TypeScript projects
     - *Component usage:* Use the context variable `var(--section-padding)` directly.
     - *Benefit:* Avoids clashing/redundant media queries in feature-level SCSS files and maintains a DRY codebase.
   - Never use `!important`. Fix the specificity hierarchy instead.
+  - **[STRICT] Component Style Budget:** Angular enforces a per-component CSS budget (`anyComponentStyle`). Before adding styles to any component SCSS file or its partials loaded via `@use`, assess the cumulative size.
+    - **Shared visual styles** (colors, transitions, borders, typography) that apply to a base element across multiple partials (e.g., grid, list) MUST be defined once in the root component SCSS file. Partials must contain layout-only overrides (sizing, spacing, flex/grid context).
+    - **Never duplicate** a style block across two or more partials loaded by the same component — duplication is the primary cause of budget breaches.
+    - *Why:* `@use`-imported partial files are bundled into the host component's output CSS. Duplicated rules across partials sum directly against the component's budget.
 - **Iconography:**
   - **Strict Ban on Textual Icons:** Never use text characters (e.g., "x", "<", ">", "+") to represent UI controls or icons.
   - **System Alignment:** Use a professional icon library aligned with the chosen Design System (e.g., FontAwesome, Material Icons, Bootstrap Icons).
@@ -79,6 +92,21 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Automatic Cleanup:** Use `takeUntilDestroyed()` on all manual RxJS subscriptions.
 - **Declarative over Imperative:** Always prefer the `async` pipe or the `toSignal()` function over manually calling `.subscribe()`.
 - **Subscription Ban:** It is strictly forbidden to use `.subscribe()` without an explicit cleanup strategy (e.g. `takeUntilDestroyed`, `DestroyRef`, or async pipe).
+- **Route Param Signals [STRICT]:** Never derive a reactive signal from route params by calling `.subscribe()` and invoking `.set()` inside the callback. Always use `toSignal()` at the class field level:
+  ```typescript
+  // ✅ Correct
+  readonly catalogType = toSignal(
+    this.route.paramMap.pipe(map(params => params.get('catalogType') ?? '')),
+    { initialValue: '' }
+  );
+
+  // ❌ Wrong — sets a signal inside a subscription
+  readonly catalogType = signal('');
+  ngOnInit() {
+    this.route.paramMap.subscribe(params => this.catalogType.set(params.get('catalogType') ?? ''));
+  }
+  ```
+  *Reason:* `toSignal()` is cleanup-free (tied to the injection context), propagates reactively, and avoids splitting state across field declaration and `ngOnInit`.
 
 ## 7. Reactive State Management
 - **Local State:** Use `signal()` for all mutable component local state.
@@ -91,7 +119,6 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Feature Modules:** Organize code by business feature rather than technical type (e.g., `features/auth/` containing its own components, services, models).
 - **Naming Convention:** All Angular files must follow standard `kebab-case` naming (e.g., `user-profile.component.ts`).
 - **Barrel Exports:** Use `index.ts` files inside feature folders to explicitly expose only the public API of that feature, preventing deep imports.
-- *Reason:* Encapsulation and faster build times.
 
 ## 9. Multi-Tenant Architecture [STRICT]
 - **Resource Resolution:**
@@ -102,3 +129,8 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Implementation: Keys must be prefixed with a unique tenant identifier (e.g., `lc_{tenantId}_{key}`).
 - **Mode-Aware UI:**
   - Standard components (Booking, Catalog) must adapt their behavior and terminology based on the `businessType` signal from `ITenantConfigService` to support diverse business models (e.g., Reservation vs. Order).
+- **Mode Logic Centralization [STRICT]:**
+  - When a config value drives conditional behavior across multiple components (e.g., a `businessType`, `userRole`, or `featureFlag`), create a dedicated injectable service that exposes named boolean signals and config methods derived from that value.
+  - Direct string comparisons against config values (e.g., `config.type === 'x'`) are **forbidden** in components and templates. Components consume named signals from the centralized service instead.
+  - Config methods on the service (e.g., `getDatePickerConfig()`, `getFormValidators()`) return typed config objects — templates bind to their properties rather than containing inline conditional expressions.
+  - *Reason:* Adding or renaming a mode value only requires updating the centralized service, not auditing every component. Templates remain declarative and free of domain string literals.

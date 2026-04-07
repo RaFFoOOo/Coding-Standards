@@ -8,8 +8,9 @@ jobs:
     uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: ${{ vars.NODE_VERSION || '24' }}
-      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
+      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: production
+      deploy-tag-prefix: 'cd-azure-swa'
     secrets: inherit
 
   deploy:
@@ -36,13 +37,12 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           skip_app_build: true
-          app_location: "./dist/lc-webapp/browser"
+          app_location: "./dist/browser"
           output_location: ""
 
       - name: Create and Push Release Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAG_NAME="prod-aswa-$(date +'%Y%m%d-%H%M')"
-          git tag "$TAG_NAME"
-          git push origin "$TAG_NAME"
+          git tag "${{ needs.build.outputs.build-tag }}"
+          git push origin "${{ needs.build.outputs.build-tag }}"

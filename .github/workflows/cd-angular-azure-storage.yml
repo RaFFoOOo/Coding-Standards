@@ -11,6 +11,7 @@ jobs:
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: production
+      deploy-tag-prefix: 'cd-azure-sta'
     secrets: inherit
 
   deploy:
@@ -40,9 +41,9 @@ jobs:
           else
             BROWSER_DIR="./dist/browser"
           fi
-          
+
           echo "Syncing from directory: $BROWSER_DIR"
-          
+
           # The azcopy tool is pre-installed on the ubuntu-latest runner
           azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
 
@@ -50,6 +51,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAG_NAME="prod-blob-storage-$(date +'%Y%m%d-%H%M')"
-          git tag "$TAG_NAME"
-          git push origin "$TAG_NAME"
+          git tag "${{ needs.build.outputs.build-tag }}"
+          git push origin "${{ needs.build.outputs.build-tag }}"
