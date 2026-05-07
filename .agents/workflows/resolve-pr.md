@@ -5,12 +5,15 @@ description: Workflow to check and resolve all PR comments before proceeding wit
 
 # PR Resolution Workflow
 
-> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__pull_request_read` for `gh pr view`, `mcp__github__add_reply_to_pull_request_comment` for `gh api` comment replies).
+> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 Execute this workflow when a Pull Request has received review comments that need to be addressed before it can be merged.
 
 ## 1. Context & Comment Retrieval
-1. **Identify the PR**: Ensure you are on the correct feature branch or know the PR number.
+1. **Identify the PR**: Ensure you are on the correct feature branch or know the PR number. Determine the **base branch** the PR targets:
+   - **Sprint task PR** → base is `sprint/<version>-<slug>` (not `main`)
+   - **Sprint final PR** or **standalone PR** → base is `main`
+   Keep the base branch in mind — all merges, pushes, and conflict resolution must target it.
 2. **Fetch Comments**: Run `gh pr view <branch-name-or-pr-number> --comments` to retrieve all active review comments and threads.
 3. **Analyze Feedback**: Read through all the comments carefully to understand the reviewer's requests, raised issues, or suggestions.
 
@@ -27,9 +30,12 @@ Execute this workflow when a Pull Request has received review comments that need
 10. Mark the corresponding task as `[x]` in `PLAN.md` once thoroughly addressed.
 
 ## 4. Validation & Push
-11. **Build Verification**: Run `npx ng build --configuration development` (or the equivalent build command for the stack) to verify there are no compilation errors.
-12. **Push**: Push the updated branch to remote: `git push origin HEAD`.
+11. **Build Verification**: Run the appropriate build command for the stack (e.g., `npx ng build --configuration development` for Angular) to verify there are no compilation errors.
+12. **Merge with base branch [MANDATORY]:** Before pushing, sync with the correct base:
+    - Sprint task: `git fetch origin && git merge origin/sprint/<version>-<slug>`
+    - Standalone/sprint final: `git fetch origin && git merge origin/main`
+13. **Push**: Push the updated branch to remote: `git push origin HEAD`.
 
 ## 5. Notification & Approval
-13. **Inform the User**: Inform the user that the review comments have been integrated and pushed.
-14. **UI Resolution**: Ask the user to officially resolve the conversations in the GitHub UI and re-request review or proceed with the PR approval.
+14. **Inform the User**: Inform the user that the review comments have been integrated and pushed.
+15. **UI Resolution**: Ask the user to officially resolve the conversations in the GitHub UI and re-request review or proceed with the PR approval.
