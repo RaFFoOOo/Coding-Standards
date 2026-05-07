@@ -34,8 +34,17 @@ The `PLAN.md` file is the source of truth. It must strictly follow this structur
 - [ ] Task 1
 - [x] Task 2 (Completed)
 
-## Trigger
-Whenever requirements change or a task is completed, you MUST update `PLAN.md` immediately.
+## Trigger — Live Sync Rules [MANDATORY]
+
+These are not suggestions. Violations cause plan drift and erode backlog trust.
+
+1. **Task completed → mark immediately.** The moment a task commit is pushed, mark `[x]` in **both** the Acceptance Criteria and Task Progress sections. Never batch this to "end of session."
+2. **Feature superseded or deferred → mark `[-]`** with a one-line note (e.g., `[-] superseded by Sprint X.Y`) in both sections.
+3. **Sprint closed → archive immediately.** A sprint is closed when all features are `[x]` or `[-]`. At that point:
+   - Add `> **STATUS: CLOSED**` to the plan header.
+   - `git mv` the plan file (and any associated QA report, mockup, or lessons-learned) to `archive/`.
+   - Commit with `chore(archive): close sprint X.Y`.
+   - **Never** leave a closed sprint plan in the project root.
 
 ## Artifact Index
 The workspace relies on the following key artifacts:
@@ -52,4 +61,4 @@ The workspace relies on the following key artifacts:
 ## Artifact Lifecycle
 - **Planning & Backlog (TODO.md):** Every time you start a new `PLAN.md`, you MUST check the `TODO.md` file. Evaluate if any tasks in the TODO list are processable in the current sprint. If so, move them from `TODO.md` into `PLAN.md` with full specifications. You can also use `TODO.md` to keep ongoing notes. `TODO.md` is specific to each project.
 - **Archiving:** At the end of a sprint/milestone, do not let artifacts grow indefinitely. Move stale sprint plans or old QA logs to an `archive/` folder, or clear them to start a fresh `PLAN.md`.
-- **One Canonical Plan File [STRICT]:** A sprint has exactly one plan file. During active work it is `PLAN.md` at the project root. On completion it is moved to `archive/PLAN_<sprint-name>.md`. A separately named copy (e.g. `PLAN_sprint_7.5_quality.md`) must **never** coexist alongside `PLAN.md` — if one is found and is identical, delete the duplicate before archiving.
+- **One Canonical Plan File [STRICT]:** A sprint has exactly one plan file. During active work it is `PLAN.md` at the project root. On completion it is moved to `archive/PLAN_<sprint-name>.md`. A separately named copy (e.g. `PLAN_sprint_007.5_quality.md`) must **never** coexist alongside `PLAN.md` — if one is found and is identical, delete the duplicate before archiving.

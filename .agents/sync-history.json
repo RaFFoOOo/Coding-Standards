@@ -17,6 +17,15 @@
       "targetRepo": "Coding-Standards",
       "targetBranch": "chore/sync-standards",
       "agent": "generic"
+    },
+    {
+      "date": "2026-05-07T00:00:00Z",
+      "direction": "PUSH",
+      "sourceRepo": "le-cementine",
+      "sourceBranch": "task/sprint-10-backend/5.1-infra-doc",
+      "targetRepo": "Coding-Standards",
+      "targetBranch": "chore/sync-standards",
+      "agent": "generic"
     }
   ]
 }

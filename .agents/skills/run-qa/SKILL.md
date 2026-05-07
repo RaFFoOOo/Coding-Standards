@@ -36,7 +36,7 @@ Run this self-review **before** launching the full QA process. If any item fails
 
 ## 1. The Console Zero-Tolerance Policy
 
-> **Claude Code:** Sections §1-§2 require browser access. Use the `/test-browser` skill with Playwright MCP if available, or ask the user to perform manual browser verification and report console output.
+> Sections §1-§2 require browser access. Use the platform's browser testing tool (e.g., `/test-browser` skill with Playwright MCP for Claude Code) if available, or ask the user to perform manual browser verification and report console output.
 
 **Protocol:**
 1.  Launch the application in the browser.

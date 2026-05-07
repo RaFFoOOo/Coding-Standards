@@ -70,7 +70,7 @@ Before proceeding with the diff, verify that this sync will not overwrite more r
       "direction": "PUSH",
       "sourceRepo": "Coding-Standards",
       "sourceBranch": "main",
-      "targetRepo": "le-cementine",
+      "targetRepo": "<your-project>",
       "targetBranch": "chore/sync-standards-claude-code",
       "agent": "claude-code"
     }
@@ -241,11 +241,10 @@ After the PR is merged in the target project, present the user with the followin
   - `NODE_VERSION` — Node.js LTS version (e.g., `24`)
   - `ANGULAR_WORKING_DIRECTORY` — Path to the Angular app (e.g., `.` or `frontend`)
   - `DISABLE_PIPELINES_FOR_TEMPLATE` — Set to `false` (or leave unset) to enable CI/CD
-- [ ] Set the following **Environment Variables** (under the `production` environment):
-  - `CI_DEFAULT_TENANT_ID` — Tenant UUID for the build (if multi-tenant)
-  - `CI_ENABLE_TENANT_SELECTOR` — `false` unless multi-tenant UI is needed
-  - `CD_AZURE_STA_BASE_URL` — Azure Blob Storage root endpoint (if using Blob Storage CD)
-  - `CD_AZURE_STA_BASE_PATH` — Target container (default: `$web`)
+- [ ] Set the following **Environment Variables** (per GitHub environment — `development` / `production`):
+  - `ENABLE_FEATURE_X` — `false` unless the feature is needed (example — replace with project-specific flags)
+  - `CD_AZURE_STA_BASE_URL` — Azure Blob Storage root endpoint (if using Blob Storage CD, production only)
+  - `CD_AZURE_STA_BASE_PATH` — Target container (default: `$web`, production only)
 - [ ] Set the following **Environment Secrets** (under the `production` environment):
   - `CD_AZURE_STA_SAS_TOKEN` — SAS token for Blob Storage deployment
   - `CD_AZURE_SWA_DEPLOYMENT_TOKEN` — Token for Azure Static Web Apps deployment
