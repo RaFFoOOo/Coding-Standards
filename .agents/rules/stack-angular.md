@@ -72,21 +72,21 @@ description: Frontend stack rules for Angular / TypeScript projects
   - The shared service is the single source of truth consumed by components. The data-layer interface is an internal collaborator injected by the shared service.
   - ❌ Signals, `switchLanguage()`, persistence calls inside `MockLanguageService`
   - ✅ `MockLanguageService` → loads files; `TranslationService` → owns signals, activation, persistence
-  - **[PRE-QA CHECK — Sprint 9 lesson]:** Before committing any new `IFoo`/`MockFooService`, verify it contains NO `signal()`, `WritableSignal`, `computed()`, or `localStorage` calls. If any are present, extract them to a dedicated `FooService` first. Catching this at authoring time avoids a full PR-cycle rework.
-- **[STRICT] Interface Parameters Must Use Stable IDs — Sprint 12 lesson:**
+  - **[PRE-QA CHECK]:** Before committing any new `IFoo`/`MockFooService`, verify it contains NO `signal()`, `WritableSignal`, `computed()`, or `localStorage` calls. If any are present, extract them to a dedicated `FooService` first. Catching this at authoring time avoids a full PR-cycle rework.
+- **[STRICT] Interface Parameters Must Use Stable IDs:**
   - Service interface method parameters that identify a resource (tenant, user, entity) MUST use the immutable primary key (`tenantId: string`, `userId: string`) — never a display name, slug, or file-path artifact.
   - If the mock implementation needs a display name for internal file paths, it resolves it from the config service internally. The interface contract is stable and ID-based from day one.
   - ❌ `abstract getAll(tenantName: string): Observable<...>` — name is a display artifact; changes break the interface
   - ✅ `abstract getAll(tenantId: string): Observable<...>` — GUID is immutable; mock resolves name internally
 
-- **[STRICT] Server-state interfaces expose Observable, not Signal — Sprint 10 lesson:**
+- **[STRICT] Server-state interfaces expose Observable, not Signal:**
   - When a `IFooService` interface represents **server-owned data** (orders, catalog items, reviews, …), every method MUST return `Observable<>`. The interface MUST NOT declare `Signal<>` properties.
   - The mock implementation simulates the backend with a plain in-memory array (NOT signals) and returns observables via `of(…).pipe(delay())`. This makes the interface 1:1 swap-compatible with an HTTP adapter later.
   - The reactive cache (`Signal<>` state) belongs to a separate `FooStateService` (`providedIn: 'root'`) that subscribes to `IFooService` on init and exposes signals to components.
-  - ❌ `abstract readonly allOrders: Signal<readonly Order[]>` in `IOrderService`
-  - ✅ `abstract getAll(): Observable<Order[]>` in `IOrderService`; `OrderStateService.allOrders: Signal<readonly Order[]>` for consumers.
-  - **Exception — client-side state:** `IAuthService.isAuthenticated: Signal<boolean>`, `ITenantConfigService.tenantConfig: Signal<TenantConfig>`, and similar interfaces representing **session-scoped client state** MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
-  - **Why this matters:** Discovered when the original `IOrderService.allOrders: Signal<>` made HTTP-adapter implementation impossible without breaking every consumer. The OrderStateService extraction was a 5-file migration that would have been a 50+ file fire-drill if caught after backend integration.
+  - ❌ `abstract readonly allItems: Signal<readonly Item[]>` in `IItemService`
+  - ✅ `abstract getAll(): Observable<Item[]>` in `IItemService`; `ItemStateService.allItems: Signal<readonly Item[]>` for consumers.
+  - **Exception — client-side state:** Interfaces representing **session-scoped client state** (e.g., `IAuthService.isAuthenticated: Signal<boolean>`) MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
+  - **Why this matters:** Conflating signals in the server-state interface makes HTTP-adapter implementation impossible without breaking every consumer. The StateService extraction is far cheaper when caught at authoring time than after backend integration.
 
 ## 4. Assets & Internationalization
 - **Text Content:**
