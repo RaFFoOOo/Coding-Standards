@@ -1,0 +1,94 @@
+name: Deploy to Azure Static Web Apps
+description: Downloads build artifact, replaces environment tokens, and deploys to an Azure SWA instance.
+
+inputs:
+  enable-tenant-selector:
+    description: 'Value for __ENABLE_TENANT_SELECTOR__ token replacement'
+    required: true
+  enable-login-features:
+    description: 'Value for __ENABLE_LOGIN_FEATURES__ token replacement'
+    required: false
+    default: 'false'
+  build-version:
+    description: 'Value for __BUILD_VERSION__ token replacement'
+    required: true
+  swa-deployment-token:
+    description: 'Azure Static Web Apps deployment token'
+    required: true
+  github-token:
+    description: 'GitHub token for SWA deploy action'
+    required: true
+  msal-client-id:
+    description: 'Value for __MSAL_CLIENT_ID__ token replacement'
+    required: false
+    default: ''
+  msal-authority:
+    description: 'Value for __MSAL_AUTHORITY__ token replacement (full CIAM authority URL)'
+    required: false
+    default: ''
+  msal-api-scope:
+    description: 'Value for __MSAL_API_SCOPE__ token replacement'
+    required: false
+    default: ''
+  api-base-url:
+    description: 'Value for __API_BASE_URL__ token replacement — the Angular app calls this URL directly'
+    required: false
+    default: ''
+  deployment-environment:
+    description: 'SWA deployment environment (e.g., preview). Omit for production slot.'
+    required: false
+    default: ''
+
+outputs:
+  static_web_app_url:
+    description: 'The URL of the deployed Static Web App'
+    value: ${{ steps.deploy.outputs.static_web_app_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Download Build Artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: angular-build-output
+        path: ./dist
+
+    - name: Replace Tokens in Build Output
+      shell: bash
+      env:
+        TOKEN_ENABLE_TENANT_SELECTOR: ${{ inputs.enable-tenant-selector }}
+        TOKEN_ENABLE_LOGIN_FEATURES: ${{ inputs.enable-login-features }}
+        TOKEN_BUILD_VERSION: ${{ inputs.build-version }}
+        TOKEN_MSAL_CLIENT_ID: ${{ inputs.msal-client-id }}
+        TOKEN_MSAL_AUTHORITY: ${{ inputs.msal-authority }}
+        TOKEN_MSAL_API_SCOPE: ${{ inputs.msal-api-scope }}
+        TOKEN_API_BASE_URL: ${{ inputs.api-base-url }}
+      run: |
+        BROWSER_DIR="./dist/lc-webapp/browser"
+        # Feature flag tokens live in feature-flags.js (loaded synchronously
+        # from index.html). External file is required by CSP `script-src 'self'`
+        # which blocks inline <script> blocks. All other tokens live in the
+        # hashed JS bundles.
+        sed -i \
+          -e "s|__ENABLE_TENANT_SELECTOR__|${TOKEN_ENABLE_TENANT_SELECTOR:-false}|g" \
+          -e "s|__ENABLE_LOGIN_FEATURES__|${TOKEN_ENABLE_LOGIN_FEATURES:-false}|g" \
+          "$BROWSER_DIR/feature-flags.js"
+        find "$BROWSER_DIR" -name "*.js" ! -name "feature-flags.js" -exec sed -i \
+          -e "s|__BUILD_VERSION__|${TOKEN_BUILD_VERSION:-unknown}|g" \
+          -e "s|__MSAL_CLIENT_ID__|${TOKEN_MSAL_CLIENT_ID}|g" \
+          -e "s|__MSAL_AUTHORITY__|${TOKEN_MSAL_AUTHORITY}|g" \
+          -e "s|__MSAL_API_SCOPE__|${TOKEN_MSAL_API_SCOPE}|g" \
+          -e "s|__API_BASE_URL__|${TOKEN_API_BASE_URL}|g" \
+          {} +
+
+    - name: Deploy to Azure Static Web Apps
+      id: deploy
+      uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9  # v1 — pinned per A08
+      with:
+        azure_static_web_apps_api_token: ${{ inputs.swa-deployment-token }}
+        repo_token: ${{ inputs.github-token }}
+        action: upload
+        skip_app_build: true
+        app_location: ./dist/lc-webapp/browser
+        output_location: ""
+        deployment_environment: ${{ inputs.deployment-environment }}

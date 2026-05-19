@@ -5,15 +5,15 @@ description: Synchronize template artifacts (AGENTS.md, .agents/, .github/) betw
 
 # Template Synchronization Workflow
 
-> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__list_pull_requests` for `gh pr list`).
+> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 This workflow automates the process of pulling or pushing standard configurations, rules, skills, and CI/CD pipelines between the **current** repository and another local repository (e.g., the `Coding-Standards` template repository). It maintains `.agents/sync-state.json` (or `.claude/sync-state.json` for Claude Code targets) skip lists in the target repository to remember explicit exclusions.
 
-It also handles **agent-aware transformation**: when the target project uses Claude Code, the workflow generates the correct `.claude/` structure, `CLAUDE.md`, and performs content substitutions to replace Antigravity-specific tools with Claude Code equivalents.
+It also handles **bidirectional agent-aware transformation**: when the source and target use different agents (Claude Code ↔ Gemini / Generic), the workflow rewrites the directory layout (`.claude/` ↔ `.agents/`), promotes/demotes skills to/from workflows according to the source's `reverseTaxonomy`, and applies content substitutions for agent-specific tool references.
 
 ## Prerequisites
 - This workflow must be executed from **the root directory of the current project repository** (verify with `git rev-parse --show-toplevel`).
-- For the very first execution in a new project, this file (`.agents/workflows/sync-templates.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
+- For the very first execution in a new project, this file (`.agents/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
 
@@ -34,8 +34,17 @@ Ask the user:
 Store the selection as `TARGET_AGENT`.
 
 ### Step 2 — Identify Source & Target
-- Verify both Source and Target absolute paths contain the `.agents/` directory.
-- If `TARGET_AGENT = Claude Code`, also note that the target will receive a `.claude/` directory (it does not need to already have one).
+
+- **Detect `SOURCE_AGENT` from the filesystem** (do not ask the user — the layout is authoritative):
+  - If `<Source>/.claude/` exists → `SOURCE_AGENT = Claude Code`.
+  - Else if `<Source>/.agents/` exists → `SOURCE_AGENT = Gemini / Generic`.
+  - Else → STOP: the Source is not a sync-managed repository.
+- The Target does not need an existing agent configuration; it will be initialized by Step 5.
+- The four supported `(SOURCE_AGENT → TARGET_AGENT)` execution paths and their handlers:
+  - `Gemini → Gemini`: Step 5a (copy `.agents/` as-is).
+  - `Gemini → Claude Code`: Step 5b (forward transformation).
+  - `Claude Code → Gemini`: Step 5c (reverse transformation).
+  - `Claude Code → Claude Code`: copy `.claude/` + `CLAUDE.md` as-is (treat like Step 5a with the `.claude/` tree).
 
 ### Step 3 — Load Local State
 - If `TARGET_AGENT = Claude Code`:
@@ -71,7 +80,7 @@ Before proceeding with the diff, verify that this sync will not overwrite more r
       "sourceRepo": "Coding-Standards",
       "sourceBranch": "main",
       "targetRepo": "<your-project>",
-      "targetBranch": "chore/sync-standards-claude-code",
+      "targetBranch": "chore/sync-standards",
       "agent": "claude-code"
     }
   ]
@@ -79,10 +88,10 @@ Before proceeding with the diff, verify that this sync will not overwrite more r
 ```
 
 ### Step 4 — Diff & Plan Review
-- Determine the effective source file set based on `TARGET_AGENT`:
-  - **Claude Code**: Source files are `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.agents/workflows/`, `.agents/sync-state.json`, `.agents/sync-history.json`, `.github/`
-  - **Gemini / Generic**: Source files are `AGENTS.md`, `.agents/`, `.github/`
-- For each source file, determine its **target path** (see Step 5b for Claude Code mapping).
+- Determine the effective source file set based on `SOURCE_AGENT`:
+  - **Gemini / Generic source**: `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.agents/workflows/`, `.agents/sync-state.json`, `.agents/sync-history.json`, `.github/`.
+  - **Claude Code source**: `AGENTS.md`, `.agents/rules/`, `.claude/skills/`, `.claude/sync-state.json`, `.github/`. **Never** include `CLAUDE.md` (agent-specific), `.claude/projects/`, `.claude/settings.local.json`, `.claude/scheduled_tasks.lock`, or `.claude/sync-history.json` — those are local-only or owned by the target's ledger (Step 6a).
+- For each source file, determine its **target path** using the matrix in Step 5b (forward) or Step 5c (reverse). When `SOURCE_AGENT = TARGET_AGENT`, the target path is the same relative path with no transformation.
 - Filter out any files matching the `skipList`.
 - Present a categorization to the user:
   - `[ADD]`: File missing in Target repo.
@@ -105,7 +114,7 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 | Source Path | Target Path |
 |---|---|
 | `AGENTS.md` | `AGENTS.md` (copy as-is) |
-| `.agents/rules/*.md` | `.claude/rules/*.md` |
+| `.agents/rules/*.md` | `.agents/rules/*.md` |
 | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
 | `.agents/workflows/X.md` | `.claude/skills/X/SKILL.md` |
 | `.agents/sync-state.json` | `.claude/sync-state.json` |
@@ -117,7 +126,7 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 | Find | Replace |
 |---|---|
 | `.agents/skills/` | `.claude/skills/` |
-| `.agents/rules/` | `.claude/rules/` |
+| `.agents/rules/` | `.agents/rules/` |
 | `.agents/workflows/` | `.claude/skills/` |
 | `generate_image` tool calls | Text wireframe instruction: *"Create a markdown wireframe describing the layout, component hierarchy, interactions, and color tokens for this UI task. Save as `mockup_[feature].md` artifact and embed it in `implementation_plan.md`."* |
 | `notify_user` tool calls | *"Output a message to the user asking for explicit approval. Wait for the user's response before proceeding."* |
@@ -160,8 +169,8 @@ Claude Code enters plan mode for complex tasks. You (Tech Lead) review and appro
 plan before any code is written. This enforces the Review Protocol in AGENTS.md §1.
 
 ### Stack Rules
-- Angular/TypeScript projects: `.claude/rules/stack-angular.md`
-- ASP.NET Core/C# projects: `.claude/rules/stack-dotnet-core.md`
+- Angular/TypeScript projects: `.agents/rules/stack-angular.md`
+- ASP.NET Core/C# projects: `.agents/rules/stack-dotnet-core.md`
 
 ### Remote Execution
 All rules and skills are version-controlled in `.claude/` and CLAUDE.md.
@@ -170,7 +179,53 @@ Remote/scheduled agents load context directly from this repository.
 
 Write the final skipList to `<Target_Repo>/.claude/sync-state.json`.
 
-### Step 5c — Old Agent Configuration Cleanup
+#### Step 5c — Reverse Transformation (Claude Code Source → Gemini / Generic Target)
+
+When `SOURCE_AGENT = Claude Code` and `TARGET_AGENT = Gemini / Generic`, apply the inverse of Step 5b. Each item under `.claude/skills/<name>/SKILL.md` must be classified as either a **skill** (folder + `SKILL.md` filename) or a **workflow** (flat `<name>.md` file directly under `.agents/workflows/`). Frontmatter is preserved in both cases — modern Antigravity workflows carry the same `name:` / `description:` frontmatter as Claude skills.
+
+**Classification source — `reverseTaxonomy` in `<Source>/.claude/sync-state.json`:**
+
+```json
+{
+  "skipList": [],
+  "reverseTaxonomy": {
+    "workflows": ["deploy-azure", "resolve-pr", "resolve-workflow", "run-feature", "sync-templates", "test-browser", "pause-session", "recursive-review"],
+    "skills":    ["manage-artifacts", "plan-sprint", "run-qa", "todo-manager"]
+  }
+}
+```
+
+- Every directory under `<Source>/.claude/skills/` MUST appear in exactly one of the two arrays.
+- If `reverseTaxonomy` is missing, or a skill is unlisted, **ask the user** for each unclassified skill and persist the answer back into the source `sync-state.json` (separate atomic commit, ahead of the sync).
+
+**Path Mapping (Source → Target):**
+
+| Source Path | Target Path |
+|---|---|
+| `AGENTS.md` | `AGENTS.md` (copy as-is) |
+| `CLAUDE.md` | (NOT pushed — agent-specific generated artifact) |
+| `.agents/rules/*.md` | `.agents/rules/*.md` |
+| `.claude/skills/<name>/SKILL.md` (classified as `skill`) | `.agents/skills/<name>/SKILL.md` |
+| `.claude/skills/<name>/SKILL.md` (classified as `workflow`) | `.agents/workflows/<name>.md` |
+| `.claude/sync-state.json` | `.agents/sync-state.json` (drop `reverseTaxonomy`, keep `skipList` only) |
+| `.claude/sync-history.json` | (NOT pushed — target maintains its own ledger per Step 6a) |
+| `.claude/projects/`, `.claude/settings.local.json`, `.claude/scheduled_tasks.lock` | (NEVER pushed — local-only / user-scoped) |
+| `.github/` | `.github/` (copy as-is) |
+
+**Content Substitutions** (apply to every copied `.md` file going into `.agents/`):
+
+| Find | Replace |
+|---|---|
+| `.agents/rules/` | `.agents/rules/` |
+| `.claude/skills/<name>` where `<name>` is in `reverseTaxonomy.skills` | `.agents/skills/<name>` |
+| `.claude/skills/<name>` where `<name>` is in `reverseTaxonomy.workflows` | `.agents/workflows/<name>` |
+| Claude-Code-specific MCP preamble: `> **Claude Code:** This skill references gh CLI commands ... mcp__github__...` (single line, may include the `mcp__github__list_pull_requests` example) | Generic preamble: `> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.` |
+
+**Frontmatter handling:** keep the YAML frontmatter (`name:`, `description:`) intact in both `skill` and `workflow` targets — the existing Antigravity workflows already use the same shape. No injection or stripping required.
+
+Write the final, approved skipList to `<Target_Repo>/.agents/sync-state.json` (strip `reverseTaxonomy` — it belongs to the Claude source only).
+
+### Step 5d — Old Agent Configuration Cleanup
 
 Before staging, remove the **previous** agent's configuration from the target to ensure only **one** agent configuration is active at a time.
 
@@ -242,7 +297,8 @@ After the PR is merged in the target project, present the user with the followin
   - `ANGULAR_WORKING_DIRECTORY` — Path to the Angular app (e.g., `.` or `frontend`)
   - `DISABLE_PIPELINES_FOR_TEMPLATE` — Set to `false` (or leave unset) to enable CI/CD
 - [ ] Set the following **Environment Variables** (per GitHub environment — `development` / `production`):
-  - `ENABLE_FEATURE_X` — `false` unless the feature is needed (example — replace with project-specific flags)
+  - `ENABLE_TENANT_SELECTOR` — `false` unless multi-tenant UI is needed
+  - `ENABLE_LOGIN_FEATURES` — `false` unless authentication UI is needed
   - `CD_AZURE_STA_BASE_URL` — Azure Blob Storage root endpoint (if using Blob Storage CD, production only)
   - `CD_AZURE_STA_BASE_PATH` — Target container (default: `$web`, production only)
 - [ ] Set the following **Environment Secrets** (under the `production` environment):

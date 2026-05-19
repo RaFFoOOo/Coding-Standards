@@ -1,0 +1,77 @@
+name: CI - Preview on Azure Static Web Apps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    uses: ./.github/workflows/shared-build-angular.yml
+    with:
+      node-version: ${{ vars.NODE_VERSION || '24' }}
+      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
+      environment: development
+      deploy-tag-prefix: 'ci-azure-swa'
+      deploy-tag-suffix: ${{ github.ref_name }}
+    secrets: inherit
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Deploy Preview to SWA
+        id: deploy
+        uses: ./.github/actions/deploy-swa
+        with:
+          enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
+          enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          build-version: ${{ needs.build.outputs.build-tag }}
+          swa-deployment-token: ${{ secrets.CI_AZURE_SWA_DEPLOYMENT_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-environment: preview
+
+      - name: Post Preview URL as PR Comment
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const sha = context.sha.substring(0, 7);
+            const branch = context.ref.replace('refs/heads/', '');
+            const buildTag = '${{ needs.build.outputs.build-tag }}';
+            const previewUrl = '${{ steps.deploy.outputs.static_web_app_url }}';
+
+            // Find open PR for this branch
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branch}`,
+              state: 'open'
+            });
+
+            if (prs.length === 0) {
+              core.info(`No open PR found for branch ${branch} — skipping comment.`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prs[0].number,
+              body: [
+                '### Preview Deployment Ready',
+                '',
+                `**URL:** ${previewUrl}`,
+                `**Branch:** \`${branch}\``,
+                `**Commit:** \`${sha}\``,
+                `**Build Tag:** \`${buildTag}\``,
+                '',
+                '_This is a shared preview slot — the latest push overwrites the previous preview._'
+              ].join('\n')
+            });

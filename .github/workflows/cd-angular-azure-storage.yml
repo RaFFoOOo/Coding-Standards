@@ -1,7 +1,33 @@
 name: CD - Deploy Angular to Azure Storage
 
 on:
+  # MANUAL-ONLY by policy (disabled 2026-05-18, commit 989b431). The Azure Storage
+  # `$web` blob target is the legacy frontend host — Azure Static Web Apps
+  # (`cd-angular-azure-static-web-apps.yml`) is the canonical SPA host and remains
+  # auto-deployed on every push to main. This workflow is kept ONLY for ad-hoc
+  # static-content republishes against the running storage version while the
+  # frontend↔backend cutover is still in progress; once that completes, the storage
+  # host will be decommissioned and this workflow will be deleted entirely.
+  #
+  # DO NOT re-enable the `push:` trigger without an explicit decision to keep the
+  # storage host in production. Reasonable triggers if it is brought back:
+  #   push:
+  #     branches:
+  #       - main
+  #     paths:
+  #       - 'lc-webapp/**'
+  #       - '.github/workflows/cd-angular-azure-storage.yml'
+  #       - '.github/workflows/shared-build-angular.yml'
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deployment target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
 
 jobs:
   build:
@@ -10,12 +36,80 @@ jobs:
     with:
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
+      # Angular CLI configuration name — always "production" for an optimized,
+      # deployable bundle. Per-environment runtime values (ENABLE_TENANT_SELECTOR,
+      # BUILD_VERSION, …) are baked in by the token-replacement step in the deploy
+      # job, sourced from the matching GitHub environment.
       environment: production
       deploy-tag-prefix: 'cd-azure-sta'
+      deploy-tag-suffix: ${{ github.ref_name }}
     secrets: inherit
 
-  deploy:
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+  # Dev deploys fire on:
+  #   - push to main (automatic, via the `push: branches: [main]` trigger) — keeps the dev
+  #     environment continuously in sync with whatever just landed on main.
+  #   - workflow_dispatch with target=dev from ANY branch — lets a developer publish a
+  #     feature branch to dev for real Azure E2E testing before opening / merging a PR.
+  # The GitHub environment named "development" should have its deployment-branches policy
+  # set to "All branches" (Environments → development → Deployment branches and tags) so
+  # non-main dispatches are not blocked at the environment-protection layer.
+  deploy-dev:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && (github.event_name == 'push' || inputs.target == 'dev')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: read
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: angular-build-output
+          path: ./dist
+
+      - name: Replace Tokens in Build Output
+        env:
+          TOKEN_ENABLE_TENANT_SELECTOR: ${{ vars.ENABLE_TENANT_SELECTOR }}
+          TOKEN_ENABLE_LOGIN_FEATURES: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          TOKEN_BUILD_VERSION: ${{ needs.build.outputs.build-tag }}
+        run: |
+          if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
+            BROWSER_DIR="./dist/${{ vars.ANGULAR_WORKING_DIRECTORY }}/browser"
+          else
+            BROWSER_DIR="./dist/browser"
+          fi
+          find "$BROWSER_DIR" -name "*.js" -exec sed -i \
+            -e "s|__ENABLE_TENANT_SELECTOR__|${TOKEN_ENABLE_TENANT_SELECTOR:-false}|g" \
+            -e "s|__ENABLE_LOGIN_FEATURES__|${TOKEN_ENABLE_LOGIN_FEATURES:-false}|g" \
+            -e "s|__BUILD_VERSION__|${TOKEN_BUILD_VERSION:-unknown}|g" \
+            {} +
+
+      - name: Deploy to Dev Azure Blob Storage
+        env:
+          SAS_URL: ${{ vars.CD_AZURE_STA_BASE_URL }}/${{ vars.CD_AZURE_STA_BASE_PATH }}?${{ secrets.CD_AZURE_STA_SAS_TOKEN }}
+        run: |
+          if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
+            BROWSER_DIR="./dist/${{ vars.ANGULAR_WORKING_DIRECTORY }}/browser"
+          else
+            BROWSER_DIR="./dist/browser"
+          fi
+          echo "Syncing $BROWSER_DIR from branch ${{ github.ref_name }} to dev storage"
+          azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
+
+      # No git tag for dev deploys — every branch push to dev would pollute
+      # the release-tag history. Tags are reserved for prod releases.
+
+  # DISABLED — production Storage Account is not yet provisioned. When it is:
+  #   1. Remove the `false &&` guard.
+  #   2. Verify the production environment's CD_AZURE_STA_BASE_URL points at the
+  #      real production storage account (NOT the dev placeholder).
+  #   3. Configure the production environment's deployment-branches policy to
+  #      "Selected branches: main" (UI: Environments → production → Deployment
+  #      branches and tags) so even the YAML guard is belt-and-suspenders.
+  # The `github.ref == 'refs/heads/main'` guard below ensures prod releases can
+  # only be dispatched from main, not from a feature branch.
+  deploy-prod:
+    if: false && inputs.target == 'prod' && github.ref == 'refs/heads/main' && vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     needs: build
     runs-on: ubuntu-latest
     environment: production
@@ -23,28 +117,41 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Build Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: angular-build-output
           path: ./dist
 
-      - name: Deploy to Azure Blob Storage
+      - name: Replace Tokens in Build Output
         env:
-          SAS_URL: ${{ vars.CD_AZURE_STA_BASE_URL }}/${{ vars.CD_AZURE_STA_BASE_PATH }}?${{ secrets.CD_AZURE_STA_SAS_TOKEN }}
+          TOKEN_ENABLE_TENANT_SELECTOR: ${{ vars.ENABLE_TENANT_SELECTOR }}
+          TOKEN_ENABLE_LOGIN_FEATURES: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          TOKEN_BUILD_VERSION: ${{ needs.build.outputs.build-tag }}
         run: |
-          # Use the repository variable to route to the correct artifact subdirectory
           if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
             BROWSER_DIR="./dist/${{ vars.ANGULAR_WORKING_DIRECTORY }}/browser"
           else
             BROWSER_DIR="./dist/browser"
           fi
+          find "$BROWSER_DIR" -name "*.js" -exec sed -i \
+            -e "s|__ENABLE_TENANT_SELECTOR__|${TOKEN_ENABLE_TENANT_SELECTOR:-false}|g" \
+            -e "s|__ENABLE_LOGIN_FEATURES__|${TOKEN_ENABLE_LOGIN_FEATURES:-false}|g" \
+            -e "s|__BUILD_VERSION__|${TOKEN_BUILD_VERSION:-unknown}|g" \
+            {} +
 
-          echo "Syncing from directory: $BROWSER_DIR"
-
-          # The azcopy tool is pre-installed on the ubuntu-latest runner
+      - name: Deploy to Prod Azure Blob Storage
+        env:
+          SAS_URL: ${{ vars.CD_AZURE_STA_BASE_URL }}/${{ vars.CD_AZURE_STA_BASE_PATH }}?${{ secrets.CD_AZURE_STA_SAS_TOKEN }}
+        run: |
+          if [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "" ] && [ "${{ vars.ANGULAR_WORKING_DIRECTORY }}" != "." ]; then
+            BROWSER_DIR="./dist/${{ vars.ANGULAR_WORKING_DIRECTORY }}/browser"
+          else
+            BROWSER_DIR="./dist/browser"
+          fi
+          echo "Syncing $BROWSER_DIR from main to PROD storage"
           azcopy sync "$BROWSER_DIR" "$SAS_URL" --delete-destination=true
 
       - name: Create and Push Release Tag

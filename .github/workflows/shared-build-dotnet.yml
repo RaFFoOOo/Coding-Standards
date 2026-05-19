@@ -1,0 +1,94 @@
+name: Shared .NET Build
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: 'Version of .NET SDK to use'
+        required: false
+        type: string
+        default: '10.x'
+      working-directory:
+        description: 'Directory containing the .sln file (relative to repo root)'
+        required: false
+        type: string
+        default: 'lc-services'
+      run-tests:
+        description: 'Whether to run dotnet test after building. Set true for CI, false for CD.'
+        required: false
+        type: boolean
+        default: false
+      publish:
+        description: 'Whether to run dotnet publish and upload the artifact. Set true for CD, false for CI.'
+        required: false
+        type: boolean
+        default: false
+      publish-project:
+        description: 'Path to the project to publish, relative to working-directory. Required when publish: true.'
+        required: false
+        type: string
+        default: 'LcServices.Functions/LcServices.Functions.csproj'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Audit .NET dependencies
+        # OWASP A06 — fail on any HIGH/CRITICAL CVE; see stack-github-actions.md §6
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt
+          if grep -qiE "(High|Critical)" /tmp/vuln.txt; then
+            echo "::error::HIGH or CRITICAL vulnerability detected in .NET packages"
+            exit 1
+          fi
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        # Integration tests spin up a SQL Server container via Testcontainers —
+        # Docker is pre-installed on ubuntu-latest runners; no extra setup needed.
+        if: inputs.run-tests
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      - name: Publish
+        if: inputs.publish
+        run: |
+          dotnet publish "${{ inputs.publish-project }}" \
+            --configuration Release \
+            --output "$GITHUB_WORKSPACE/publish"
+
+          # Copy .azurefunctions/ into the publish output — required by Functions host v4.1000+.
+          # The SDK generates this folder in the build OutputPath but dotnet publish --output
+          # does not carry it to the custom destination directory.
+          PROJ_DIR=$(dirname "${{ inputs.publish-project }}")
+          AZFUNC_SRC="$PROJ_DIR/bin/Release/net10.0/.azurefunctions"
+          if [ -d "$AZFUNC_SRC" ]; then
+            cp -r "$AZFUNC_SRC" "$GITHUB_WORKSPACE/publish/.azurefunctions"
+          fi
+
+      - name: Upload Build Artifact
+        if: inputs.publish
+        uses: actions/upload-artifact@v7
+        with:
+          name: dotnet-publish-output
+          path: ${{ github.workspace }}/publish
+          retention-days: 1
+          # Required so the .azurefunctions/ folder (dot-prefixed, treated as hidden by
+          # upload-artifact) is shipped with the rest of the publish output.
+          include-hidden-files: true

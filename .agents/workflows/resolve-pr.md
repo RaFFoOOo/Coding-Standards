@@ -30,12 +30,12 @@ Execute this workflow when a Pull Request has received review comments that need
 10. Mark the corresponding task as `[x]` in `PLAN.md` once thoroughly addressed.
 
 ## 4. Validation & Push
-11. **Build Verification**: Run the appropriate build command for the stack (e.g., `npx ng build --configuration development` for Angular) to verify there are no compilation errors.
-12. **Merge with base branch [MANDATORY]:** Before pushing, sync with the correct base:
+9. **Build Verification**: Run `npx ng build --configuration development` (or the equivalent build command for the stack) to verify there are no compilation errors.
+10. **Merge with base branch [MANDATORY]:** Before pushing, sync with the correct base:
     - Sprint task: `git fetch origin && git merge origin/sprint/<version>-<slug>`
     - Standalone/sprint final: `git fetch origin && git merge origin/main`
-13. **Push**: Push the updated branch to remote: `git push origin HEAD`.
+11. **Push**: Push the updated branch to remote: `git push origin HEAD`.
 
 ## 5. Notification & Approval
-14. **Inform the User**: Inform the user that the review comments have been integrated and pushed.
-15. **UI Resolution**: Ask the user to officially resolve the conversations in the GitHub UI and re-request review or proceed with the PR approval.
+12. **Inform the User**: Inform the user that the review comments have been integrated and pushed.
+13. **UI Resolution**: Ask the user to officially resolve the conversations in the GitHub UI and re-request review or proceed with the PR approval.

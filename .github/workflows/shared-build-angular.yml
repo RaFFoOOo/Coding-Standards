@@ -14,7 +14,12 @@ on:
         type: string
         default: '.'
       environment:
-        description: 'Angular environment configuration to build (e.g., production, development)'
+        description: |
+          Angular CLI configuration name (passed as `--configuration <value>`),
+          NOT a GitHub environment scope. Maps to angular.json configurations
+          and the matching `src/environments/environment.<value>.ts` file
+          replacement. Use `production` for any deployed bundle (optimized,
+          minified) and `development` only for unoptimized CI / local builds.
         required: false
         type: string
         default: 'production'
@@ -23,18 +28,24 @@ on:
         required: false
         type: string
         default: 'build'
-    secrets:
-      CI_DEFAULT_TENANT_ID:
+      deploy-tag-suffix:
+        description: 'Optional suffix appended after the date segment (e.g., branch name). Tag format: <prefix>-<date>-<suffix>.'
         required: false
+        type: string
+        default: ''
+      upload-artifact:
+        description: 'Whether to upload the build artifact. Set to false for pure CI validation runs that do not need to deploy.'
+        required: false
+        type: boolean
+        default: true
     outputs:
       build-tag:
-        description: 'The generated build version tag (e.g., cd-azure-sta-20260330-1430)'
+        description: 'The generated build version tag (e.g., cd-azure-swa-20260330-1430-main)'
         value: ${{ jobs.build.outputs.build-tag }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -42,54 +53,46 @@ jobs:
       build-tag: ${{ steps.generate-tag.outputs.build-tag }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node-version }}
           cache: 'npm'
           cache-dependency-path: '${{ inputs.working-directory }}/package-lock.json'
 
       - name: Install Dependencies
-        run: npm ci
+        # --legacy-peer-deps required: @angular/build@21.2.11 declares typescript@">=5.9 <6.0"
+        # (conservative/lagging range); @angular/compiler-cli accepts >=5.9 <6.1 (authoritative).
+        # ng update uses legacy resolution locally; npm ci in npm v10 ignores .npmrc for ERESOLVE.
+        run: npm ci --legacy-peer-deps
+
+      - name: Audit npm dependencies
+        # OWASP A06 — fail the workflow on any moderate-or-higher CVE.
+        # See `.claude/rules/stack-github-actions.md` §6 Security Gates.
+        run: npm audit --audit-level=moderate
 
       - name: Generate Build Tag
         id: generate-tag
         run: |
-          BUILD_TAG="${{ inputs.deploy-tag-prefix }}-$(date +'%Y%m%d-%H%M')"
-          echo "build-tag=$BUILD_TAG" >> "$GITHUB_OUTPUT"
-          echo "BUILD_TAG=$BUILD_TAG" >> "$GITHUB_ENV"
-
-      - name: Replace Environment Tokens
-        env:
-          ENV_TENANT_ID: ${{ vars.CI_DEFAULT_TENANT_ID }}
-          ENV_ENABLE_TENANT_SELECTOR: ${{ vars.CI_ENABLE_TENANT_SELECTOR }}
-        run: |
-          ENV_FILE="src/environments/environment.${{ inputs.environment }}.ts"
-          if [ -f "$ENV_FILE" ]; then
-            node -e "
-              const fs = require('fs');
-              const file = '$ENV_FILE';
-              let content = fs.readFileSync(file, 'utf8');
-              content = content.replaceAll('__DEFAULT_TENANT_ID__', process.env.ENV_TENANT_ID || '');
-              content = content.replaceAll('__ENABLE_TENANT_SELECTOR__', process.env.ENV_ENABLE_TENANT_SELECTOR || 'false');
-              content = content.replaceAll('__BUILD_VERSION__', process.env.BUILD_TAG || 'unknown');
-              fs.writeFileSync(file, content);
-            "
-          elif [ "${{ inputs.environment }}" = "production" ]; then
-            echo "::error::Environment file not found at $ENV_FILE (required for production)"
-            exit 1
-          else
-            echo "::warning::Environment file not found at $ENV_FILE — skipping token replacement for '${{ inputs.environment }}'"
+          TAG="${{ inputs.deploy-tag-prefix }}-$(date +'%Y%m%d-%H%M')"
+          SUFFIX="${{ inputs.deploy-tag-suffix }}"
+          if [ -n "$SUFFIX" ]; then
+            # Sanitize: replace slashes with hyphens for git-tag and URL safety
+            SUFFIX=$(echo "$SUFFIX" | tr '/' '-')
+            TAG="${TAG}-${SUFFIX}"
           fi
+          echo "build-tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "BUILD_TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Build Application
         run: npm run build -- --configuration ${{ inputs.environment }}
 
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v6
+        if: inputs.upload-artifact
+        uses: actions/upload-artifact@v7
         with:
           name: angular-build-output
           path: ${{ inputs.working-directory }}/dist/
-          retention-days: 7
+          retention-days: 1

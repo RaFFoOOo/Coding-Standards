@@ -52,13 +52,13 @@ nohup bash -c "cd [project]/[webapp-dir] && npx ng serve --port 4200 2>&1" > /tm
 
 ## Step 4 — Execute in the Browser
 
-Use the platform's browser testing tool (e.g., Playwright MCP for Claude Code). If unavailable, describe the test steps to the user for manual execution. Open the local dev URL and execute each test case from the sprint test plan.
+Use the `playwright` MCP tool (requires Playwright MCP server configured in `.mcp.json`). Open the local dev URL and execute each test case from the sprint test plan. If Playwright MCP is unavailable, describe the test steps to the user for manual execution.
 
-For each test case, mark PASS or FAIL (with description of actual vs expected behavior).
+For each test case, mark ✅ PASS or ❌ FAIL (with description of actual vs expected behavior).
 
 ## Step 5 — Handle Failures
 
-For every FAIL:
+For every ❌ FAIL:
 1. Document the bug in the sprint test plan under a `## Bugs Found` section
 2. Add a bug-fix task to `PLAN.md` **before any remaining sprint tasks** so it is resolved before moving on
 3. Fix, rebuild, and re-test only the failed items

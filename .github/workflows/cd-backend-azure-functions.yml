@@ -1,0 +1,117 @@
+name: CD - Deploy to Azure Function App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lc-services/**'
+      - '.github/workflows/cd-backend-azure-functions.yml'
+      - '.github/workflows/shared-build-dotnet.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    uses: ./.github/workflows/shared-build-dotnet.yml
+    with:
+      publish: true
+    secrets: inherit
+
+  deploy-dev:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+    concurrency:
+      group: cd-backend-dev
+      cancel-in-progress: true
+    permissions:
+      id-token: write   # Required for OIDC token exchange with Azure
+      contents: read    # Required for actions/checkout (job-level overrides workflow-level)
+
+    steps:
+      - name: Check out repository (composite action + migration source)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions/
+            lc-services/
+
+      - name: Login to Azure (OIDC — Workload Identity Federation)
+        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8  # v2.3.0 — pinned per A08
+        with:
+          client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.CD_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Functions
+        uses: ./.github/actions/deploy-functions
+        with:
+          function-app-name: ${{ vars.FUNCTION_APP_NAME }}
+          resource-group: ${{ vars.RESOURCE_GROUP }}
+          connection-string: ${{ vars.AZURE_SQL_CONNECTION_STRING }}
+          msal-authority: ${{ vars.MSAL_AUTHORITY }}
+          msal-api-client-id: ${{ vars.MSAL_API_CLIENT_ID }}
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          cors-allowed-origin: ${{ vars.CORS_ALLOWED_ORIGIN }}
+          data-access-mode: ${{ vars.DATA_ACCESS_MODE }}
+          storage-account-url: ${{ vars.STORAGE_ACCOUNT_URL }}
+          storage-runtime-account-name: ${{ vars.STORAGE_RUNTIME_ACCOUNT_NAME }}
+          applicationinsights-connection-string: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+
+  deploy-prod:
+    # DISABLED — production Function App is not yet provisioned. The production
+    # environment has no FUNCTION_APP_NAME var, so this job would either fail or
+    # (worse) deploy to whatever target Azure infers. Re-enable by removing the
+    # `false &&` guard below once production resources are provisioned (see
+    # INFRA.md §2 production resource map).
+    #
+    # The `github.ref == 'refs/heads/main'` guard prevents accidental prod deploys
+    # from feature branches when `workflow_dispatch` is triggered (the dispatch
+    # branch selector defaults to the branch the user is viewing). Belt-and-
+    # suspenders alongside the production environment's deployment-branches
+    # policy (Environments → production → "Selected branches: main").
+    if: false && vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: cd-backend-prod
+      cancel-in-progress: false
+    permissions:
+      id-token: write   # Required for OIDC token exchange with Azure
+      contents: read    # Required for actions/checkout (job-level overrides workflow-level)
+
+    steps:
+      - name: Check out repository (composite action + migration source)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions/
+            lc-services/
+
+      - name: Login to Azure (OIDC — Workload Identity Federation)
+        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8  # v2.3.0 — pinned per A08
+        with:
+          client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.CD_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Functions
+        uses: ./.github/actions/deploy-functions
+        with:
+          function-app-name: ${{ vars.FUNCTION_APP_NAME }}
+          resource-group: ${{ vars.RESOURCE_GROUP }}
+          connection-string: ${{ vars.AZURE_SQL_CONNECTION_STRING }}
+          msal-authority: ${{ vars.MSAL_AUTHORITY }}
+          msal-api-client-id: ${{ vars.MSAL_API_CLIENT_ID }}
+          azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+          cors-allowed-origin: ${{ vars.CORS_ALLOWED_ORIGIN }}
+          data-access-mode: ${{ vars.DATA_ACCESS_MODE }}
+          storage-account-url: ${{ vars.STORAGE_ACCOUNT_URL }}
+          storage-runtime-account-name: ${{ vars.STORAGE_RUNTIME_ACCOUNT_NAME }}
+          applicationinsights-connection-string: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}

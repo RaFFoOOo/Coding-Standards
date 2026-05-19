@@ -1,19 +1,26 @@
 name: CI - Angular Build Validations
 
 on:
-  push:
-    branches:
-      - 'feature/**'
   pull_request:
     branches:
       - main
+    paths:
+      - 'lc-webapp/**'
+      - 'package*.json'
+
+permissions:
+  contents: read
 
 jobs:
   validate-build:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    concurrency:
+      group: ci-angular-${{ github.ref }}
+      cancel-in-progress: true
     uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: development
+      upload-artifact: false
     secrets: inherit
