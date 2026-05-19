@@ -196,7 +196,7 @@ This is the recursive part of the recursive review.
 ## § 8. Anti-patterns
 
 - **Generic advice.** Every finding must be tied to a file path, line, or PR number.
-  "Improve test coverage" is not a finding; "`LcServices.IntegrationTests` does not test
+  "Improve test coverage" is not a finding; "`<YourApp>.IntegrationTests` does not test
   the `PATCH /v1/requests/{id}/status` endpoint" is.
 - **Padding.** A 1000-line review is unreadable. The Tech Lead needs to make decisions, not
   read prose.

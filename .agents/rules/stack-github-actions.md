@@ -54,17 +54,17 @@ The identity used by the CD pipeline to deploy resources MUST be a dedicated **A
   federated credential for the `development` environment.
 - **Authentication App Registrations** (SPA login, API JWT audience) are authentication identities
   — never operational identities. Do not reuse them for CI/CD.
-- Name CD SPNs following `naming-azure-resources.md`: `eudwlcespn01` (dev), `eupwlcespn01` (prod).
+- Name CD SPNs with environment-specific suffixes (one per GitHub environment) following the project's Azure resource naming convention.
 
-**Identity taxonomy for this project:**
+**Identity taxonomy (illustrative template):**
 
 | Identity | Type | Purpose | Grants |
 |---|---|---|---|
-| `eudwlceumi01` | User-Assigned Managed Identity | Function App → Azure SQL (runtime) | `db_datareader` + `db_datawriter` on SQL only |
-| `le-cementine-spa` | App Registration | SPA MSAL authentication | — |
-| `lc-services-api` | App Registration | Backend JWT audience/validation | — |
-| `eudwlcespn01` | App Registration / SPN | GitHub Actions CD — dev environment | `Reader` on subscription + `Website Contributor` on `eudwlceazf01` |
-| `eupwlcespn01` | App Registration / SPN | GitHub Actions CD — prod environment (TBD) | `Reader` on subscription + `Website Contributor` on prod Function App |
+| `<runtime-uami>` | User-Assigned Managed Identity | Function App → Azure SQL (runtime) | `db_datareader` + `db_datawriter` on SQL only |
+| `<spa-app>` | App Registration | SPA MSAL authentication | — |
+| `<api-app>` | App Registration | Backend JWT audience/validation | — |
+| `<dev-cd-spn>` | App Registration / SPN | GitHub Actions CD — dev environment | `Reader` on subscription + `Website Contributor` on `<dev-function-app>` |
+| `<prod-cd-spn>` | App Registration / SPN | GitHub Actions CD — prod environment | `Reader` on subscription + `Website Contributor` on prod Function App |
 
 ## 3. Secret & Variable Scope
 
@@ -101,7 +101,7 @@ inputs:
     default: false    # CD sets true; CI omits (false)
   publish-project:
     type: string
-    default: 'LcServices.Functions/LcServices.Functions.csproj'
+    default: '<YourApp>.Functions/<YourApp>.Functions.csproj'
 ```
 
 **Deploy job stays in the caller — never in the shared workflow.** The deploy job requires `environment: production` to access environment-scoped secrets. Moving it into the shared workflow would force all callers (including CI) to request production secrets — a security misconfiguration.

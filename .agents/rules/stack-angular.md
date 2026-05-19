@@ -68,7 +68,7 @@ description: Frontend stack rules for Angular / TypeScript projects
   - To mock backend-level secure payload injections natively during local development, the consuming Mock Service MUST intercept the parsed JSON structure and dynamically merge active secrets isolated securely within `environment.development.ts` into the configuration state prior to distribution.
 - **[STRICT] Data Layer vs. Shared Behavior Separation:**
   - `IFoo` / `MockFooService` implementations are **data-source adapters only**. They fetch, transform, and register data. They MUST NOT own reactive state (signals), persist user preferences, or contain business logic.
-  - Shared state, derived signals, user preference persistence, and cross-component behavior MUST live in a dedicated `FooService` annotated `@Injectable({ providedIn: 'root' })` — following the `BusinessModeService` / `CartService` / `TranslationService` / `OrderStateService` pattern.
+  - Shared state, derived signals, user preference persistence, and cross-component behavior MUST live in a dedicated `FooService` annotated `@Injectable({ providedIn: 'root' })` — following the `CartService` / `TranslationService` / `AuthService` pattern.
   - The shared service is the single source of truth consumed by components. The data-layer interface is an internal collaborator injected by the shared service.
   - ❌ Signals, `switchLanguage()`, persistence calls inside `MockLanguageService`
   - ✅ `MockLanguageService` → loads files; `TranslationService` → owns signals, activation, persistence

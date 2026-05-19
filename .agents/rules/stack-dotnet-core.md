@@ -117,7 +117,7 @@ in .NET 8+ registers `AuthorizationPolicyCache` — a component that resolves
 container and the host crashes at startup with no actionable error. Add the framework
 reference and a no-op `EndpointDataSource` to the Functions project:
 ```xml
-<!-- LcServices.Functions.csproj -->
+<!-- <YourApp>.Functions.csproj -->
 <ItemGroup>
   <FrameworkReference Include="Microsoft.AspNetCore.App" />
 </ItemGroup>
@@ -146,7 +146,7 @@ _logger.LogWarning("Authn rejected. UserId={ObjectId} CorrelationId={Correlation
 
 **Correct implementation — `AzureSqlAuthInterceptor`:**
 ```csharp
-// LcServices.DataAccess/Database/AzureSqlAuthInterceptor.cs
+// <YourApp>.DataAccess/Database/AzureSqlAuthInterceptor.cs
 // Requires: Azure.Identity package in the DataAccess project
 internal sealed class AzureSqlAuthInterceptor : DbConnectionInterceptor
 {
@@ -183,12 +183,12 @@ internal sealed class AzureSqlAuthInterceptor : DbConnectionInterceptor
 **Registration — both runtime and design-time:**
 ```csharp
 // ServiceCollectionExtensions.cs (runtime)
-services.AddDbContext<LcServicesDbContext>(opts =>
+services.AddDbContext<AppDbContext>(opts =>
     opts.UseSqlServer(connectionString)
         .AddInterceptors(new AzureSqlAuthInterceptor()));
 
-// LcServicesDbContextFactory.cs (EF CLI tooling / dotnet ef database update)
-var options = new DbContextOptionsBuilder<LcServicesDbContext>()
+// AppDbContextFactory.cs (EF CLI tooling / dotnet ef database update)
+var options = new DbContextOptionsBuilder<AppDbContext>()
     .UseSqlServer(connectionString)
     .AddInterceptors(new AzureSqlAuthInterceptor())
     .Options;
