@@ -144,7 +144,7 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Side Effects:** Use `effect()` strictly for side-effects (e.g., syncing to local storage, logging, external DOM manipulation) and never for state derivation.
 - **Component API:** Use `input()`, `output()`, and `model()` for component communication.
 - **Derived overrides:** Use `linkedSignal()` when you need state that is derived from props/inputs but can also be explicitly overridden by the user.
-- **[STRICT] Optimistic Server-State Updates — Sprint 13 lesson:** When a component must render an
+- **[STRICT] Optimistic Server-State Updates:** When a component must render an
   async server-owned list AND accept optimistic local mutations (role change, status toggle, etc.),
   layer signals as `toSignal(httpStream$, { initialValue }) → linkedSignal(() => serverSignal())`.
   - `toSignal` owns the reactive subscription to the http source.

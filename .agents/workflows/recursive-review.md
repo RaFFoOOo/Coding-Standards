@@ -67,7 +67,7 @@ Files > 200 lines, sorted desc, top 15. Note: 200-line rule applies to LOGIC fil
 ### 4. Framework-specific size budgets [DO NOT SKIP]
 Read <frontend>/angular.json. For every component .scss whose byte size exceeds the
 production `anyComponentStyle.maximumError` setting, report file path + size + budget +
-multiplier-over-error. **Sprint 10.5 lesson: line count is not the right gate for SCSS.**
+multiplier-over-error. **Note: line count is not the right gate for SCSS — use byte budgets.**
 
 ### 5. STRICT-rule grep targets [MANDATORY]
 For each STRICT rule in .agents/rules/*.md, grep the codebase for the explicit forbidden
@@ -98,8 +98,8 @@ archived.
 
 ### 9. Pipeline health
 For every workflow in .github/workflows/, check: does any deploy workflow have a post-deploy
-smoke step? If no, flag as 🔴 (Sprint 10.5 lesson — 5 sequential bugfix PRs all shipped
-"successful" CI without a smoke gate).
+smoke step? If no, flag as 🔴 — without a post-deploy smoke gate, a chain of "successful"
+CI runs can still ship broken builds.
 
 ### 10. Anything else flagged by the rules
 Up to 5 violations of any rule in .agents/rules/. Cite rule + file:line evidence.
@@ -119,7 +119,7 @@ For every finding from §2, assign:
 - **Proposed fix:** specific, actionable; not "review and improve"
 - **Target sprint:** which existing or future sprint absorbs this
 
-**Mechanical verification rule [Sprint 10.5 lesson]:** if you intend to mark a finding "Out
+**Mechanical verification rule:** if you intend to mark a finding "Out
 of Scope" or "deferred", the rationale MUST include the command (with output) that
 mechanically proves the deferral is safe. Example:
 

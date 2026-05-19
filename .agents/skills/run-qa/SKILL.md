@@ -34,7 +34,7 @@ Run this self-review **before** launching the full QA process. If any item fails
 10. **Stack Rules**: Did you comply with all stack-specific rules? (e.g., `.agents/rules/stack-angular.md`)
 11. **Skills**: Were all relevant skills followed? (e.g., `SPRINT_MANAGER`)
 
-### Mock File Security [MANDATORY — Sprint 11 lesson]
+### Mock File Security [MANDATORY]
 12. **SAS token scan**: Before committing any change that touches `assets/mock/`, run:
     ```bash
     grep -r "sig=" lc-webapp/src/assets/mock/

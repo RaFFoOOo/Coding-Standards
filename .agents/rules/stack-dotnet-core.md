@@ -110,7 +110,7 @@ new JwtSecurityTokenHandler().ValidateToken(token, validationParams, out _);
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration);
 ```
 
-**Isolated worker (Functions) DI stub [STRICT — Sprint 10.5 lesson]:** in the Functions
+**Isolated worker (Functions) DI stub [STRICT]:** in the Functions
 isolated worker, `AddMicrosoftIdentityWebApi` v3+ chains into `AddAuthorization()`, which
 in .NET 8+ registers `AuthorizationPolicyCache` — a component that resolves
 `Microsoft.AspNetCore.Routing.EndpointDataSource`. That service is absent in the worker DI
@@ -138,7 +138,7 @@ _logger.LogWarning("Authn rejected. UserId={ObjectId} CorrelationId={Correlation
     objectId, HttpContext.TraceIdentifier);
 ```
 
-## 9. Azure SQL Authentication with Microsoft.Data.SqlClient 7+ [STRICT — Sprint 11 lesson]
+## 9. Azure SQL Authentication with Microsoft.Data.SqlClient 7+ [STRICT]
 
 `Microsoft.Data.SqlClient` 7.0 removed the built-in `Authentication=Active Directory*` connection-string keyword handlers. They must be replaced with the `AccessTokenCallback` pattern via an EF Core `DbConnectionInterceptor`.
 

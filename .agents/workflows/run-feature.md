@@ -100,7 +100,7 @@ Execute this section **once per sprint**, after the final Feature's PR has been 
 27. **GitHub Actions:** Audit every `.github/workflows/*.yml` file **AND** every `.github/actions/**/*.yml` composite action file. For each action (e.g., `actions/checkout`, `actions/setup-node`, `Azure/static-web-apps-deploy`):
     - Check the action's GitHub releases page for newer major versions.
     - Verify Node.js runtime compatibility (currently Node.js 24 LTS).
-    - **[Sprint 12 lesson]** Composite actions in `.github/actions/` are frequently missed — they must be included in the A08 SHA-pinning audit alongside top-level workflow files.
+    - **Composite actions:** files under `.github/actions/` are frequently missed in dependency audits — they must be included in the A08 SHA-pinning audit alongside top-level workflow files.
 28. **CI/CD Runner Defaults:** Verify the default Node.js version in all workflow files matches the current **LTS** release.
 29. **Report & Plan:** If ANY outdated dependencies or actions are found:
     - Generate a `DEPENDENCY_AUDIT.md` artifact listing all findings with their `[SAFE]` / `[BREAKING]` classification.
