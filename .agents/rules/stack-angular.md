@@ -41,8 +41,8 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Expose named `readonly` component properties (computed signals or direct signal aliases) that delegate to the service internally. Templates bind only to component properties.
   - ❌ `[value]="myService.someSignal()"` in template
   - ✅ `readonly someValue = this.myService.someSignal;` in component, then `[value]="someValue()"` in template
-- **[STRICT] ViewChild Clean Surface — Sprint 10 lesson:**
-  - `viewChild()` / `@ViewChild()` references MUST be `private`. Templates must not access child-component internals directly (e.g., `bookingForm.bookingForm.invalid` or `bookingForm.confirmSubmit()` in the template is forbidden).
+- **[STRICT] ViewChild Clean Surface:**
+  - `viewChild()` / `@ViewChild()` references MUST be `private`. Templates must not access child-component internals directly (e.g., `childForm.form.invalid` or `childForm.submit()` in the template is forbidden).
   - Expose proxy signals (`Signal<>` derived from the child via `computed(() => child()?.value())`) and proxy methods (`public foo(): void { this.child()?.foo(); }`) on the parent component. Templates bind only to those.
   - Prefer signal-based `viewChild()` over the legacy decorator `@ViewChild()` — the result is a `Signal<T | undefined>` that integrates naturally with `computed()`.
   - To bridge child reactive-form state into a signal, the child can wire `form.statusChanges.pipe(takeUntilDestroyed()).subscribe(() => versionSignal.update(v => v + 1))` and expose `formInvalid: Signal<boolean> = computed(() => { versionSignal(); return this.form.invalid; })`.
