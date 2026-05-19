@@ -108,17 +108,16 @@ description: Frontend stack rules for Angular / TypeScript projects
   - **Strict Ban on Textual Icons:** Never use text characters (e.g., "x", "<", ">", "+") to represent UI controls or icons.
   - **System Alignment:** Use a professional icon library aligned with the chosen Design System (e.g., FontAwesome, Material Icons, Bootstrap Icons).
   - **Implementation:** Render icons using the framework's dedicated component (e.g., `<fa-icon>`, `<mat-icon>`) or optimized SVGs (NOT `<i class="fa-solid">` style — use the framework component for tree-shaking and type safety).
-- **[STRICT] Shared UI Primitives — Sprint 10 lesson:**
-  - When the same visual block (empty-state, badge, status-pill, etc.) appears in 3+ component templates, extract it into a reusable primitive before adding the 4th instance.
-  - Empty-states use the shared `EmptyStateComponent` (`shared/components/empty-state`) — `[icon]` + `[message]` + optional `[translateMessage]`. Do NOT roll a new `<div class="empty-state">` block.
-  - Status / source badges use the global SCSS classes from `src/styles/_badges.scss` (loaded once via `styles.scss`): `.status-badge.badge--{pending,approved,rejected}`, `.source-badge.source--{direct,imported}`. Do NOT redefine these styles in component SCSS.
-  - **Why:** Sprint 10 had ~100 lines of duplicated badge SCSS across 3 components and 4 hand-rolled empty-state blocks. Each duplicate is a maintenance trap (style drift) and a CSS budget consumer.
+- **[STRICT] Shared UI Primitives:**
+  - When the same visual block (empty-state, badge, status-pill, etc.) appears in 3+ component templates, extract it into a reusable shared primitive component before adding the 4th instance.
+  - Status/category badges and other recurring visual patterns MUST use project-wide global SCSS utility classes defined once in a shared stylesheet (e.g., `_badges.scss` loaded via `styles.scss`). Do NOT redefine these styles in individual component SCSS files.
+  - **Why:** Duplicated visual blocks across components are maintenance traps (style drift) and cumulative CSS budget consumers. Centralization ensures a single point of change.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
   - Implement a global `HttpInterceptor` to catch errors.
   - Log errors to the console with specific "Reproduction Steps":
-    `console.error("Context: [BookingForm]", "Input:", inputData, "Error:", error);`
+    `console.error("Context: [ComponentName]", "Input:", inputData, "Error:", error);`
 
 ## 6. Memory Safety & Subscriptions
 - **Automatic Cleanup:** Use `takeUntilDestroyed()` on all manual RxJS subscriptions.
