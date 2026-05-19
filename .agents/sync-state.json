@@ -1,5 +1,6 @@
 {
   "skipList": [
-    ".claude/"
+    ".claude/",
+    ".claude/rules/naming-azure-resources.md"
   ]
 }

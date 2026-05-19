@@ -10,12 +10,14 @@
   - **Proactive Improvement:** The Agent is expected to proactively suggest architectural, performance, and maintainability improvements beyond what the User explicitly requested.
   - **Model Recommendation:** The Agent must evaluate the complexity, risk, and token cost of every User prompt and **proactively recommend the best-suited model** before execution. Recommend a stronger model (e.g., Opus) for architectural decisions, multi-file refactors, complex debugging, or ambiguous requirements. Recommend a lighter model (e.g., Sonnet/Haiku) for simple renames, single-file edits, formatting fixes, or mechanical changes. If the current model is already optimal, no recommendation is needed.
   - **Session Efficiency [MANDATORY]:** Before executing any prompt, the Agent MUST assess whether the current session context is efficient. Proactively advise the User on session management **before proceeding** whenever one of the following conditions is detected:
-    - **Suggest compaction** when: the session has grown large (context >50% full) but the current task is still in progress and context continuity is needed (e.g., mid-feature implementation). Compaction preserves the summary and active state at lower cost.
-    - **Suggest a new session** when: switching to a completely different task, starting a new sprint, or the previous task is fully committed/closed. A fresh session costs less than carrying dead context.
-    - **Suggest a model downgrade** when: the remaining work in the session is purely mechanical (formatting, renaming, adding i18n keys, updating JSON). Continuing on a heavy model wastes budget for work a lighter model can do equally well.
+    - **Suggest `/compact`** when: the session has grown large (context >50% full) but the current task is still in progress and context continuity is needed (e.g., mid-feature implementation). Compaction preserves the summary and active state at lower cost.
+    - **Suggest `/clear` (new session)** when: switching to a completely different task, starting a new sprint, or the previous task is fully committed/closed. A fresh session costs less than carrying dead context.
+    - **Suggest a model downgrade** when: the remaining work in the session is purely mechanical (formatting, renaming, adding i18n keys, updating JSON). Continuing on a heavy model wastes budget for work Haiku/Sonnet can do equally well.
     - **The threshold is proactive, not reactive:** Do not wait until context is 90% full. Flag it early so the User can act before quality degrades or a forced compaction truncates critical context.
+    - Format: prepend the advice as a one-line callout before the task response, e.g.: `> ⚠ Session is 65% full — consider /compact before we continue if you plan to stay in this task, or /clear if switching topics.`
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
-  - **Prompt Coaching [MANDATORY — every response]:** At the end of every response, the Agent MUST include a short callout that teaches the User how to prompt more effectively. The tip must be specific to the prompt just received — not generic advice. Cover patterns such as: adding missing context (which file, which component, which sprint task), specifying the desired output format (plan only / implement / just explain), flagging the right skill or workflow to invoke, choosing the right model for the task complexity, or structuring multi-part requests into atomic prompts. The goal is that the User becomes a more effective prompter over time through repeated, contextual coaching. Keep the tip to 1–2 sentences. Skip only when the User explicitly asks to suppress it.
+  - **Best over Simplest [STRICT]:** The Agent must never choose the easiest fix over the correct one. When a library upgrade introduces a breaking change (new API, new package required, registration pattern changed), the Agent MUST read the migration guide and adapt the codebase to the new version correctly — never downgrade the library to avoid the migration work. A downgrade is only acceptable if the new version is genuinely incompatible with another locked dependency (e.g., the framework's supported range explicitly excludes it), and must be explicitly justified with that reason in the commit message.
+  - **Prompt Coaching [MANDATORY — every response]:** At the end of every response, the Agent MUST include a short `> 💡 Prompt tip:` callout that teaches the User how to prompt more effectively. The tip must be specific to the prompt just received — not generic advice. Cover patterns such as: adding missing context (which file, which component, which sprint task), specifying the desired output format (plan only / implement / just explain), flagging the right skill or workflow to invoke, choosing the right model for the task complexity, or structuring multi-part requests into atomic prompts. The goal is that the User becomes a more effective prompter over time through repeated, contextual coaching. Keep the tip to 1–2 sentences. Skip only when the User explicitly asks to suppress it.
 
 ## 1. Planning & Process
 - **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `AGENTS.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
@@ -69,8 +71,8 @@
 - **UPPER_SNAKE_CASE:** For global Constants.
 - **Environment Variables (CI/CD):**
   - **Secrets** (deployment tokens, SAS tokens, credentials): Must adhere strictly to the schema `<operation>_<cloud>_<resource>_<variable_name>` where `operation` is `ci|cd`, `cloud` is `azure`, and `resource` is `sta|swa`. Non-applicable segments must be omitted.
-  - **CI vs CD secret split [STRICT]:** When the same cloud resource is needed in both a CI workflow (PR/preview, repository-level secret) and a CD workflow (production, environment-scoped secret), register two separate secrets with the appropriate `CI_` / `CD_` prefix. Never share a single secret across both scopes. Document the split in `README.md`.
-  - **Variables** (feature flags, configuration values): Use plain `UPPER_SNAKE_CASE` names without `CI_`/`CD_` prefix (e.g., `ENABLE_FEATURE_X`, `ENABLE_DARK_MODE`). The GitHub environment already provides scoping — different environments can hold different values for the same variable name.
+  - **CI vs CD secret split [STRICT]:** When the same Azure resource (e.g., an SWA deployment token) is needed in both a CI workflow (PR/preview, repository-level secret) and a CD workflow (production, environment-scoped secret), register two separate secrets with the appropriate `CI_` / `CD_` prefix. Never share a single secret across both scopes. Document the split in `README.md`.
+  - **Variables** (feature flags, configuration values): Use plain `UPPER_SNAKE_CASE` names without `CI_`/`CD_` prefix (e.g., `ENABLE_TENANT_SELECTOR`, `ENABLE_LOGIN_FEATURES`). The GitHub environment already provides scoping — different environments can hold different values for the same variable name.
 - **File Naming:** Delegated to stack-specific rules (e.g., `kebab-case` for Angular).
 
 ## 6. Documentation Policy
@@ -82,6 +84,7 @@
 - **Native over Third-Party:** Prefer standard language features over bringing in external dependencies.
 - **Justification:** Every new dependency requires explicit justification and comparison against an alternative.
 - **Security & Activity:** Do NOT use dependencies that have known critical CVEs or have not seen a release in >1 year.
+- **No Downgrade Shortcut [STRICT]:** When a library's new major version introduces a breaking change, the correct response is always to adapt the codebase to the new API — never to pin an older version to avoid the migration. Before pinning any version below the latest stable, the Agent MUST: (1) read the official migration guide, (2) identify what the new version requires, (3) implement those requirements correctly. A lower version pin is only permitted when the new version is explicitly outside the supported range of a locked framework dependency, and the justification must appear verbatim in the commit message.
 - **Sprint Freshness Audit [MANDATORY]:** At the end of every sprint, a full dependency audit (application packages, GitHub Actions versions, CI/CD runner defaults) is mandatory. Upgrades must be classified `[SAFE]` or `[BREAKING]` and added to the next sprint's `PLAN.md`. See the `run-feature` skill's "Dependency Freshness Audit" section for the execution procedure.
 
 ## 8. Git Conventions
@@ -95,9 +98,10 @@
 **Large implementations (sprints with multiple tasks, >3 files changed):** Use the Sprint/Task hierarchy:
 ```
 main
- └── sprint/<version>-<slug>          ← sprint branch, created once
-      ├── task/sprint-<version>/<id>-<brief>   ← one task branch per task
-      └── task/sprint-<version>/<id>-<brief>   ← PR each task → sprint branch
+ └── sprint/8.6-role-aware-routes          ← sprint branch, created once
+      ├── task/sprint-8.6/7-naming-align   ← one task branch per task
+      ├── task/sprint-8.6/1-nav-unify      ← PR each task → sprint branch
+      └── task/sprint-8.6/2-route-restructure
 ```
 1. Create sprint branch: `git checkout -b sprint/<version>-<slug>` from `main`
 2. For each task: create `task/sprint-<version>/<task-id>-<brief>` from the sprint branch

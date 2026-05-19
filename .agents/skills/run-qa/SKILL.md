@@ -34,9 +34,18 @@ Run this self-review **before** launching the full QA process. If any item fails
 10. **Stack Rules**: Did you comply with all stack-specific rules? (e.g., `.agents/rules/stack-angular.md`)
 11. **Skills**: Were all relevant skills followed? (e.g., `SPRINT_MANAGER`)
 
+### Mock File Security [MANDATORY — Sprint 11 lesson]
+12. **SAS token scan**: Before committing any change that touches `assets/mock/`, run:
+    ```bash
+    grep -r "sig=" lc-webapp/src/assets/mock/
+    ```
+    Any non-empty match is a **blocking violation** — SAS tokens must never appear in
+    version-controlled mock files. Secrets belong in `environment.development.ts` locally
+    (never committed) and in the backend database (runtime fetch).
+
 ## 1. The Console Zero-Tolerance Policy
 
-> Sections §1-§2 require browser access. Use the platform's browser testing tool (e.g., `/test-browser` skill with Playwright MCP for Claude Code) if available, or ask the user to perform manual browser verification and report console output.
+> Sections §1-§2 require browser access. Use the `/test-browser` skill with Playwright MCP if available, or ask the user to perform manual browser verification and report console output.
 
 **Protocol:**
 1.  Launch the application in the browser.

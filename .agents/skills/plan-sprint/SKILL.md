@@ -32,11 +32,12 @@ When the User provides a Sprint Plan or User Story:
     - **Complexity Tags:** Tag each task in `PLAN.md` with an estimation size (`[S]`, `[M]`, `[L]`, `[XL]`).
     - **Priority & Ordering:** Order the tasks in a strict Dependency-First sequence (e.g., Schema -> API -> Service -> UI).
 3.  **Visualize (The "Mockup Gate"):**
-    - For any UI/Frontend task, you **MUST** create a **text-based wireframe** (markdown layout, component hierarchy, interactions, color tokens). Save as `mockup_[feature].md` artifact and embed it in `implementation_plan.md`.
-    - The wireframe must include specific details about:
+    - For any UI/Frontend task, you **MUST** create a **text-based wireframe** in markdown describing the layout, component hierarchy, interactions, and color tokens. Save as `mockup_[feature].md` artifact and embed it in `implementation_plan.md`.
+    - The prompt for the image verification must include specific details about:
         - Layout structure (Grid, Flex, Sidebar, etc.).
         - Color palette defined in the project's Design System.
         - Typography according to project standards.
+    - Save the generated image as an artifact and embed it in `implementation_plan.md`.
 4.  **Validate:** Check dependencies against the **Global Constitution** (in `AGENTS.md`) and **Project Rules** (e.g., `stack-angular.md`).
 5.  **Plan:** Update the `PLAN.md` artifact with the new tasks only *after* the Visual Mockup is approved.
 

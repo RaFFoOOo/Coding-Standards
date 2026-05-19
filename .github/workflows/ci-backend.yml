@@ -1,0 +1,22 @@
+name: CI - .NET Backend Build & Test
+
+on:
+  pull_request:
+    paths:
+      - 'lc-services/**'
+      - '.github/workflows/ci-backend.yml'
+      - '.github/workflows/shared-build-dotnet.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    concurrency:
+      group: ci-backend-${{ github.ref }}
+      cancel-in-progress: true
+    uses: ./.github/workflows/shared-build-dotnet.yml
+    with:
+      run-tests: true
+    secrets: inherit

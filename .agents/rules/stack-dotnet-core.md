@@ -54,7 +54,7 @@ description: Backend stack rules for ASP.NET Core / C# projects
 
 ## 8. Security & Validation
 
-### §8.1 Baselines
+### §8.1 Existing Baselines
 - **Authentication/Authorization:** Secure all endpoints by default. Expose explicitly using `[AllowAnonymous]`. Combine Role-based and Policy-based authorization.
 - **Input Validation:** Use `FluentValidation` instead of data annotations for DTOs to separate validation logic from data models.
 - **CORS & Rate Limiting:** Apply explicit, least-privilege CORS policies and rate limiting middleware for public-facing APIs.
@@ -66,10 +66,10 @@ All secrets (connection strings, API keys, tokens) MUST be sourced at runtime fr
 
 - ❌ `"ConnectionStrings": { "Default": "Server=prod;Password=secret" }` — literal secret in source
 - ❌ `"ConnectionStrings": { "Default": "@Microsoft.KeyVault(SecretUri=...)" }` — provider-specific reference in committed config
-- ✅ `"ConnectionStrings": { "Default": "" }` in `appsettings.json`; the CD pipeline injects the real value as a platform environment variable that overrides `appsettings.json` at startup (double-underscore = section separator, e.g., `ConnectionStrings__Default`)
+- ✅ `"ConnectionStrings": { "Default": "" }` in `appsettings.json`; the CD pipeline injects the real value as a platform application setting (`ConnectionStrings__Default`, `AzureAd__TenantId`, etc.)
 
 **How secrets reach the runtime:**
-- **Deployment platform:** The CD pipeline sets values as encrypted platform application settings — they are exposed as environment variables at runtime and override `appsettings.json`.
+- **Azure Functions / App Service:** CD pipeline sets values via `az functionapp config appsettings set` — Azure stores them encrypted at rest and exposes them as environment variables that override `appsettings.json` at startup (double-underscore = section separator).
 - **Local development:** set values in `appsettings.Development.json` (must be git-ignored) or via `dotnet user-secrets`.
 - **[MANDATORY]** All required secret names MUST be documented in `README.md` under a clearly labelled "Secrets & Configuration" section so operators know exactly what to provision.
 
@@ -110,6 +110,23 @@ new JwtSecurityTokenHandler().ValidateToken(token, validationParams, out _);
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration);
 ```
 
+**Isolated worker (Functions) DI stub [STRICT — Sprint 10.5 lesson]:** in the Functions
+isolated worker, `AddMicrosoftIdentityWebApi` v3+ chains into `AddAuthorization()`, which
+in .NET 8+ registers `AuthorizationPolicyCache` — a component that resolves
+`Microsoft.AspNetCore.Routing.EndpointDataSource`. That service is absent in the worker DI
+container and the host crashes at startup with no actionable error. Add the framework
+reference and a no-op `EndpointDataSource` to the Functions project:
+```xml
+<!-- LcServices.Functions.csproj -->
+<ItemGroup>
+  <FrameworkReference Include="Microsoft.AspNetCore.App" />
+</ItemGroup>
+```
+```csharp
+// Program.cs — after AddAuthentication / AddMicrosoftIdentityWebApi
+services.AddSingleton<EndpointDataSource>(_ => new DefaultEndpointDataSource([]));
+```
+
 #### A09 — Logging Failures [STRICT]
 Structured logging via `ILogger<T>` with a correlation ID injected per request. Logging tokens, raw request bodies, passwords, or PII (email, phone, address) is strictly forbidden. Failed authn/authz events MUST be logged at `Warning` with the user's Object ID — never email.
 ```csharp
@@ -120,3 +137,72 @@ _logger.LogWarning("Login failed for {Email}", userEmail);
 _logger.LogWarning("Authn rejected. UserId={ObjectId} CorrelationId={CorrelationId}",
     objectId, HttpContext.TraceIdentifier);
 ```
+
+## 9. Azure SQL Authentication with Microsoft.Data.SqlClient 7+ [STRICT — Sprint 11 lesson]
+
+`Microsoft.Data.SqlClient` 7.0 removed the built-in `Authentication=Active Directory*` connection-string keyword handlers. They must be replaced with the `AccessTokenCallback` pattern via an EF Core `DbConnectionInterceptor`.
+
+**Never downgrade SqlClient to avoid this migration.** SqlClient 6.0 was the first version to support the native `json` column type; 7.0 is the current target. Pinning to an older version to sidestep the breaking change violates `AGENTS.md §7 No Downgrade Shortcut`.
+
+**Correct implementation — `AzureSqlAuthInterceptor`:**
+```csharp
+// LcServices.DataAccess/Database/AzureSqlAuthInterceptor.cs
+// Requires: Azure.Identity package in the DataAccess project
+internal sealed class AzureSqlAuthInterceptor : DbConnectionInterceptor
+{
+    private static readonly DefaultAzureCredential Credential = new();
+    private static readonly string[] Scopes = ["https://database.windows.net/.default"];
+
+    public override async ValueTask<InterceptionResult> ConnectionOpeningAsync(
+        DbConnection connection, ConnectionEventData eventData,
+        InterceptionResult result, CancellationToken cancellationToken = default)
+    {
+        if (connection is SqlConnection sqlConnection)
+            sqlConnection.AccessTokenCallback = FetchTokenAsync;
+        return await base.ConnectionOpeningAsync(connection, eventData, result, cancellationToken);
+    }
+
+    public override InterceptionResult ConnectionOpening(
+        DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
+    {
+        if (connection is SqlConnection sqlConnection)
+            sqlConnection.AccessTokenCallback = FetchTokenAsync;
+        return base.ConnectionOpening(connection, eventData, result);
+    }
+
+    private static async Task<SqlAuthenticationToken> FetchTokenAsync(
+        SqlAuthenticationParameters parameters, CancellationToken cancellationToken)
+    {
+        var token = await Credential.GetTokenAsync(
+            new TokenRequestContext(Scopes), cancellationToken);
+        return new SqlAuthenticationToken(token.Token, token.ExpiresOn);
+    }
+}
+```
+
+**Registration — both runtime and design-time:**
+```csharp
+// ServiceCollectionExtensions.cs (runtime)
+services.AddDbContext<LcServicesDbContext>(opts =>
+    opts.UseSqlServer(connectionString)
+        .AddInterceptors(new AzureSqlAuthInterceptor()));
+
+// LcServicesDbContextFactory.cs (EF CLI tooling / dotnet ef database update)
+var options = new DbContextOptionsBuilder<LcServicesDbContext>()
+    .UseSqlServer(connectionString)
+    .AddInterceptors(new AzureSqlAuthInterceptor())
+    .Options;
+```
+
+**Connection string requirements:**
+- Must NOT contain `Authentication=` keyword — token injection is handled entirely by the interceptor.
+- Minimal form: `Server=<host>.database.windows.net;Database=<db>;Encrypt=True;TrustServerCertificate=False;`
+- `DefaultAzureCredential` resolves credentials in order: Managed Identity (Azure) → Azure CLI → Visual Studio → environment variables. No connection string changes are needed between environments.
+
+**Dependency matrix:**
+
+| SqlClient version | `SqlDbType.Json` | Built-in AAD auth | `AccessTokenCallback` |
+|---|---|---|---|
+| 5.x (EF Core 9 default) | ❌ | ✅ | ✅ |
+| 6.x | ✅ | ✅ | ✅ |
+| 7.x (current target) | ✅ | ❌ (use interceptor) | ✅ |

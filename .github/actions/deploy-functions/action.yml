@@ -1,0 +1,103 @@
+name: Deploy to Azure Function App
+description: Checks out source, applies EF Core migrations, injects app settings, and deploys the published artifact to an Azure Function App.
+
+inputs:
+  function-app-name:
+    description: 'Azure Function App name'
+    required: true
+  resource-group:
+    description: 'Azure resource group containing the Function App'
+    required: true
+  connection-string:
+    description: 'Azure SQL connection string (used for migrations and runtime settings)'
+    required: true
+  msal-authority:
+    description: 'MSAL/Entra authority URL (AzureAd__Authority)'
+    required: true
+  msal-api-client-id:
+    description: 'lc-services-api app registration client ID (AzureAd__ClientId + Audience)'
+    required: true
+  azure-client-id:
+    description: 'User-Assigned Managed Identity client ID (AZURE_CLIENT_ID)'
+    required: true
+  cors-allowed-origin:
+    description: 'CORS allowed origin (CORS__AllowedOrigin)'
+    required: true
+  data-access-mode:
+    description: 'Data access mode, e.g. Database (DATA_ACCESS_MODE)'
+    required: true
+  storage-account-url:
+    description: 'Content storage account URL (STORAGE_ACCOUNT_URL)'
+    required: true
+  storage-runtime-account-name:
+    description: 'Runtime storage account name for WebJobs and content share (STORAGE_RUNTIME_ACCOUNT_NAME)'
+    required: true
+  applicationinsights-connection-string:
+    description: 'Application Insights connection string (APPLICATIONINSIGHTS_CONNECTION_STRING)'
+    required: true
+  artifact-name:
+    description: 'Name of the build artifact to download and deploy'
+    required: false
+    default: 'dotnet-publish-output'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.x'
+
+    - name: Apply EF Core migrations
+      shell: bash
+      run: |
+        if [[ -z "${AZURE_SQL_CONNECTION_STRING:-}" || "${AZURE_SQL_CONNECTION_STRING}" == "-" ]]; then
+          echo "::error::AZURE_SQL_CONNECTION_STRING is empty or unset. Set vars.AZURE_SQL_CONNECTION_STRING in the GitHub environment via scripts/azure-setup/set-github-vars.sh."
+          exit 1
+        fi
+        cd lc-services
+        dotnet tool restore
+        dotnet restore
+        dotnet ef database update \
+          --project LcServices.DataAccess \
+          --startup-project LcServices.Functions
+      env:
+        AZURE_SQL_CONNECTION_STRING: ${{ inputs.connection-string }}
+
+    - name: Inject Function App Settings
+      shell: bash
+      run: |
+        # Remove legacy key-based storage settings — replaced by MI-based __accountName form.
+        # Idempotent: `|| true` absorbs the error when the setting does not exist.
+        az functionapp config appsettings delete \
+          --name "${{ inputs.function-app-name }}" \
+          --resource-group "${{ inputs.resource-group }}" \
+          --setting-names AzureWebJobsStorage WEBSITE_CONTENTAZUREFILECONNECTIONSTRING 2>/dev/null || true
+
+        az functionapp config appsettings set \
+          --name "${{ inputs.function-app-name }}" \
+          --resource-group "${{ inputs.resource-group }}" \
+          --settings \
+            "AzureAd__Authority=${{ inputs.msal-authority }}" \
+            "AzureAd__ClientId=${{ inputs.msal-api-client-id }}" \
+            "AzureAd__Audience=${{ inputs.msal-api-client-id }}" \
+            "AzureWebJobsStorage__accountName=${{ inputs.storage-runtime-account-name }}" \
+            "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName=${{ inputs.storage-runtime-account-name }}" \
+            "AZURE_CLIENT_ID=${{ inputs.azure-client-id }}" \
+            "AZURE_SQL_CONNECTION_STRING=${{ inputs.connection-string }}" \
+            "CORS__AllowedOrigin=${{ inputs.cors-allowed-origin }}" \
+            "DATA_ACCESS_MODE=${{ inputs.data-access-mode }}" \
+            "STORAGE_ACCOUNT_URL=${{ inputs.storage-account-url }}" \
+            "APPLICATIONINSIGHTS_CONNECTION_STRING=${{ inputs.applicationinsights-connection-string }}"
+
+    - name: Download Build Artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ./publish
+
+    - name: Deploy to Function App
+      uses: azure/functions-action@bc63708cc6539760eea18d8a7de4ce8ef5fdf593  # v1.5.6 — pinned per A08
+      with:
+        app-name: ${{ inputs.function-app-name }}
+        package: ./publish

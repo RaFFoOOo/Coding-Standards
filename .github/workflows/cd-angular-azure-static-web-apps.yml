@@ -1,44 +1,89 @@
 name: CD - Deploy to Azure Static Web Apps
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lc-webapp/**'
+      - '.github/workflows/cd-angular-azure-static-web-apps.yml'
+      - '.github/workflows/shared-build-angular.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
       node-version: ${{ vars.NODE_VERSION || '24' }}
-      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
+      working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
+      # Angular CLI configuration name (`--configuration <value>`) — NOT a GitHub
+      # environment scope. We always want optimized, minified bundles for any
+      # deployed SWA (dev or prod); per-environment values are injected at deploy
+      # time via index.html token replacement in the deploy-swa action.
       environment: production
       deploy-tag-prefix: 'cd-azure-swa'
+      deploy-tag-suffix: ${{ github.ref_name }}
     secrets: inherit
 
-  deploy:
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+    concurrency:
+      group: cd-swa-dev
+      cancel-in-progress: true
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Deploy to Dev SWA
+        uses: ./.github/actions/deploy-swa
+        with:
+          enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
+          enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          build-version: ${{ needs.build.outputs.build-tag }}
+          msal-client-id: ${{ vars.MSAL_CLIENT_ID }}
+          msal-authority: ${{ vars.MSAL_AUTHORITY }}
+          msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
+          api-base-url: ${{ vars.API_BASE_URL }}
+          swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-prod:
+    # DISABLED — production SWA is not yet provisioned. While disabled, a
+    # workflow_dispatch trigger deploying with the `production` environment
+    # would land on the dev SWA's default slot (eudwlceswa01) and overwrite
+    # whatever deploy-dev last shipped — including stale prod-env values like
+    # ENABLE_TENANT_SELECTOR=false. Re-enable by removing the `false &&` guard
+    # below once production resources are provisioned (see INFRA.md §2 and
+    # `naming-azure-resources.md` for the eupwlce... naming).
+    if: false && github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     environment: production
-    permissions:
-      contents: write
+    concurrency:
+      group: cd-swa-prod
+      cancel-in-progress: false
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v5
+      - name: Deploy to Prod SWA
+        uses: ./.github/actions/deploy-swa
         with:
-          name: angular-build-output
-          path: ./dist
-
-      - name: Deploy to Azure Static Web Apps
-        id: builddeploy
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          skip_app_build: true
-          app_location: "./dist/browser"
-          output_location: ""
+          enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
+          enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          build-version: ${{ needs.build.outputs.build-tag }}
+          msal-client-id: ${{ vars.MSAL_CLIENT_ID }}
+          msal-authority: ${{ vars.MSAL_AUTHORITY }}
+          msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
+          api-base-url: ${{ vars.API_BASE_URL }}
+          swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and Push Release Tag
         run: |
