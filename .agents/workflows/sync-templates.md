@@ -79,8 +79,8 @@ Before proceeding with the diff, verify that this sync will not overwrite more r
       "direction": "PUSH",
       "sourceRepo": "Coding-Standards",
       "sourceBranch": "main",
-      "targetRepo": "le-cementine",
-      "targetBranch": "chore/sync-standards-claude-code",
+      "targetRepo": "<your-project>",
+      "targetBranch": "chore/sync-standards",
       "agent": "claude-code"
     }
   ]
