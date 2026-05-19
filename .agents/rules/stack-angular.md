@@ -194,11 +194,11 @@ description: Frontend stack rules for Angular / TypeScript projects
 
 ## 10. Multi-Tenant Architecture [STRICT]
 - **Resource Resolution:**
-  - **MUST** resolve all brand-specific brand assets (logos, favicons, primary images) dynamically via the `ITenantConfigService.getResourceUrl()` pattern.
+  - **MUST** resolve all brand-specific assets (logos, favicons, primary images) dynamically via a tenant config service pattern (e.g., `ITenantConfigService.getResourceUrl()`).
   - Hardcoded paths to tenant assets in the `assets/` directory are forbidden for multi-tenant features.
 - **Data Segregation:**
   - **MUST** use tenant-segregated keys for all browser-side persistence (localStorage, sessionStorage).
-  - Implementation: Keys must be prefixed with a unique tenant identifier (e.g., `lc_{tenantId}_{key}`).
+  - Implementation: Keys must be prefixed with a unique tenant identifier (e.g., `{appPrefix}_{tenantId}_{key}`).
 - **Mode-Aware UI:**
   - Standard components (Booking, Catalog) must adapt their behavior and terminology based on the `businessType` signal from `ITenantConfigService` to support diverse business models (e.g., Reservation vs. Order).
 - **Mode Logic Centralization [STRICT]:**
