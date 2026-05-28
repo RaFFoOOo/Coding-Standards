@@ -48,7 +48,10 @@ runs:
       with:
         dotnet-version: '10.x'
 
+    # Skip in Mock-mode deployments — there's no SQL backend to migrate.
+    # Case-sensitive: vars.DATA_ACCESS_MODE must be exactly "Database".
     - name: Apply EF Core migrations
+      if: inputs.data-access-mode == 'Database'
       shell: bash
       run: |
         if [[ -z "${AZURE_SQL_CONNECTION_STRING:-}" || "${AZURE_SQL_CONNECTION_STRING}" == "-" ]]; then
