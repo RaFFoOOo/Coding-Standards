@@ -16,11 +16,11 @@
     - **The threshold is proactive, not reactive:** Do not wait until context is 90% full. Flag it early so the User can act before quality degrades or a forced compaction truncates critical context.
     - Format: prepend the advice as a one-line callout before the task response, e.g.: `> ⚠ Session is 65% full — consider /compact before we continue if you plan to stay in this task, or /clear if switching topics.`
   - **The Recursive Approach:** The Agent must act strictly following the established rules, skills, and workflows. After acting, the Agent must reflect on the outcome and proactively update those very rules, skills, and workflows with any new lessons learned. This ensures our standards improve recursively project by project.
-  - **Best over Simplest [STRICT]:** The Agent must never choose the easiest fix over the correct one. When a library upgrade introduces a breaking change (new API, new package required, registration pattern changed), the Agent MUST read the migration guide and adapt the codebase to the new version correctly — never downgrade the library to avoid the migration work. A downgrade is only acceptable if the new version is genuinely incompatible with another locked dependency (e.g., the framework's supported range explicitly excludes it), and must be explicitly justified with that reason in the commit message.
+  - **Best over Simplest [STRICT]:** The Agent must never choose the easiest fix over the correct one, trading correctness for speed. The canonical case — adapting to a breaking library upgrade instead of pinning an older version to dodge the migration — is governed in full by §7 *No Downgrade Shortcut*; the same principle applies to every shortcut of this shape.
   - **Prompt Coaching [MANDATORY — every response]:** At the end of every response, the Agent MUST include a short `> 💡 Prompt tip:` callout that teaches the User how to prompt more effectively. The tip must be specific to the prompt just received — not generic advice. Cover patterns such as: adding missing context (which file, which component, which sprint task), specifying the desired output format (plan only / implement / just explain), flagging the right skill or workflow to invoke, choosing the right model for the task complexity, or structuring multi-part requests into atomic prompts. The goal is that the User becomes a more effective prompter over time through repeated, contextual coaching. Keep the tip to 1–2 sentences. Skip only when the User explicitly asks to suppress it.
 
 ## 1. Planning & Process
-- **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `AGENTS.md`, Local Rules (e.g., `stack-angular.md`), and Active Skills.
+- **Context Integrity:** Before starting any new Feature or major Refactor, explicitly verify you are referencing the latest versions of `AGENTS.md`, Local Rules (e.g., `stack-angular.md`), Active Skills, and `DECISIONS.md`. Any proposal that contradicts a recorded decision in `DECISIONS.md` must include an explicit justification — do not silently override architectural choices.
 - **Task Granularity:** If a User Prompt is complex, multi-faceted, or "heavy":
   - **Do NOT** attempt to execute it in a single turn.
   - **Split** the prompt into smaller, sequential entries in `PLAN.md`.
@@ -28,12 +28,29 @@
   - **Threshold:** Split when prompt involves **3+ components**, **2+ features**, or **>10 estimated tool calls**.
 - **Artifact Generation:** Before implementing any feature, generate a `PLAN.md`.
 - **Review Protocol:** Do not implement the plan until explicitly approved by the User.
+- **Design Exploration → Lock [STRICT]:** Invest in the **design phase before** locking. Explore with **schemas/diagrams over prose** — wireframes, link-position / state matrices — starting from the **current state of the art**, and converge on one (or a few) candidate solutions for the Tech Lead to choose. **Only once the resulting mockup/design is approved (Mockup Gate) is it frozen for that sprint:** new design ideas surfacing mid-implementation are logged to `TODO.md` (or the next sprint's PLAN), **not** reworked in-flight on the task branch. Re-opening a frozen design requires an explicit, recorded Tech-Lead decision with a one-line rationale. *(Rationale: Sprint 21 T7 churned ~15 commits / several full rewrites over 3 days because (a) the design phase under-explored options up front and (b) approved design kept being re-opened live. The link-position matrix that finally resolved it is the model: schemas, current-state-first, options enumerated — do that **before** locking, then convert later ideas into logged follow-ups.)*
+- **Verify, don't assume [STRICT]:** When the User reports a UI/behavior gap ("I can't see X", "X doesn't work"), confirm the actual rendered/runtime state (read the real CSS/markup, or run the app) **before** claiming it's done or diagnosing. Never assert a feature works from code you didn't check end-to-end.
 - **Mandatory QA Gate:** No task can be marked as `[x]` in `PLAN.md` without a corresponding affirmative `QA_REPORT.md` generated by the `QUALITY_ASSURANCE` skill.
+- **Self-Review Gate [MANDATORY]:** At the end of **every** implementation — before marking a task `[x]`, opening a PR, or reporting "done" — the Agent MUST run this 7-question self-review and report the findings honestly:
+  1. **Do I like the produced artifact?** (Would I ship it as-is?)
+  2. **Is it comfortable for the user?** (UX/ergonomics, fewest interactions.)
+  3. **Can I do better / improve something?**
+  4. **Did I strictly respect all rules & skills?** (Constitution, stack rules, the relevant SKILL.)
+  5. **Is the code well made or does it need refactoring?** (Redundancy/DRY, code smells, anti-patterns, maintainability.)
+  6. **Are performances good?** (Redundant/N+1 HTTP requests on page load, layout thrashing, unnecessary work.)
+  7. **Is it a good base for future sprints?** (Any new ideas for `TODO.md`?)
+  Each finding is then **actioned**: a rule/skill violation or a cheap fix is corrected before done; larger refactors/ideas are logged to `TODO.md`. Skipping the gate, or answering it dishonestly to declare done faster, is a process violation.
+- **Iterative Review Gate [STRICT]:** Every artifact — code, rules/standards, plans, docs — is reviewed in **repeated passes, never once**. Run a **minimum of 3 iterations** and **stop only when a full pass finds no new defect in the work under review** (a clean pass); if a pass finds anything in scope, fix it and run another. Rules:
+  - **Each iteration MUST be self-critical:** it re-examines **the changes the previous iteration(s) made**, not only the original artifact — a fix routinely introduces a new defect, so the work that *resolved* the last finding is itself the prime suspect in the next pass. Adopt an adversarial stance toward your own edits ("what did I just break / overlook / over-trim?").
+  - Each pass must **actually re-read the artifact**, not re-reason from memory — later passes routinely surface defects the first looked past.
+  - Pre-existing issues outside the change's scope are **logged as follow-ups** (`TODO.md` / separate PR), not folded in, and do not block the clean pass.
+  - Applies equally to development, rule/standard authoring, and planning. *(Rationale: a token-efficiency review of these very templates found 2 latent sync bugs + a self-contradiction only in iterations 2–4, after iteration 1 looked "done".)*
 - **Living Plan Enforcement [STRICT]:** Mark tasks `[x]` in PLAN.md immediately after each commit — never defer to end of session. Mark superseded/deferred items `[-]`. Archive closed sprint plans to `archive/` as soon as all features reach `[x]` or `[-]`. A stale `[ ]` on a completed task or a closed plan in the project root are both bugs.
 - **Skills Enforcement:** Before implementing any feature or major change:
   - Check `.agents/skills/` for applicable skills
   - Read and follow the relevant `SKILL.md` instructions
   - Key skills: `QUALITY_ASSURANCE` (before marking done), `ARTIFACT_MANAGER` (for PLAN.md updates), `SPRINT_MANAGER` (for new features)
+- **Decision Recording [MANDATORY]:** Any deviation from a previously-approved plan that introduces or removes a major dependency, library, or architectural pattern must produce a one-paragraph entry in `DECISIONS.md` in the same PR.
 
 ## 2. Code Quality & Structure
 - **Access Modifiers:**
@@ -50,7 +67,7 @@
   - **Deprecation Zero-Tolerance:** Never use deprecated methods or libraries. Check the latest LTS documentation before implementation.
   - **Standard-Compliant Performance:** Always prefer the native, modern idiom over legacy workarounds (e.g., use `Span<T>` in C# for slicing, use `Signals` in Angular for reactivity where appropriate). Maximize efficiency using the language's latest standard features.
 - **Method Size:** Optimize for readability. A method should fit on a standard screen (approx. 20-30 lines).
-- **The 200-Line Threshold:** If any logic file (excluding auto-generated configuration or lockfiles) exceeds 200 lines, the Agent MUST instantly halt and trigger a mandatory architectural review to refactor and split it into smaller, focused components or services.
+- **The 200-Line Threshold:** If any logic file (excluding auto-generated configuration, lockfiles, and prose docs — rule/skill markdown, PLANs, READMEs) exceeds 200 lines, the Agent MUST instantly halt and trigger a mandatory architectural review to refactor and split it into smaller, focused components or services. *(Prose docs are exempt because they are specifications, not logic; keep them focused but do not split solely to satisfy a line count.)*
 
 ## 3. Reliability & Security
 - **Exception Safety:** All external calls (DB, API, File) must be wrapped in error handling blocks that fail gracefully.

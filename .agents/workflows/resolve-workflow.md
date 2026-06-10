@@ -5,7 +5,7 @@ description: Diagnose and fix a failing GitHub Actions workflow run, then re-tri
 
 # Workflow Resolution Loop
 
-> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 Execute this workflow when a GitHub Actions run has failed and you want to systematically diagnose, fix, push, and re-trigger until the run completes successfully.
 

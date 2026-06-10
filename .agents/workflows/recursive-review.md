@@ -5,7 +5,7 @@ description: Periodic, honest audit of the project — rules, skills, sprints, c
 
 # SKILL: recursive-review
 
-> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 > **Cron note:** This skill is invoked manually (`/recursive-review` or `/recursive-review YYYY-MM-DD`).
 > If you want it to fire automatically on a schedule, wire `CronCreate` from a separate
@@ -67,7 +67,7 @@ Files > 200 lines, sorted desc, top 15. Note: 200-line rule applies to LOGIC fil
 ### 4. Framework-specific size budgets [DO NOT SKIP]
 Read <frontend>/angular.json. For every component .scss whose byte size exceeds the
 production `anyComponentStyle.maximumError` setting, report file path + size + budget +
-multiplier-over-error. **Note: line count is not the right gate for SCSS — use byte budgets.**
+multiplier-over-error. **Note: line count is not the right gate for SCSS.**
 
 ### 5. STRICT-rule grep targets [MANDATORY]
 For each STRICT rule in .agents/rules/*.md, grep the codebase for the explicit forbidden
@@ -98,8 +98,8 @@ archived.
 
 ### 9. Pipeline health
 For every workflow in .github/workflows/, check: does any deploy workflow have a post-deploy
-smoke step? If no, flag as 🔴 — without a post-deploy smoke gate, a chain of "successful"
-CI runs can still ship broken builds.
+smoke step? If no, flag as 🔴 (5 sequential bugfix PRs all shipped
+"successful" CI without a smoke gate).
 
 ### 10. Anything else flagged by the rules
 Up to 5 violations of any rule in .agents/rules/. Cite rule + file:line evidence.

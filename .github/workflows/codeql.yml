@@ -1,0 +1,61 @@
+name: CodeQL
+
+# ⚠ DORMANT — does not run automatically. See DECISIONS.md (2026-06-02 "CodeQL
+# gated behind paid GitHub Advanced Security on this private repo").
+#
+# CodeQL *analysis* runs anywhere, but uploading results to the Security tab
+# requires GitHub Advanced Security, which on a PRIVATE repo is a paid add-on
+# (PATCH security_and_analysis → HTTP 422 "Advanced security has not been
+# purchased" on this Free personal account). So this workflow is kept ready but
+# inert — `workflow_dispatch`-only AND job-gated on the `ENABLE_CODEQL` repo
+# variable — so it neither fails CI nor runs CodeQL under a license that only
+# permits private use in connection with GitHub code scanning.
+#
+# ── To ACTIVATE (all required) ───────────────────────────────────────────────
+#   1. Make the repo public  OR  purchase GitHub Advanced Security (Team/Enterprise).
+#   2. Set repo variable ENABLE_CODEQL=true.
+#   3. Restore automatic triggers (push: [main], pull_request: [main], weekly cron)
+#      below — they were removed to keep the workflow dormant.
+# Build mode stays `none` for both languages (C# none avoids .NET 10 SDK setup).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    # Inert until GHAS/public + the flag is set; a skipped job keeps CI green.
+    if: vars.ENABLE_CODEQL == 'true'
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload SARIF results to the Security tab
+      actions: read # required for private repos
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: csharp
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # github/codeql-action is first-party (github/ org) — version tags are
+      # permitted per stack-github-actions.md §A08 (no SHA pin required).
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

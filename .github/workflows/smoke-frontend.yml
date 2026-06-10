@@ -1,0 +1,35 @@
+name: Smoke — Frontend SWA
+
+# Reusable workflow: runs the SPA bootstrap smoke gate against a deployed Static
+# Web App. The caller passes `swa-url` (captured from the deploy step output) and
+# optionally `api-base-url` to enable the cross-origin CORS check.
+#
+# SWA default hostnames are randomized per app, so `swa-url` is required — there
+# is no sensible default (unlike the deterministic Function App URL in smoke-dev.yml).
+on:
+  workflow_call:
+    inputs:
+      swa-url:
+        description: 'Deployed SWA root URL (no trailing slash)'
+        type: string
+        required: true
+      api-base-url:
+        description: 'API base URL (no trailing slash). When set, adds a cross-origin CORS check. Omit to skip.'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Run frontend smoke gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Run frontend smoke script
+        run: bash scripts/smoke/frontend.sh "${{ inputs.swa-url }}" "${{ inputs.api-base-url }}"

@@ -2,6 +2,27 @@ name: CI - Preview on Azure Static Web Apps
 
 on:
   workflow_dispatch:
+  # Auto-deploy a preview whenever frontend (or this pipeline) changes on an active
+  # feature branch. Branch prefixes are mandated by stack-github-actions.md §1; `main`
+  # is intentionally excluded (it goes through cd-angular-azure-static-web-apps.yml).
+  push:
+    branches:
+      - 'feature/**'
+      - 'chore/**'
+      - 'bugfix/**'
+      - 'refactor/**'
+      - 'sprint/**'
+      - 'task/**'
+    paths:
+      - 'lc-webapp/**'
+      - '.github/workflows/ci-preview-swa.yml'
+      - '.github/workflows/shared-build-angular.yml'
+      - '.github/actions/deploy-swa/**'
+
+# Shared preview slot — a newer push supersedes an in-flight preview deploy.
+concurrency:
+  group: ci-preview-swa
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,7 +35,13 @@ jobs:
     with:
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
-      environment: development
+      # Angular CLI configuration (`--configuration`), NOT a GitHub environment.
+      # MUST be `production` for any deployed bundle: the `development` config bakes
+      # in environment.development.ts (apiBaseUrl http://localhost:7071) — a preview
+      # built with it calls localhost and is CSP-blocked. The production config emits
+      # __API_BASE_URL__ / __MSAL_*__ token placeholders that the deploy step fills
+      # from the development-scoped vars below.
+      environment: production
       deploy-tag-prefix: 'ci-azure-swa'
       deploy-tag-suffix: ${{ github.ref_name }}
     secrets: inherit
@@ -34,6 +61,13 @@ jobs:
           enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
           enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
           build-version: ${{ needs.build.outputs.build-tag }}
+          # Development-scoped values (job is bound to environment: development) — point
+          # the preview at the dev Function App + dev MSAL app registration, NOT localhost.
+          msal-client-id: ${{ vars.MSAL_CLIENT_ID }}
+          msal-authority: ${{ vars.MSAL_AUTHORITY }}
+          msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
+          api-base-url: ${{ vars.API_BASE_URL }}
+          tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CI_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deployment-environment: preview

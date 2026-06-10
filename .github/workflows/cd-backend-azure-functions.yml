@@ -9,10 +9,27 @@ on:
       - '.github/workflows/cd-backend-azure-functions.yml'
       - '.github/workflows/shared-build-dotnet.yml'
   workflow_dispatch:
+    inputs:
+      target-env:
+        description: 'Target environment(s). "both" = build once → deploy-dev → smoke → deploy-prod (smoke gates the promotion; deploy-prod runs only via manual dispatch).'
+        type: choice
+        options:
+          - development
+          - production
+          - both
+        default: development
+        required: true
 
 permissions:
   contents: read
 
+# Build once / deploy multiple — the build job emits a single .NET publish
+# artifact that both deploy-dev and deploy-prod consume, so the binaries are
+# byte-identical across environments. `workflow_dispatch target-env=both`
+# chains the deploys through the dev smoke gate so the same build is only
+# promoted to production after smoke passes against dev. A prod deploy only ever
+# runs via manual dispatch — there is no required-reviewer environment gate
+# (that is a paid-plan feature not enabled on this Free private repo).
 jobs:
   build:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
@@ -21,13 +38,23 @@ jobs:
       publish: true
     secrets: inherit
 
+  # Runs on:
+  #   - push to main                                  (auto-deploy)
+  #   - workflow_dispatch target-env=development      (manual dev redeploy)
+  #   - workflow_dispatch target-env=both             (first leg of promotion)
   deploy-dev:
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    if: |
+      vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' &&
+      (
+        github.event_name == 'push' ||
+        github.event.inputs.target-env == 'development' ||
+        github.event.inputs.target-env == 'both'
+      )
     needs: build
     runs-on: ubuntu-latest
     environment: development
     concurrency:
-      group: cd-backend-dev
+      group: cd-backend-development
       cancel-in-progress: true
     permissions:
       id-token: write   # Required for OIDC token exchange with Azure
@@ -35,14 +62,14 @@ jobs:
 
     steps:
       - name: Check out repository (composite action + migration source)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github/actions/
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8  # v2.3.0 — pinned per A08
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2.3.0 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
@@ -57,30 +84,44 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-client-id: ${{ vars.MSAL_API_CLIENT_ID }}
           azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
-          cors-allowed-origin: ${{ vars.CORS_ALLOWED_ORIGIN }}
+          cors-allowed-origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
           data-access-mode: ${{ vars.DATA_ACCESS_MODE }}
           storage-account-url: ${{ vars.STORAGE_ACCOUNT_URL }}
           storage-runtime-account-name: ${{ vars.STORAGE_RUNTIME_ACCOUNT_NAME }}
           applicationinsights-connection-string: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
 
+  # Smoke gate against dev. Runs whenever deploy-dev runs (push, dev-only
+  # dispatch, or as the second leg of a "both" promotion). On the "both" path,
+  # a smoke failure prevents deploy-prod from starting.
+  smoke:
+    if: |
+      vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' &&
+      needs.deploy-dev.result == 'success'
+    needs: deploy-dev
+    uses: ./.github/workflows/smoke-dev.yml
+    secrets: inherit
+
+  # Runs only on manual dispatch — prod is never auto-deployed on push to main.
+  #   - workflow_dispatch target-env=production       (prod-only, no dev gate, no smoke)
+  #   - workflow_dispatch target-env=both             (after smoke passes against dev)
+  # The manual workflow_dispatch trigger is itself the human gate for prod.
+  # NOTE: GitHub environment required-reviewer protection is a paid-plan feature
+  # (Pro/Team) and is NOT enabled on this Free private repo — do not assume an
+  # approval gate exists beyond the manual dispatch.
   deploy-prod:
-    # DISABLED — production Function App is not yet provisioned. The production
-    # environment has no FUNCTION_APP_NAME var, so this job would either fail or
-    # (worse) deploy to whatever target Azure infers. Re-enable by removing the
-    # `false &&` guard below once production resources are provisioned (see
-    # INFRA.md §2 production resource map).
-    #
-    # The `github.ref == 'refs/heads/main'` guard prevents accidental prod deploys
-    # from feature branches when `workflow_dispatch` is triggered (the dispatch
-    # branch selector defaults to the branch the user is viewing). Belt-and-
-    # suspenders alongside the production environment's deployment-branches
-    # policy (Environments → production → "Selected branches: main").
-    if: false && vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: build
+    if: |
+      always() &&
+      vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' &&
+      needs.build.result == 'success' &&
+      (
+        (github.event.inputs.target-env == 'production' && needs.deploy-dev.result == 'skipped') ||
+        (github.event.inputs.target-env == 'both' && needs.smoke.result == 'success')
+      )
+    needs: [build, deploy-dev, smoke]
     runs-on: ubuntu-latest
     environment: production
     concurrency:
-      group: cd-backend-prod
+      group: cd-backend-production
       cancel-in-progress: false
     permissions:
       id-token: write   # Required for OIDC token exchange with Azure
@@ -88,14 +129,14 @@ jobs:
 
     steps:
       - name: Check out repository (composite action + migration source)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github/actions/
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8  # v2.3.0 — pinned per A08
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2.3.0 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
@@ -110,7 +151,7 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-client-id: ${{ vars.MSAL_API_CLIENT_ID }}
           azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
-          cors-allowed-origin: ${{ vars.CORS_ALLOWED_ORIGIN }}
+          cors-allowed-origins: ${{ vars.CORS_ALLOWED_ORIGINS }}
           data-access-mode: ${{ vars.DATA_ACCESS_MODE }}
           storage-account-url: ${{ vars.STORAGE_ACCOUNT_URL }}
           storage-runtime-account-name: ${{ vars.STORAGE_RUNTIME_ACCOUNT_NAME }}

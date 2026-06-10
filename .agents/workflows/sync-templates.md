@@ -44,7 +44,7 @@ Store the selection as `TARGET_AGENT`.
   - `Gemini → Gemini`: Step 5a (copy `.agents/` as-is).
   - `Gemini → Claude Code`: Step 5b (forward transformation).
   - `Claude Code → Gemini`: Step 5c (reverse transformation).
-  - `Claude Code → Claude Code`: copy `.claude/` + `CLAUDE.md` as-is (treat like Step 5a with the `.claude/` tree).
+  - `Claude Code → Claude Code`: Step 5e (copy the `.claude/` tree with sanitization, no path transform).
 
 ### Step 3 — Load Local State
 - If `TARGET_AGENT = Claude Code`:
@@ -189,7 +189,7 @@ When `SOURCE_AGENT = Claude Code` and `TARGET_AGENT = Gemini / Generic`, apply t
 {
   "skipList": [],
   "reverseTaxonomy": {
-    "workflows": ["deploy-azure", "resolve-pr", "resolve-workflow", "run-feature", "sync-templates", "test-browser", "pause-session", "recursive-review"],
+    "workflows": ["deploy-azure", "pause-session", "recursive-review", "resolve-pr", "resolve-workflow", "resume-session", "run-feature", "sync-templates", "test-browser"],
     "skills":    ["manage-artifacts", "plan-sprint", "run-qa", "todo-manager"]
   }
 }
@@ -224,6 +224,15 @@ When `SOURCE_AGENT = Claude Code` and `TARGET_AGENT = Gemini / Generic`, apply t
 **Frontmatter handling:** keep the YAML frontmatter (`name:`, `description:`) intact in both `skill` and `workflow` targets — the existing Antigravity workflows already use the same shape. No injection or stripping required.
 
 Write the final, approved skipList to `<Target_Repo>/.agents/sync-state.json` (strip `reverseTaxonomy` — it belongs to the Claude source only).
+
+#### Step 5e — Claude Code → Claude Code (sibling project sync)
+
+When `SOURCE_AGENT = TARGET_AGENT = Claude Code`, both repos use the `.claude/` layout, so **no path or taxonomy transformation applies** — files map to the identical relative path. But the copy is **not** verbatim:
+
+- **Apply `templateSanitization`** (from `<Source>/.claude/sync-state.json`, in array order — same procedure as Step 5c) to every `.md` file copied into the target's `.claude/`. Without this, the sibling inherits the source project's class names, resource IDs, and `Sprint N lesson` attributions — valid context in the source, noise in the target. If the source has no `templateSanitization`, warn the user that project-specific identifiers will be carried over verbatim and ask whether to proceed.
+- **Never copy `CLAUDE.md`** — it is project-specific operational state (active-sprint pointer, sprint history), not a shared standard. This matches the Step 4 exclusion; copying it would clobber the target's own pointer. The target keeps its existing `CLAUDE.md`.
+- **Preserve `reverseTaxonomy`** in the copied `sync-state.json` (the target is still a Claude repo and may later reverse-sync). Keep `skipList` as the approved final list.
+- Apply the **Claude-Code preamble handling** rules from Step 5c only if the target is destined to also serve non-Claude agents; otherwise leave `> **Claude Code:**` notes intact.
 
 ### Step 5d — Old Agent Configuration Cleanup
 

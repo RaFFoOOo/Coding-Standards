@@ -20,14 +20,14 @@ on:
   #       - '.github/workflows/shared-build-angular.yml'
   workflow_dispatch:
     inputs:
-      target:
-        description: 'Deployment target environment'
+      target-env:
+        description: 'Deployment target environment (workflow_dispatch only)'
         required: true
         type: choice
         options:
-          - dev
-          - prod
-        default: dev
+          - development
+          - production
+        default: development
 
 jobs:
   build:
@@ -54,7 +54,7 @@ jobs:
   # set to "All branches" (Environments → development → Deployment branches and tags) so
   # non-main dispatches are not blocked at the environment-protection layer.
   deploy-dev:
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && (github.event_name == 'push' || inputs.target == 'dev')
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && (github.event_name == 'push' || inputs.target-env == 'development')
     needs: build
     runs-on: ubuntu-latest
     environment: development
@@ -109,7 +109,7 @@ jobs:
   # The `github.ref == 'refs/heads/main'` guard below ensures prod releases can
   # only be dispatched from main, not from a feature branch.
   deploy-prod:
-    if: false && inputs.target == 'prod' && github.ref == 'refs/heads/main' && vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    if: false && inputs.target-env == 'production' && github.ref == 'refs/heads/main' && vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     needs: build
     runs-on: ubuntu-latest
     environment: production

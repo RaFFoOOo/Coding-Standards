@@ -5,7 +5,7 @@ description: Workflow to check and resolve all PR comments before proceeding wit
 
 # PR Resolution Workflow
 
-> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 Execute this workflow when a Pull Request has received review comments that need to be addressed before it can be merged.
 

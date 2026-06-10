@@ -1,6 +1,8 @@
 {
   "skipList": [
     ".claude/",
-    ".claude/rules/naming-azure-resources.md"
+    ".claude/rules/naming-azure-resources.md",
+    ".github/tenant-meta.json",
+    ".github/workflows/smoke-dev.yml"
   ]
 }

@@ -56,6 +56,7 @@ description: Backend stack rules for ASP.NET Core / C# projects
 
 ### §8.1 Existing Baselines
 - **Authentication/Authorization:** Secure all endpoints by default. Expose explicitly using `[AllowAnonymous]`. Combine Role-based and Policy-based authorization.
+- **Role-based authorization [authorization model]:** Authorization is **role-based and owned entirely by internal application logic** — never delegated to OAuth token claims. **Roles** (`owner`/`customer`, resolved from the `TenantUserRole` table) answer *who the user is* and are enforced per-tenant via `ITenantScopeAuthorization` / `RequireOwnerAsync`. The access token is used **only** to authenticate the caller — `[FunctionAuthorize]` + `FunctionAuthorizationMiddleware` validate the Bearer token and resolve identity; the token's claims (including `scp`) are **not** consulted for permission decisions. OAuth scope-based authorization (`[RequireScope]`, `scp`-claim checks) is explicitly **out of scope** for this single-first-party-client project — see `DECISIONS.md` (2026-05-22, scope-based authorization rejected).
 - **Input Validation:** Use `FluentValidation` instead of data annotations for DTOs to separate validation logic from data models.
 - **CORS & Rate Limiting:** Apply explicit, least-privilege CORS policies and rate limiting middleware for public-facing APIs.
 
@@ -144,55 +145,16 @@ _logger.LogWarning("Authn rejected. UserId={ObjectId} CorrelationId={Correlation
 
 **Never downgrade SqlClient to avoid this migration.** SqlClient 6.0 was the first version to support the native `json` column type; 7.0 is the current target. Pinning to an older version to sidestep the breaking change violates `AGENTS.md §7 No Downgrade Shortcut`.
 
-**Correct implementation — `AzureSqlAuthInterceptor`:**
-```csharp
-// <YourApp>.DataAccess/Database/AzureSqlAuthInterceptor.cs
-// Requires: Azure.Identity package in the DataAccess project
-internal sealed class AzureSqlAuthInterceptor : DbConnectionInterceptor
-{
-    private static readonly DefaultAzureCredential Credential = new();
-    private static readonly string[] Scopes = ["https://database.windows.net/.default"];
-
-    public override async ValueTask<InterceptionResult> ConnectionOpeningAsync(
-        DbConnection connection, ConnectionEventData eventData,
-        InterceptionResult result, CancellationToken cancellationToken = default)
-    {
-        if (connection is SqlConnection sqlConnection)
-            sqlConnection.AccessTokenCallback = FetchTokenAsync;
-        return await base.ConnectionOpeningAsync(connection, eventData, result, cancellationToken);
-    }
-
-    public override InterceptionResult ConnectionOpening(
-        DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
-    {
-        if (connection is SqlConnection sqlConnection)
-            sqlConnection.AccessTokenCallback = FetchTokenAsync;
-        return base.ConnectionOpening(connection, eventData, result);
-    }
-
-    private static async Task<SqlAuthenticationToken> FetchTokenAsync(
-        SqlAuthenticationParameters parameters, CancellationToken cancellationToken)
-    {
-        var token = await Credential.GetTokenAsync(
-            new TokenRequestContext(Scopes), cancellationToken);
-        return new SqlAuthenticationToken(token.Token, token.ExpiresOn);
-    }
-}
-```
-
-**Registration — both runtime and design-time:**
-```csharp
-// ServiceCollectionExtensions.cs (runtime)
-services.AddDbContext<AppDbContext>(opts =>
-    opts.UseSqlServer(connectionString)
-        .AddInterceptors(new AzureSqlAuthInterceptor()));
-
-// AppDbContextFactory.cs (EF CLI tooling / dotnet ef database update)
-var options = new DbContextOptionsBuilder<AppDbContext>()
-    .UseSqlServer(connectionString)
-    .AddInterceptors(new AzureSqlAuthInterceptor())
-    .Options;
-```
+**Reference implementation — `AzureSqlAuthInterceptor` (`<YourApp>.DataAccess/Database/`):**
+a `sealed DbConnectionInterceptor` (override both `ConnectionOpeningAsync` and the sync
+`ConnectionOpening`) that, when the connection is a `SqlConnection`, sets
+`sqlConnection.AccessTokenCallback` to a static callback fetching a token from a shared
+`DefaultAzureCredential` for scope `https://database.windows.net/.default`. Requires the
+`Azure.Identity` package in the DataAccess project. Register it via
+`.AddInterceptors(new AzureSqlAuthInterceptor())` in **both** the runtime DbContext
+(`ServiceCollectionExtensions`) **and** the design-time factory
+(`AppDbContextFactory`, used by `dotnet ef`). Both registrations are mandatory —
+the EF CLI tooling fails to connect without the design-time one.
 
 **Connection string requirements:**
 - Must NOT contain `Authentication=` keyword — token injection is handled entirely by the interceptor.

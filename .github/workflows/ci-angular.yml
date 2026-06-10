@@ -23,4 +23,5 @@ jobs:
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: development
       upload-artifact: false
+      run-tests: true
     secrets: inherit
