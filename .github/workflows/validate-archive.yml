@@ -24,6 +24,7 @@ permissions:
 jobs:
   archive-guard:
     name: Closed artifacts are archived
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -33,6 +34,7 @@ jobs:
 
   readme-modes:
     name: README service modes consistent
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -42,6 +44,7 @@ jobs:
 
   tenant-guid-drift:
     name: Tenant container GUIDs single-sourced
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
