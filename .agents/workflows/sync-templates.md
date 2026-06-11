@@ -291,6 +291,15 @@ Before staging, append a new execution record to the **Sync History Ledger** in 
   - Claude Code: `chore(standards): sync template updates (claude-code)`
 - Push the branch and instruct the user to open a Pull Request in the *Target* repository to merge the updated standards.
 
+#### Step 6c — Self-maintaining template: reconcile `.claude/` shims [MANDATORY when target keeps both `.agents/` and `.claude/`]
+
+The master template repo is a hybrid: `.agents/` is its canonical source **and** it ships its own `.claude/` shims + `CLAUDE.md` so it is natively usable in Claude Code. A Generic/reverse sync (Step 5c) writes only to `.agents/`, so any workflow/skill it **adds or removes** would otherwise leave the local `.claude/` layer stale — the defect that orphaned `recursive-review`, `pause-session`, `resume-session`, and `resolve-workflow` after the #18/#20 syncs.
+
+When the target keeps both trees, after Step 5 reconcile them:
+- For every `.agents/skills/<n>/SKILL.md` and `.agents/workflows/<n>.md` with **no** matching `.claude/skills/<n>/SKILL.md`, generate the shim (copy the source `name:`/`description:` frontmatter; body = `Read the full ... instructions from \`.agents/...\` and execute them.`) and add a row to the `CLAUDE.md` skill table.
+- For every `.claude/skills/<n>/` shim whose `.agents/` source no longer exists, delete the shim and its `CLAUDE.md` row.
+- Quick check (must show no diff): `diff <( { ls .agents/skills; ls .agents/workflows | sed 's/\.md$//'; } | sort -u) <(ls .claude/skills | sort)`.
+
 ### Step 7 — Post-Sync Configuration Checklist
 
 After the PR is merged in the target project, present the user with the following checklist. Items marked **[REQUIRED]** must be completed before CI/CD is functional. Items marked **[OPTIONAL]** enable additional capabilities.
