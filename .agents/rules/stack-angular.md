@@ -110,9 +110,9 @@ description: Frontend stack rules for Angular / TypeScript projects
   - **Implementation:** Render icons using the framework's dedicated component (e.g., `<fa-icon>`, `<mat-icon>`) or optimized SVGs (NOT `<i class="fa-solid">` style — use the framework component for tree-shaking and type safety).
 - **[STRICT] Shared UI Primitives:**
   - When the same visual block (empty-state, badge, status-pill, etc.) appears in 3+ component templates, extract it into a reusable primitive before adding the 4th instance.
-  - Empty-states use the shared `EmptyStateComponent` (`shared/components/empty-state`) — `[icon]` + `[message]` + optional `[translateMessage]`. Do NOT roll a new `<div class="empty-state">` block.
-  - Status / source badges use the global SCSS classes from `src/styles/_badges.scss` (loaded once via `styles.scss`): `.status-badge.badge--{pending,approved,rejected}`, `.source-badge.source--{direct,imported}`. Do NOT redefine these styles in component SCSS.
-  - **Why:** Sprint 10 had ~100 lines of duplicated badge SCSS across 3 components and 4 hand-rolled empty-state blocks. Each duplicate is a maintenance trap (style drift) and a CSS budget consumer.
+  - Empty-states use a single shared component (e.g. an `EmptyStateComponent` with `[icon]` + `[message]` inputs) — never re-roll a fresh `<div class="empty-state">` block per feature.
+  - Recurring status / source badges use global SCSS classes defined once in a shared stylesheet (loaded via the root `styles` entry point) — never redefine the same badge styles in component SCSS.
+  - **Why:** duplicating badge SCSS across components and hand-rolling empty-state blocks per feature is a maintenance trap — every copy drifts independently on a style change, and each duplicate counts against the per-component CSS budget.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
