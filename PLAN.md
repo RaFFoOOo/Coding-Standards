@@ -36,7 +36,7 @@
 - [x] **T2 `[M]`** — Cross-file dedup: choose canonical home (usually `AGENTS.md`) for each repeated concept; replace copies with one-line cross-references. *(dep: T1)* → PR #25.
 - [x] **T2b `[M]` — Shim/sync integrity fix (folded in mid-sprint, Tech-Lead flagged):** 4 workflows synced into `.agents/` (#18, #20) were never wired into Claude Code — no `.claude/` shim, no `CLAUDE.md` row (`recursive-review`, `pause-session`, `resume-session`, `resolve-workflow`). Created the 4 shims + CLAUDE.md rows (table 9→13) **and** patched `sync-templates.md` with **Step 6c** self-sync reconciliation so it can't recur (root-cause per §0). *(dep: T2; precedes T4)*
 - [x] **T3 `[M]`** — Skills lean pass: dedup'd `manage-artifacts` against AGENTS.md §1 + todo-manager (cross-refs, both tagged rules preserved). `run-qa`/`todo-manager`/`plan-sprint` already tight — no manufactured churn. *(dep: T1)*
-- [ ] **T4 `[L]`** — Workflows lean pass: `sync-templates` (336 ln) first, then `recursive-review`, `run-feature`, `resolve-*`, session workflows. *(dep: T2)*
+- [x] **T4 `[L]`** — Workflows lean pass. Honest finding: workflows are mostly necessary procedure (low removable fat; the big *structural* fix was T2b). Real wins: removed dead `PR #108` cross-repo refs in `recursive-review` (×2), fixed stale `sync-template.md`→`sync-templates.md` reference. No manufactured churn on already-tight files (sessions, resolve-pr). *(dep: T2)*
 - [ ] **T5 `[S]`** — Light rules pass: apply dedup cross-refs + structure only; **do not** re-trim the prose PR #20 already leaned. *(dep: T2)*
 - [ ] **T6 `[S]`** — Verify: rule-inventory diff (nothing dropped) + final token-delta report + README/metrics note. *(dep: T2–T5)*
 
