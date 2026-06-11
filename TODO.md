@@ -10,6 +10,8 @@ This file contains tasks, ideas, and architectural improvements that are **not p
 - [ ] Configure Playwright MCP server (`.mcp.json`) to enable native browser testing via the `/browser-test` skill in Claude Code projects.
 - [ ] Evaluate adding a `hooks` section to `.claude/settings.json` in the sync-template output for Claude Code targets (e.g., PostToolUse linting hook on Write/Edit).
 - [ ] Consider adding a `Copilot` (GitHub Copilot) transformation path to `sync-template` once its agent file conventions stabilize.
+- [ ] **Root-cause the sync re-leak (high value):** Back-port the `templateSanitization` pattern into the *source* project's `.claude/sync-state.json` so reverse-transform syncs strip project-specific identifiers (sprint numbers, project-only service/table names like `IOrderService`/`TenantUserRole`, dated `DECISIONS.md` links) automatically. PR #20 had to clean these by hand — without the source-side pattern, every future sync re-introduces them.
+- [ ] **Repo-wide agnostic sweep:** Audit the remaining synced files (`.agents/workflows/**`, `.agents/skills/**`, `.agents/sync-state.json`) for the same direct-project-reference pattern the PR #20 reviewer flagged in the stack rules, and genericize.
 
 ## 📝 Ongoing Notes
 *Architectural notes or reminders for the agent/user.*
