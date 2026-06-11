@@ -33,10 +33,11 @@
 
 ### 4. Task Progress
 - [x] **T1 `[S]`** — Baseline + method artifact: per-file token counts, the `rule-inventory.md` (meaning-loss guard, 81 tagged rules), acceptance criteria. *(dep: —)* → archived in T6.
-- [ ] **T2 `[M]`** — Cross-file dedup: choose canonical home (usually `AGENTS.md`) for each repeated concept; replace copies with one-line cross-references. *(dep: T1)*
+- [x] **T2 `[M]`** — Cross-file dedup: choose canonical home (usually `AGENTS.md`) for each repeated concept; replace copies with one-line cross-references. *(dep: T1)* → PR #25.
+- [x] **T2b `[M]` — Shim/sync integrity fix (folded in mid-sprint, Tech-Lead flagged):** 4 workflows synced into `.agents/` (#18, #20) were never wired into Claude Code — no `.claude/` shim, no `CLAUDE.md` row (`recursive-review`, `pause-session`, `resume-session`, `resolve-workflow`). Created the 4 shims + CLAUDE.md rows (table 9→13) **and** patched `sync-templates.md` with **Step 6c** self-sync reconciliation so it can't recur (root-cause per §0). *(dep: T2; precedes T4)*
 - [ ] **T3 `[M]`** — Skills lean pass: `run-qa`, `todo-manager`, `manage-artifacts`, `plan-sprint`. *(dep: T1)*
 - [ ] **T4 `[L]`** — Workflows lean pass: `sync-templates` (336 ln) first, then `recursive-review`, `run-feature`, `resolve-*`, session workflows. *(dep: T2)*
 - [ ] **T5 `[S]`** — Light rules pass: apply dedup cross-refs + structure only; **do not** re-trim the prose PR #20 already leaned. *(dep: T2)*
 - [ ] **T6 `[S]`** — Verify: rule-inventory diff (nothing dropped) + final token-delta report + README/metrics note. *(dep: T2–T5)*
 
-**Dependency order:** T1 → T2 → (T3, T5) → T4 → T6. Each task = atomic commit on its own `task/sprint-1.0/<id>-<slug>` branch, PR'd into the sprint branch; Iterative Review Gate (min 3 passes) per task.
+**Dependency order:** T1 → T2 → T2b → (T3, T5) → T4 → T6. Each task = atomic commit on its own `task/sprint-1.0/<id>-<slug>` branch, PR'd into the sprint branch; Iterative Review Gate (min 3 passes) per task.
