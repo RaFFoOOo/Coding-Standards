@@ -37,7 +37,7 @@ Run this self-review **before** launching the full QA process. If any item fails
 ### Mock File Security [MANDATORY]
 12. **SAS token scan**: Before committing any change that touches `assets/mock/`, run:
     ```bash
-    grep -r "sig=" lc-webapp/src/assets/mock/
+    grep -r "sig=" src/assets/mock/
     ```
     Any non-empty match is a **blocking violation** — SAS tokens must never appear in
     version-controlled mock files. Secrets belong in `environment.development.ts` locally

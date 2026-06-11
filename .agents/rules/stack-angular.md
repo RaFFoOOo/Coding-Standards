@@ -61,7 +61,7 @@ description: Frontend stack rules for Angular / TypeScript projects
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
   - **[ARCHITECT REQUIRED]** Every API Service (e.g., `BookingService`) must have a corresponding `MockBookingService`.
-  - Switch providers per-service via a `ServiceMode` flag (`'Mock' | 'Http'`), not a single global `useMocks` boolean. Each service flips independently in `environment.*.ts` under `services.*` (e.g. `auth`, `catalog`, `cmsContent`) and is wired with `provideByMode(token, MockCtor, HttpCtor, MODES.<service>)` in `app.providers.ts`.
+  - Switch providers per-service via a `ServiceMode` flag (`'Mock' | 'Http'`), not a single global `useMocks` boolean. Each service flips independently in `environment.*.ts` (e.g. under a `services.*` map) and is wired via a per-service provider factory (e.g. `provideByMode(token, MockCtor, HttpCtor, mode)`) in the app's providers config.
   - Mock services must return synthetic data with realistic delays (using `delay()` operator) to simulate network latency.
 - **Local Environment Secure Mocking:**
   - Mock configuration payloads tracked in version control (e.g., `app-config.json`) **MUST NEVER** contain hardcoded secrets or SAS tokens.

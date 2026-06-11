@@ -48,8 +48,8 @@ Report findings in the EXACT order below. ≤ 200 words per section. No code cha
 
 ### 1. Frontend service inventory
 For every IFooService interface in <frontend-src>: list the interface path, the Mock*Service
-sibling path, whether an Http*Service exists, and where it's bound in app.providers.ts /
-app.config.ts. Flag every interface still showing TODO [Sprint-N] in its provideByMode call.
+sibling path, whether an Http*Service exists, and where it's bound in the app's DI/provider
+config. Flag every interface still showing a `TODO [<ticket>]` in its provider registration.
 
 ### 2. Backend endpoint inventory
 List every [Function(...)] HTTP endpoint in <backend-src>. For each: name, route, methods,
@@ -121,7 +121,7 @@ of Scope" or "deferred", the rationale MUST include the command (with output) th
 mechanically proves the deferral is safe. Example:
 
 ```
-"Out of Scope: SCSS audit. Verified: ls -la lc-webapp/src/app/**/*.scss | sort -k5 -n -r |
+"Out of Scope: SCSS audit. Verified: ls -la <frontend>/src/app/**/*.scss | sort -k5 -n -r |
 head -3 → top 3 files at 13.0/10.9/5.5 KB; production anyComponentStyle error budget = 8 KB
 → FAIL. Promote to in-scope."
 ```
