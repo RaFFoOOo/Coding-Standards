@@ -83,10 +83,10 @@ description: Frontend stack rules for Angular / TypeScript projects
   - When a `IFooService` interface represents **server-owned data** (orders, catalog items, reviews, …), every method MUST return `Observable<>`. The interface MUST NOT declare `Signal<>` properties.
   - The mock implementation simulates the backend with a plain in-memory array (NOT signals) and returns observables via `of(…).pipe(delay())`. This makes the interface 1:1 swap-compatible with an HTTP adapter later.
   - The reactive cache (`Signal<>` state) belongs to a separate `FooStateService` (`providedIn: 'root'`) that subscribes to `IFooService` on init and exposes signals to components.
-  - ❌ `abstract readonly allOrders: Signal<readonly Order[]>` in `IOrderService`
-  - ✅ `abstract getAll(): Observable<Order[]>` in `IOrderService`; `OrderStateService.allOrders: Signal<readonly Order[]>` for consumers.
-  - **Exception — client-side state:** `IAuthService.isAuthenticated: Signal<boolean>`, `ITenantConfigService.tenantConfig: Signal<TenantConfig>`, and similar interfaces representing **session-scoped client state** MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
-  - **Why this matters:** Discovered when the original `IOrderService.allOrders: Signal<>` made HTTP-adapter implementation impossible without breaking every consumer. The OrderStateService extraction was a 5-file migration that would have been a 50+ file fire-drill if caught after backend integration.
+  - ❌ `abstract readonly all: Signal<readonly Foo[]>` in `IFooService`
+  - ✅ `abstract getAll(): Observable<Foo[]>` in `IFooService`; `FooStateService.all: Signal<readonly Foo[]>` for consumers.
+  - **Exception — client-side state:** an `IAuthService.isAuthenticated: Signal<boolean>`, a config service's `Signal<Config>`, and similar interfaces representing **session-scoped client state** MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
+  - **Why this matters:** an interface that exposes `Signal<>` for server-owned data makes a later HTTP-adapter implementation impossible without breaking every consumer — swapping the in-memory mock for a real backend forces a multi-file migration. Keeping server data behind `Observable<>` from day one reduces that swap to a single-file change.
 
 ## 4. Assets & Internationalization
 - **Text Content:**
