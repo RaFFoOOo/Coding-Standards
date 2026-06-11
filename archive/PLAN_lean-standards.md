@@ -1,10 +1,12 @@
 # PLAN.md
 
+> **STATUS: CLOSED** — sprint/1.0-lean-standards. Tech Lead accepted the honest outcome (zero rule loss + single-sourcing; token target not met, corpus already leaned by #20). Merged to `main` via PR #23.
+
 ### 1. Current Sprint Context
 - **Sprint:** `sprint/1.0-lean-standards`
 - **Goal:** Reduce the token cost of the standards corpus (rules + skills + workflows + `AGENTS.md`) and improve agent retrieval accuracy — **without losing a single `STRICT`/`MANDATORY` rule**. "Performance" here means token cost when loaded + retrieval clarity (structure), not runtime speed.
 - **Approach (Tech-Lead approved):** Scope = rules + skills + workflows. Aggressiveness = **Conservative / dedup-first** — cut duplication and dead prose, preserve every rule's wording and intent.
-- **Status:** Tasks complete (T1–T6) — **awaiting Tech-Lead decision** on the token-reduction target miss (see Acceptance Criteria + §5 T6 report).
+- **Status:** **CLOSED** — all tasks T1–T6 done; Tech Lead accepted (token target consciously not met, see §5).
 
 ### 2. Feature Specification
 #### Feature: Lean Standards Corpus
