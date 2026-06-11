@@ -20,8 +20,8 @@ inputs:
   azure-client-id:
     description: 'User-Assigned Managed Identity client ID (AZURE_CLIENT_ID)'
     required: true
-  cors-allowed-origin:
-    description: 'CORS allowed origin (CORS__AllowedOrigin)'
+  cors-allowed-origins:
+    description: 'CORS allowed origins — comma-separated list (CORS__AllowedOrigins). Supports several SWAs + default URL + custom domain.'
     required: true
   data-access-mode:
     description: 'Data access mode, e.g. Database (DATA_ACCESS_MODE)'
@@ -44,11 +44,14 @@ runs:
   using: composite
   steps:
     - name: Set up .NET SDK
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '10.x'
 
+    # Skip in Mock-mode deployments — there's no SQL backend to migrate.
+    # Case-sensitive: vars.DATA_ACCESS_MODE must be exactly "Database".
     - name: Apply EF Core migrations
+      if: inputs.data-access-mode == 'Database'
       shell: bash
       run: |
         if [[ -z "${AZURE_SQL_CONNECTION_STRING:-}" || "${AZURE_SQL_CONNECTION_STRING}" == "-" ]]; then
@@ -67,12 +70,15 @@ runs:
     - name: Inject Function App Settings
       shell: bash
       run: |
-        # Remove legacy key-based storage settings — replaced by MI-based __accountName form.
-        # Idempotent: `|| true` absorbs the error when the setting does not exist.
+        # AzureWebJobsStorage (key-based) is superseded by AzureWebJobsStorage__accountName (MI).
+        # WEBSITE_CONTENTAZUREFILECONNECTIONSTRING is intentionally NOT touched here:
+        # Azure Functions consumption plan does NOT support managed identity for the content
+        # share — it requires a key-based connection string. That setting is provisioned once
+        # via scripts/azure-setup/set-github-vars.sh and must remain stable across deploys.
         az functionapp config appsettings delete \
           --name "${{ inputs.function-app-name }}" \
           --resource-group "${{ inputs.resource-group }}" \
-          --setting-names AzureWebJobsStorage WEBSITE_CONTENTAZUREFILECONNECTIONSTRING 2>/dev/null || true
+          --setting-names AzureWebJobsStorage WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName 2>/dev/null || true
 
         az functionapp config appsettings set \
           --name "${{ inputs.function-app-name }}" \
@@ -82,10 +88,9 @@ runs:
             "AzureAd__ClientId=${{ inputs.msal-api-client-id }}" \
             "AzureAd__Audience=${{ inputs.msal-api-client-id }}" \
             "AzureWebJobsStorage__accountName=${{ inputs.storage-runtime-account-name }}" \
-            "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName=${{ inputs.storage-runtime-account-name }}" \
             "AZURE_CLIENT_ID=${{ inputs.azure-client-id }}" \
             "AZURE_SQL_CONNECTION_STRING=${{ inputs.connection-string }}" \
-            "CORS__AllowedOrigin=${{ inputs.cors-allowed-origin }}" \
+            "CORS__AllowedOrigins=${{ inputs.cors-allowed-origins }}" \
             "DATA_ACCESS_MODE=${{ inputs.data-access-mode }}" \
             "STORAGE_ACCOUNT_URL=${{ inputs.storage-account-url }}" \
             "APPLICATIONINSIGHTS_CONNECTION_STRING=${{ inputs.applicationinsights-connection-string }}"
@@ -96,8 +101,23 @@ runs:
         name: ${{ inputs.artifact-name }}
         path: ./publish
 
+    - name: Package artifact as zip
+      shell: bash
+      run: |
+        cd publish
+        zip -r ../publish.zip .
+        cd ..
+        echo "Package size: $(du -sh publish.zip)"
+
     - name: Deploy to Function App
-      uses: azure/functions-action@bc63708cc6539760eea18d8a7de4ce8ef5fdf593  # v1.5.6 — pinned per A08
-      with:
-        app-name: ${{ inputs.function-app-name }}
-        package: ./publish
+      shell: bash
+      # Uses Azure CLI zip deploy via ARM management plane instead of Kudu SCM.
+      # azure/functions-action consistently returned HTTP 500 from Kudu on this
+      # consumption-plan Function App — az functionapp deploy bypasses that endpoint.
+      run: |
+        az functionapp deploy \
+          --name "${{ inputs.function-app-name }}" \
+          --resource-group "${{ inputs.resource-group }}" \
+          --src-path publish.zip \
+          --type zip \
+          --async true

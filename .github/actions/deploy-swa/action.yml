@@ -34,6 +34,9 @@ inputs:
     description: 'Value for __API_BASE_URL__ token replacement — the Angular app calls this URL directly'
     required: false
     default: ''
+  tenant-key:
+    description: 'Tenant slug selecting the entry in .github/tenant-meta.json (e.g. la-cremeria, le-cementine). Resolves __BRAND_TITLE__, __FAVICON_URL__, __OG_TITLE__, __OG_DESCRIPTION__, __OG_IMAGE_URL__, __OG_URL__.'
+    required: true
   deployment-environment:
     description: 'SWA deployment environment (e.g., preview). Omit for production slot.'
     required: false
@@ -53,6 +56,30 @@ runs:
         name: angular-build-output
         path: ./dist
 
+    - name: Resolve Tenant Meta from Dictionary
+      shell: bash
+      env:
+        TENANT_KEY: ${{ inputs.tenant-key }}
+      run: |
+        # Per-tenant static HTML meta lives in version control (.github/tenant-meta.json),
+        # not in 6 GitHub env vars. The CD env's TENANT_KEY selects the entry; the 6 token
+        # values are exported to $GITHUB_ENV for the downstream Replace/Prune steps.
+        set -euo pipefail
+        META=".github/tenant-meta.json"
+        if [[ ! -f "$META" ]]; then echo "::error::$META not found"; exit 1; fi
+        if ! jq -e --arg k "$TENANT_KEY" 'has($k)' "$META" >/dev/null; then
+          echo "::error::tenant-key '$TENANT_KEY' not found in $META"; exit 1
+        fi
+        get() { jq -er --arg k "$TENANT_KEY" ".[\$k].$1" "$META"; }
+        {
+          echo "TOKEN_BRAND_TITLE=$(get brandTitle)"
+          echo "TOKEN_FAVICON_URL=$(get faviconUrl)"
+          echo "TOKEN_OG_TITLE=$(get ogTitle)"
+          echo "TOKEN_OG_DESCRIPTION=$(get ogDescription)"
+          echo "TOKEN_OG_IMAGE_URL=$(get ogImageUrl)"
+          echo "TOKEN_OG_URL=$(get ogUrl)"
+        } >> "$GITHUB_ENV"
+
     - name: Replace Tokens in Build Output
       shell: bash
       env:
@@ -63,23 +90,73 @@ runs:
         TOKEN_MSAL_AUTHORITY: ${{ inputs.msal-authority }}
         TOKEN_MSAL_API_SCOPE: ${{ inputs.msal-api-scope }}
         TOKEN_API_BASE_URL: ${{ inputs.api-base-url }}
+        # TOKEN_BRAND_TITLE / FAVICON_URL / OG_* inherited from $GITHUB_ENV
+        # (set by the "Resolve Tenant Meta" step from .github/tenant-meta.json).
       run: |
+        # set -u: any token left unset by the caller fails the deploy loudly
+        # rather than silently shipping a literal __TOKEN__ string to prod.
+        set -euo pipefail
         BROWSER_DIR="./dist/lc-webapp/browser"
+        # Escape characters special to sed's REPLACEMENT side before interpolating a
+        # token value: backslash, the `|` delimiter, and `&` (which sed expands to the
+        # whole matched pattern). Without this, a value like the le-cementine
+        # ogDescription "Multi-tenant booking & catalog platform" makes sed re-insert
+        # the literal __OG_DESCRIPTION__ marker, which then ships to the SWA and trips
+        # the frontend smoke gate. Free-form, customer-supplied meta copy is the common
+        # carrier, so every replacement value is escaped.
+        esc() { local s=$1; s=${s//\\/\\\\}; s=${s//&/\\&}; s=${s//|/\\|}; printf '%s' "$s"; }
         # Feature flag tokens live in feature-flags.js (loaded synchronously
         # from index.html). External file is required by CSP `script-src 'self'`
-        # which blocks inline <script> blocks. All other tokens live in the
-        # hashed JS bundles.
+        # which blocks inline <script> blocks. All other JS-side tokens live in
+        # the hashed bundles.
         sed -i \
-          -e "s|__ENABLE_TENANT_SELECTOR__|${TOKEN_ENABLE_TENANT_SELECTOR:-false}|g" \
-          -e "s|__ENABLE_LOGIN_FEATURES__|${TOKEN_ENABLE_LOGIN_FEATURES:-false}|g" \
+          -e "s|__ENABLE_TENANT_SELECTOR__|$(esc "${TOKEN_ENABLE_TENANT_SELECTOR:-false}")|g" \
+          -e "s|__ENABLE_LOGIN_FEATURES__|$(esc "${TOKEN_ENABLE_LOGIN_FEATURES:-false}")|g" \
           "$BROWSER_DIR/feature-flags.js"
         find "$BROWSER_DIR" -name "*.js" ! -name "feature-flags.js" -exec sed -i \
-          -e "s|__BUILD_VERSION__|${TOKEN_BUILD_VERSION:-unknown}|g" \
-          -e "s|__MSAL_CLIENT_ID__|${TOKEN_MSAL_CLIENT_ID}|g" \
-          -e "s|__MSAL_AUTHORITY__|${TOKEN_MSAL_AUTHORITY}|g" \
-          -e "s|__MSAL_API_SCOPE__|${TOKEN_MSAL_API_SCOPE}|g" \
-          -e "s|__API_BASE_URL__|${TOKEN_API_BASE_URL}|g" \
+          -e "s|__BUILD_VERSION__|$(esc "${TOKEN_BUILD_VERSION:-unknown}")|g" \
+          -e "s|__MSAL_CLIENT_ID__|$(esc "${TOKEN_MSAL_CLIENT_ID}")|g" \
+          -e "s|__MSAL_AUTHORITY__|$(esc "${TOKEN_MSAL_AUTHORITY}")|g" \
+          -e "s|__MSAL_API_SCOPE__|$(esc "${TOKEN_MSAL_API_SCOPE}")|g" \
+          -e "s|__API_BASE_URL__|$(esc "${TOKEN_API_BASE_URL}")|g" \
           {} +
+        # Static HTML meta tokens (Sprint 16 Track F) — substituted into
+        # index.html so social-share crawlers (facebookexternalhit, WhatsApp,
+        # Twitter) see per-tenant branding in the pre-hydration response.
+        sed -i \
+          -e "s|__BRAND_TITLE__|$(esc "${TOKEN_BRAND_TITLE}")|g" \
+          -e "s|__FAVICON_URL__|$(esc "${TOKEN_FAVICON_URL}")|g" \
+          -e "s|__OG_TITLE__|$(esc "${TOKEN_OG_TITLE}")|g" \
+          -e "s|__OG_DESCRIPTION__|$(esc "${TOKEN_OG_DESCRIPTION}")|g" \
+          -e "s|__OG_IMAGE_URL__|$(esc "${TOKEN_OG_IMAGE_URL}")|g" \
+          -e "s|__OG_URL__|$(esc "${TOKEN_OG_URL}")|g" \
+          "$BROWSER_DIR/index.html"
+
+    - name: Prune Unused Tenant Favicons
+      shell: bash
+      # TOKEN_FAVICON_URL / TOKEN_OG_IMAGE_URL inherited from $GITHUB_ENV
+      # (set by the "Resolve Tenant Meta" step).
+      run: |
+        # The repo carries every tenant's favicon centrally under
+        # lc-webapp/public/favicons/. Each per-tenant SWA should ship ONLY
+        # the active tenant's assets — delete every favicon whose filename
+        # is not referenced by FAVICON_URL or OG_IMAGE_URL.
+        set -euo pipefail
+        BROWSER_DIR="./dist/lc-webapp/browser"
+        FAVICONS_DIR="$BROWSER_DIR/favicons"
+        if [[ ! -d "$FAVICONS_DIR" ]]; then
+          echo "::warning::no favicons directory in build output — skipping prune"
+          exit 0
+        fi
+        FAVICON_KEEP="$(basename "$TOKEN_FAVICON_URL")"
+        OG_KEEP="$(basename "$TOKEN_OG_IMAGE_URL")"
+        echo "keeping: $FAVICON_KEEP, $OG_KEEP"
+        find "$FAVICONS_DIR" -type f \
+          ! -name "$FAVICON_KEEP" \
+          ! -name "$OG_KEEP" \
+          -print -delete
+        echo "remaining favicons after prune:"
+        ls -1 "$FAVICONS_DIR"
 
     - name: Deploy to Azure Static Web Apps
       id: deploy

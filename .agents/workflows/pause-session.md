@@ -5,6 +5,10 @@ description: End-of-session checkpoint. Generates a self-contained `__resume_pro
 
 # SKILL: pause-session
 
+> **Pairs with `/resume-session`** — the inverse skill that consumes the `__resume_prompt.txt`
+> this skill writes. Author the prompt for that consumer: verification first, gates explicit,
+> protected files named.
+
 ## § 0. When to Use This Skill
 
 Invoke when:
@@ -50,8 +54,11 @@ Write the file at the **project root** (NOT inside `.claude/`). Required section
 **Rules:**
 - **Self-contained.** A fresh agent must succeed without reading any prior conversation. No *"as we discussed"*, no implicit references — every term defined or pointing to a file.
 - **Lead with verification.** Yesterday's state may have changed (PRs merged, branches force-pushed, deploys completed).
+- **Point, don't restate.** Reference memory slugs, PLAN files, and stack rules by path — do not copy their content into the prompt. `/resume-session` reads the named files directly. This keeps the checkpoint lean and prevents it drifting out of sync with the source it duplicated.
+- **Mark gates explicitly.** Any approval/STOP gate (e.g. *"Tech Lead deploy-verifies before merging"*) and any protected file (e.g. a locally-modified env file that must not be committed) must be called out in the relevant priority — the resuming agent enforces them verbatim.
 - **Use a fenced ``` block** so the User can copy-paste directly into a new chat.
 - **No duplication.** If the file already exists, Read it first, then **rewrite** with `Write` — do not append.
+- **Close with the handoff cue.** End the file with a one-line pointer telling the next session to run `/resume-session`.
 
 ### Step 4 — Persist durable items to auto-memory
 Apply the auto-memory rules from `CLAUDE.md`:

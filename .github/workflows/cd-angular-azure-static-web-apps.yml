@@ -9,10 +9,28 @@ on:
       - '.github/workflows/cd-angular-azure-static-web-apps.yml'
       - '.github/workflows/shared-build-angular.yml'
   workflow_dispatch:
+    inputs:
+      target-env:
+        description: 'Target environment(s). "both" = build once → deploy-dev → smoke → deploy-prod (smoke gates the promotion; deploy-prod runs only via manual dispatch).'
+        type: choice
+        options:
+          - development
+          - production
+          - both
+        default: development
+        required: true
 
 permissions:
   contents: write
 
+# Build once / deploy multiple — the build job runs exactly once per workflow
+# execution and emits a single artifact. Both deploy-dev and deploy-prod download
+# that same artifact, so the bytes are byte-identical across environments.
+# `workflow_dispatch target-env=both` chains the deploys through the dev SPA smoke
+# gate so the same build is only promoted to production after smoke passes against
+# dev. A prod deploy only ever runs via manual dispatch — there is no required-reviewer
+# environment gate (that is a paid-plan feature not enabled on this Free private repo);
+# the manual dispatch is the human gate.
 jobs:
   build:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
@@ -29,18 +47,33 @@ jobs:
       deploy-tag-suffix: ${{ github.ref_name }}
     secrets: inherit
 
+  # Runs on:
+  #   - push to main                                  (auto-deploy)
+  #   - workflow_dispatch target-env=development      (manual dev redeploy)
+  #   - workflow_dispatch target-env=both             (first leg of promotion)
   deploy-dev:
+    if: |
+      github.event_name == 'push' ||
+      github.event.inputs.target-env == 'development' ||
+      github.event.inputs.target-env == 'both'
     needs: build
     runs-on: ubuntu-latest
     environment: development
+    # Surface the deployed URL + the dev API base so the smoke job can hit them.
+    # `vars.API_BASE_URL` resolves to the development-scoped value because this
+    # job is bound to `environment: development`; the smoke job has no environment.
+    outputs:
+      url: ${{ steps.deploy.outputs.static_web_app_url }}
+      api-base-url: ${{ vars.API_BASE_URL }}
     concurrency:
-      group: cd-swa-dev
+      group: cd-swa-development
       cancel-in-progress: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
 
       - name: Deploy to Dev SWA
+        id: deploy
         uses: ./.github/actions/deploy-swa
         with:
           enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
@@ -50,23 +83,43 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
           api-base-url: ${{ vars.API_BASE_URL }}
+          tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  # SPA bootstrap smoke gate against the dev SWA. Runs whenever deploy-dev runs
+  # (push, dev-only dispatch, or the first leg of `both`). On `both`, a smoke
+  # failure prevents deploy-prod from starting — mirroring the backend CD's
+  # smoke-dev gate. SWA URLs are randomized, so the deployed URL is passed from
+  # the deploy-dev output rather than hardcoded.
+  smoke:
+    if: needs.deploy-dev.result == 'success'
+    needs: deploy-dev
+    uses: ./.github/workflows/smoke-frontend.yml
+    with:
+      swa-url: ${{ needs.deploy-dev.outputs.url }}
+      api-base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
+
+  # Runs only on manual dispatch — prod is never auto-deployed on push to main.
+  #   - workflow_dispatch target-env=production       (prod-only, no dev gate, no smoke)
+  #   - workflow_dispatch target-env=both             (after smoke passes against dev)
+  # The manual workflow_dispatch trigger is itself the human gate for prod.
+  # NOTE: GitHub environment required-reviewer protection is a paid-plan feature
+  # (Pro/Team) and is NOT enabled on this Free private repo — do not assume an
+  # approval gate exists beyond the manual dispatch.
   deploy-prod:
-    # DISABLED — production SWA is not yet provisioned. While disabled, a
-    # workflow_dispatch trigger deploying with the `production` environment
-    # would land on the dev SWA's default slot (eudwlceswa01) and overwrite
-    # whatever deploy-dev last shipped — including stale prod-env values like
-    # ENABLE_TENANT_SELECTOR=false. Re-enable by removing the `false &&` guard
-    # below once production resources are provisioned (see INFRA.md §2 and
-    # `naming-azure-resources.md` for the eupwlce... naming).
-    if: false && github.event_name == 'workflow_dispatch'
-    needs: build
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (
+        (github.event.inputs.target-env == 'production' && needs.deploy-dev.result == 'skipped') ||
+        (github.event.inputs.target-env == 'both' && needs.smoke.result == 'success')
+      )
+    needs: [build, deploy-dev, smoke]
     runs-on: ubuntu-latest
     environment: production
     concurrency:
-      group: cd-swa-prod
+      group: cd-swa-production
       cancel-in-progress: false
     steps:
       - name: Checkout Code
@@ -82,6 +135,7 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
           api-base-url: ${{ vars.API_BASE_URL }}
+          tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

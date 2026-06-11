@@ -1,0 +1,58 @@
+# Dependabot — continuous dependency + GitHub Actions update PRs.
+# Replaces the manual end-of-sprint dependency audit as the primary mechanism
+# (the audit becomes review-and-merge). Carried open across 3 recursive reviews;
+# landed in Sprint 19 T2.
+#
+# Grouping keeps noise low: minor/patch updates batch into a single PR per
+# ecosystem; majors arrive individually for careful review. The github-actions
+# updater also keeps the A08 SHA-pins (third-party actions) current — it bumps
+# both the pinned SHA and the human-readable version comment.
+version: 2
+updates:
+  # ── Frontend (Angular / TypeScript) ──────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/lc-webapp"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      # Angular packages release in lockstep and must move together.
+      angular:
+        patterns:
+          - "@angular*"
+          - "@angular-devkit*"
+          - "zone.js"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── Backend (.NET / NuGet) ───────────────────────────────────────────────
+  - package-ecosystem: "nuget"
+    directory: "/lc-services"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── GitHub Actions (keeps A08 SHA-pins current) ──────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"

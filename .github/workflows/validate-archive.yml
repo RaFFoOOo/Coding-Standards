@@ -1,0 +1,53 @@
+name: Validate Artifacts
+
+# Cheap repo-hygiene guards:
+#  - archive-guard: no closed PLAN/TEST_PLAN/EPIC/QA_REPORT artifact left at repo
+#    root (the drift the recursive review flagged 3×, §4.6 / N1). (Sprint 19 T4)
+#  - readme-modes: README service-mode docs stay consistent with
+#    environment.production.ts (§4.5 — the stale "all Mock" claim T3 fixed). (Sprint 19 T4)
+#  - tenant-guid-drift: each tenant's blob container GUID stays single-sourced — backend
+#    TenantRegistry.cs == frontend tenants.json (Sprint 20 T6 / DECISIONS.md 2026-06-04).
+#
+# Targets the main boundary: PRs into main (incl. the cumulative sprint PR) and
+# pushes to main. `branches: [main]` filters the TARGET branch per
+# stack-github-actions.md §1.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  archive-guard:
+    name: Closed artifacts are archived
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Validate archive hygiene
+        run: bash scripts/ci/validate-archive.sh
+
+  readme-modes:
+    name: README service modes consistent
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Validate README service-mode docs
+        run: bash scripts/ci/check-readme-modes.sh
+
+  tenant-guid-drift:
+    name: Tenant container GUIDs single-sourced
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Validate tenant container GUID single source (BE == FE)
+        run: bash scripts/ci/check-tenant-guid-drift.sh

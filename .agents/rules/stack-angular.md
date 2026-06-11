@@ -61,7 +61,7 @@ description: Frontend stack rules for Angular / TypeScript projects
 ## 3. Data Service & Mocking Strategy
 - **Offline Capability:**
   - **[ARCHITECT REQUIRED]** Every API Service (e.g., `BookingService`) must have a corresponding `MockBookingService`.
-  - Use Angular's `environment` flag (`useMocks: true/false`) to switch the provider at the module level.
+  - Switch providers per-service via a `ServiceMode` flag (`'Mock' | 'Http'`), not a single global `useMocks` boolean. Each service flips independently in `environment.*.ts` under `services.*` (e.g. `auth`, `catalog`, `cmsContent`) and is wired with `provideByMode(token, MockCtor, HttpCtor, MODES.<service>)` in `app.providers.ts`.
   - Mock services must return synthetic data with realistic delays (using `delay()` operator) to simulate network latency.
 - **Local Environment Secure Mocking:**
   - Mock configuration payloads tracked in version control (e.g., `app-config.json`) **MUST NEVER** contain hardcoded secrets or SAS tokens.
@@ -83,10 +83,10 @@ description: Frontend stack rules for Angular / TypeScript projects
   - When a `IFooService` interface represents **server-owned data** (orders, catalog items, reviews, …), every method MUST return `Observable<>`. The interface MUST NOT declare `Signal<>` properties.
   - The mock implementation simulates the backend with a plain in-memory array (NOT signals) and returns observables via `of(…).pipe(delay())`. This makes the interface 1:1 swap-compatible with an HTTP adapter later.
   - The reactive cache (`Signal<>` state) belongs to a separate `FooStateService` (`providedIn: 'root'`) that subscribes to `IFooService` on init and exposes signals to components.
-  - ❌ `abstract readonly allItems: Signal<readonly Item[]>` in `IItemService`
-  - ✅ `abstract getAll(): Observable<Item[]>` in `IItemService`; `ItemStateService.allItems: Signal<readonly Item[]>` for consumers.
-  - **Exception — client-side state:** Interfaces representing **session-scoped client state** (e.g., `IAuthService.isAuthenticated: Signal<boolean>`) MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
-  - **Why this matters:** Conflating signals in the server-state interface makes HTTP-adapter implementation impossible without breaking every consumer. The StateService extraction is far cheaper when caught at authoring time than after backend integration.
+  - ❌ `abstract readonly all: Signal<readonly Foo[]>` in `IFooService`
+  - ✅ `abstract getAll(): Observable<Foo[]>` in `IFooService`; `FooStateService.all: Signal<readonly Foo[]>` for consumers.
+  - **Exception — client-side state:** an `IAuthService.isAuthenticated: Signal<boolean>`, a config service's `Signal<Config>`, and similar interfaces representing **session-scoped client state** MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
+  - **Why this matters:** an interface that exposes `Signal<>` for server-owned data makes a later HTTP-adapter implementation impossible without breaking every consumer — swapping the in-memory mock for a real backend forces a multi-file migration. Keeping server data behind `Observable<>` from day one reduces that swap to a single-file change.
 
 ## 4. Assets & Internationalization
 - **Text Content:**
@@ -109,9 +109,10 @@ description: Frontend stack rules for Angular / TypeScript projects
   - **System Alignment:** Use a professional icon library aligned with the chosen Design System (e.g., FontAwesome, Material Icons, Bootstrap Icons).
   - **Implementation:** Render icons using the framework's dedicated component (e.g., `<fa-icon>`, `<mat-icon>`) or optimized SVGs (NOT `<i class="fa-solid">` style — use the framework component for tree-shaking and type safety).
 - **[STRICT] Shared UI Primitives:**
-  - When the same visual block (empty-state, badge, status-pill, etc.) appears in 3+ component templates, extract it into a reusable shared primitive component before adding the 4th instance.
-  - Status/category badges and other recurring visual patterns MUST use project-wide global SCSS utility classes defined once in a shared stylesheet (e.g., `_badges.scss` loaded via `styles.scss`). Do NOT redefine these styles in individual component SCSS files.
-  - **Why:** Duplicated visual blocks across components are maintenance traps (style drift) and cumulative CSS budget consumers. Centralization ensures a single point of change.
+  - When the same visual block (empty-state, badge, status-pill, etc.) appears in 3+ component templates, extract it into a reusable primitive before adding the 4th instance.
+  - Empty-states use a single shared component (e.g. an `EmptyStateComponent` with `[icon]` + `[message]` inputs) — never re-roll a fresh `<div class="empty-state">` block per feature.
+  - Recurring status / source badges use global SCSS classes defined once in a shared stylesheet (loaded via the root `styles` entry point) — never redefine the same badge styles in component SCSS.
+  - **Why:** duplicating badge SCSS across components and hand-rolling empty-state blocks per feature is a maintenance trap — every copy drifts independently on a style change, and each duplicate counts against the per-component CSS budget.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
@@ -194,7 +195,7 @@ description: Frontend stack rules for Angular / TypeScript projects
 
 ## 10. Multi-Tenant Architecture [STRICT]
 - **Resource Resolution:**
-  - **MUST** resolve all brand-specific assets (logos, favicons, primary images) dynamically via a tenant config service pattern (e.g., `ITenantConfigService.getResourceUrl()`).
+  - **MUST** resolve all brand-specific brand assets (logos, favicons, primary images) dynamically via the `ITenantConfigService.getResourceUrl()` pattern.
   - Hardcoded paths to tenant assets in the `assets/` directory are forbidden for multi-tenant features.
 - **Data Segregation:**
   - **MUST** use tenant-segregated keys for all browser-side persistence (localStorage, sessionStorage).

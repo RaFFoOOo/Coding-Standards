@@ -5,7 +5,7 @@ description: Standard workflow for implementing a feature from PLAN.md
 
 # Feature Implementation Cycle
 
-> This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
 Execute each step sequentially for every Feature in the sprint.
 
@@ -32,6 +32,9 @@ Execute each step sequentially for every Feature in the sprint.
 8. **Mockup Gate** (UI tasks only): Use the `/plan-sprint` skill to create a text-based wireframe (markdown layout, component hierarchy, interactions, color tokens). Save as `mockup_[feature].md` artifact. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
 10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
+
+> **Self-Review Gate [MANDATORY — AGENTS.md §1]:** Before committing, run the 7-question self-review (like artifact? · comfortable for user? · can I do better? · rules/skills respected? · refactor/smells? · performance/redundant HTTP? · good base + new TODOs?). Action each finding honestly — cheap fixes and rule violations now; larger refactors/ideas → `TODO.md`.
+
 11. **Atomic Commit [MANDATORY]:** Per AGENTS.md §8, commit each task separately (e.g., `git add <files> && git commit -m "feat(scope): complete task part"`).
 12. **PLAN.md Live Sync [MANDATORY — do not defer]:** Immediately after the commit in step 11:
     - Mark the task `[x]` in **both** the Acceptance Criteria section and the Task Progress section of `PLAN.md`.
@@ -100,7 +103,7 @@ Execute this section **once per sprint**, after the final Feature's PR has been 
 27. **GitHub Actions:** Audit every `.github/workflows/*.yml` file **AND** every `.github/actions/**/*.yml` composite action file. For each action (e.g., `actions/checkout`, `actions/setup-node`, `Azure/static-web-apps-deploy`):
     - Check the action's GitHub releases page for newer major versions.
     - Verify Node.js runtime compatibility (currently Node.js 24 LTS).
-    - **Composite actions:** files under `.github/actions/` are frequently missed in dependency audits — they must be included in the A08 SHA-pinning audit alongside top-level workflow files.
+    - **Composite actions in `.github/actions/` are frequently missed — they must be included in the A08 SHA-pinning audit alongside top-level workflow files.
 28. **CI/CD Runner Defaults:** Verify the default Node.js version in all workflow files matches the current **LTS** release.
 29. **Report & Plan:** If ANY outdated dependencies or actions are found:
     - Generate a `DEPENDENCY_AUDIT.md` artifact listing all findings with their `[SAFE]` / `[BREAKING]` classification.

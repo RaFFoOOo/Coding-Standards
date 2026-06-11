@@ -38,6 +38,11 @@ on:
         required: false
         type: boolean
         default: true
+      run-tests:
+        description: 'Whether to run the unit test suite (ng test). CI sets true; CD omits (false).'
+        required: false
+        type: boolean
+        default: false
     outputs:
       build-tag:
         description: 'The generated build version tag (e.g., cd-azure-swa-20260330-1430-main)'
@@ -72,6 +77,10 @@ jobs:
         # OWASP A06 — fail the workflow on any moderate-or-higher CVE.
         # See `.claude/rules/stack-github-actions.md` §6 Security Gates.
         run: npm audit --audit-level=moderate
+
+      - name: Run Unit Tests
+        if: inputs.run-tests
+        run: npm test
 
       - name: Generate Build Tag
         id: generate-tag

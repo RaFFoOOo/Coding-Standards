@@ -1,6 +1,8 @@
 ---
+name: Stack GitHub Actions
 trigger: glob
-glob: ".github/workflows/**"
+globs: [".github/workflows/**", ".github/actions/**"]
+description: CI/CD workflow rules for GitHub Actions pipelines
 ---
 
 # GITHUB ACTIONS WORKFLOW SPECIFICATIONS
@@ -12,7 +14,7 @@ glob: ".github/workflows/**"
   - `push` events carry no PR payload. The PR number would require an extra API call, adding latency and a failure mode.
   - `pull_request` events expose `github.event.number`, `context.issue.number`, and `github.head_ref` natively.
   - **Exception — Azure SWA preview deployments:** When a stable `deployment_environment` URL is required (e.g., for pre-configured auth redirect URIs), use `push` instead. Azure SWA generates PR-numbered URLs for `pull_request`-triggered deployments regardless of the `deployment_environment` parameter. Use `pulls.list({ head })` to resolve the PR number for commenting.
-  - **Branch coverage for preview CI [STRICT]:** The `ci-preview-swa.yml` push trigger MUST include all active branch prefixes: `feature/**`, `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`. This ensures preview deployments fire for the sprint/task branching hierarchy.
+  - **Branch coverage for preview CI [STRICT]:** A push-triggered preview-deployment workflow MUST include all active branch prefixes: `feature/**`, `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`. Otherwise preview deployments silently skip branches in the sprint/task hierarchy, and a contributor on an uncovered prefix gets no preview URL.
 - **Branch-prefix filtering** on `pull_request` triggers MUST use a job-level `if` condition, not the `branches:` key:
   ```yaml
   # ✅ Correct — filters by source branch (head_ref)
@@ -54,9 +56,9 @@ The identity used by the CD pipeline to deploy resources MUST be a dedicated **A
   federated credential for the `development` environment.
 - **Authentication App Registrations** (SPA login, API JWT audience) are authentication identities
   — never operational identities. Do not reuse them for CI/CD.
-- Name CD SPNs with environment-specific suffixes (one per GitHub environment) following the project's Azure resource naming convention.
+- Name CD SPNs following `naming-azure-resources.md`: `<dev-cd-spn>` (dev), `<prod-cd-spn>` (prod).
 
-**Identity taxonomy (illustrative template):**
+**Identity taxonomy for this project:**
 
 | Identity | Type | Purpose | Grants |
 |---|---|---|---|
@@ -64,19 +66,20 @@ The identity used by the CD pipeline to deploy resources MUST be a dedicated **A
 | `<spa-app>` | App Registration | SPA MSAL authentication | — |
 | `<api-app>` | App Registration | Backend JWT audience/validation | — |
 | `<dev-cd-spn>` | App Registration / SPN | GitHub Actions CD — dev environment | `Reader` on subscription + `Website Contributor` on `<dev-function-app>` |
-| `<prod-cd-spn>` | App Registration / SPN | GitHub Actions CD — prod environment | `Reader` on subscription + `Website Contributor` on prod Function App |
+| `<prod-cd-spn>` | App Registration / SPN | GitHub Actions CD — prod environment (TBD) | `Reader` on subscription + `Website Contributor` on prod Function App |
 
 ## 3. Secret & Variable Scope
 
+> The secret naming **schema** and the CI/CD-split principle are defined once in `AGENTS.md §5`. This section covers only the GitHub-specific **placement**.
+
 ### CI vs CD secret separation
 - When the same Azure resource (e.g., an ASWA deployment token) is required in both a CI workflow (PR/preview) and a CD workflow (production):
-  - Register a `CI_AZURE_<RESOURCE>_<NAME>` secret at **repository level** (Settings → Secrets and variables → Actions). Required because PR workflows cannot access environment-protected secrets.
-  - Register a `CD_AZURE_<RESOURCE>_<NAME>` secret scoped to the **production environment** (Settings → Environments → production → Secrets).
-  - Never share one secret across both scopes; document the split in `README.md` under two clearly labelled subsections.
+  - Register the `CI_AZURE_<RESOURCE>_<NAME>` secret at **repository level** (Settings → Secrets and variables → Actions) — PR workflows cannot access environment-protected secrets.
+  - Register the `CD_AZURE_<RESOURCE>_<NAME>` secret scoped to the **production environment** (Settings → Environments → production → Secrets).
+  - Never share one secret across both scopes; document the split in `README.md`.
 
 ### Variables (feature flags, configuration) — no CI/CD prefix
-- Environment-scoped variables (e.g., `ENABLE_TENANT_SELECTOR`, `ENABLE_LOGIN_FEATURES`) use plain `UPPER_SNAKE_CASE` — no `CI_`/`CD_` prefix. The GitHub environment already provides scoping; different environments hold different values for the same variable name.
-- The `CI_`/`CD_` prefix convention applies exclusively to **secrets** where repository-level vs. environment-level isolation is critical.
+- Per `AGENTS.md §5`: environment-scoped variables use plain `UPPER_SNAKE_CASE` with no `CI_`/`CD_` prefix (the GitHub environment provides scoping). The `CI_`/`CD_` prefix applies **only** to secrets that need repository-vs-environment isolation.
 
 ## 4. Reusable Workflows (`workflow_call`)
 
@@ -166,7 +169,7 @@ that legitimately needs a dot-prefixed file or directory MUST set `include-hidde
   with:
     name: dotnet-publish-output
     path: ${{ github.workspace }}/publish
-    include-hidden-files: true   # required for .azurefunctions/ (dot-prefixed paths)
+    include-hidden-files: true   # required for .azurefunctions/
 ```
 
 **Verification:** after deploy, a fresh `GET https://<scmsite>/api/vfs/site/wwwroot/` should
@@ -217,4 +220,4 @@ uses: third-party/some-action@a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # v2.1.0
 ```
 
 ### A06 — CodeQL Scanning [RECOMMENDED]
-A CodeQL scan workflow is recommended for every repository; it is free for any visibility level and catches a broad class of injection, path-traversal, and data-flow vulnerabilities automatically. Add to the backlog when feasible — the plan already tracks this under `PLAN_sprint_010_owasp.md` §5 Out of Scope.
+A CodeQL scan workflow catches a broad class of injection, path-traversal, and data-flow vulnerabilities automatically. **It is free for PUBLIC repositories only.** On a **private** repository, CodeQL *analysis* still runs, but uploading results to the Security tab requires **GitHub Advanced Security** — a paid add-on (Team/Enterprise) **not available on Free/personal plans** (`PATCH …/security_and_analysis` → HTTP 422 "Advanced security has not been purchased"). Do **not** state CodeQL is "free at any visibility" — that conflates public-repo-free with all-visibility-free. Running the CodeQL CLI with `upload:false` to dodge GHAS on a private repo is **license-gray** (the CLI is licensed for private use only *in connection with* GitHub code scanning) — not a permitted workaround. On a private repo where GHAS is unavailable, ship CodeQL **dormant** (e.g. `workflow_dispatch`-only behind an enablement gate) and record the choice in the project's decision log. Free first-party SAST on a private repo means a different tool (semgrep OSS, eslint security plugins, Roslyn analyzers).
