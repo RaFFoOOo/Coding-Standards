@@ -29,6 +29,10 @@ Invoke via slash commands (shims in `.claude/skills/`) or by reading the source 
 | `/test-browser` | `.agents/workflows/test-browser.md` | Plan and execute browser tests |
 | `/deploy-azure` | `.agents/workflows/deploy-azure.md` | Build for production and deploy to Azure |
 | `/todo-manager` | `.agents/skills/todo-manager/SKILL.md` | Manage TODO.md lifecycle (append, mark done, archive, promote to PLAN.md) |
+| `/recursive-review` | `.agents/workflows/recursive-review.md` | Periodic honest audit of rules, skills, code, pipeline, and direction |
+| `/resolve-workflow` | `.agents/workflows/resolve-workflow.md` | Diagnose and fix a failing GitHub Actions run until it passes |
+| `/pause-session` | `.agents/workflows/pause-session.md` | End-of-session checkpoint; writes `__resume_prompt.txt` + persists lessons |
+| `/resume-session` | `.agents/workflows/resume-session.md` | Session-start bootstrap; replays the saved resume protocol |
 
 ### Plan Mode
 Claude Code enters plan mode for complex tasks. You (Tech Lead) review and approve
