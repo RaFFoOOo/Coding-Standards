@@ -23,9 +23,6 @@ followed by a PR.
 - **Optional:** when the user asks "what's wrong with this project?", "review the
   architecture", or similar open-ended health questions.
 
-The user's exemplar invocation produced `PLAN_recursive_review.md` (no date suffix) at PR
-#108 — keep that as the canonical example of output shape.
-
 ## § 1. Pre-flight [MANDATORY]
 
 1. Read these in full — never skim:
@@ -153,8 +150,7 @@ the user to push back.
 ## § 5. Synthesis — the PLAN file
 
 Write the deliverable to `PLAN_recursive_review_<YYYY_MM_DD>.md` (or, for the very first
-review, `PLAN_recursive_review.md` without date). Use this exact section order — it is
-proven, see PR #108:
+review, `PLAN_recursive_review.md` without date). Use this exact, proven section order:
 
 1. Reading guide (one paragraph)
 2. **Executive summary** — 60-second read; top 5 takeaways

@@ -13,7 +13,7 @@ It also handles **bidirectional agent-aware transformation**: when the source an
 
 ## Prerequisites
 - This workflow must be executed from **the root directory of the current project repository** (verify with `git rev-parse --show-toplevel`).
-- For the very first execution in a new project, this file (`.agents/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
+- For the very first execution in a new project, this file (`.agents/workflows/sync-templates.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
 
