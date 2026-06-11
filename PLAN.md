@@ -4,7 +4,7 @@
 - **Sprint:** `sprint/1.0-lean-standards`
 - **Goal:** Reduce the token cost of the standards corpus (rules + skills + workflows + `AGENTS.md`) and improve agent retrieval accuracy — **without losing a single `STRICT`/`MANDATORY` rule**. "Performance" here means token cost when loaded + retrieval clarity (structure), not runtime speed.
 - **Approach (Tech-Lead approved):** Scope = rules + skills + workflows. Aggressiveness = **Conservative / dedup-first** — cut duplication and dead prose, preserve every rule's wording and intent.
-- **Status:** Planning (awaiting go to execute T1)
+- **Status:** In progress (T1 done — baseline + rule-inventory guard captured: 81 tagged rules)
 
 ### 2. Feature Specification
 #### Feature: Lean Standards Corpus
@@ -32,7 +32,7 @@
 **Meaning-loss guard:** T1 produces a `rule-inventory.md` artifact listing every `STRICT`/`MANDATORY`/`[X]`-tagged rule with its source file:line. T6 re-derives the same inventory and diffs — any missing entry blocks the sprint.
 
 ### 4. Task Progress
-- [ ] **T1 `[S]`** — Baseline + method artifact: per-file token counts, the `rule-inventory.md` (meaning-loss guard), acceptance criteria. *(dep: —)*
+- [x] **T1 `[S]`** — Baseline + method artifact: per-file token counts, the `rule-inventory.md` (meaning-loss guard, 81 tagged rules), acceptance criteria. *(dep: —)* → archived in T6.
 - [ ] **T2 `[M]`** — Cross-file dedup: choose canonical home (usually `AGENTS.md`) for each repeated concept; replace copies with one-line cross-references. *(dep: T1)*
 - [ ] **T3 `[M]`** — Skills lean pass: `run-qa`, `todo-manager`, `manage-artifacts`, `plan-sprint`. *(dep: T1)*
 - [ ] **T4 `[L]`** — Workflows lean pass: `sync-templates` (336 ln) first, then `recursive-review`, `run-feature`, `resolve-*`, session workflows. *(dep: T2)*
