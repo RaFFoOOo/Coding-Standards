@@ -29,7 +29,7 @@ Execute each step sequentially for every Feature in the sprint.
 
 ## Implementation Loop (per task)
 
-8. **Mockup Gate** (UI tasks only): Use the `/plan-sprint` skill to create a text-based wireframe (markdown layout, component hierarchy, interactions, color tokens). Save as `mockup_[feature].md` artifact. Skip for backend/service tasks.
+8. **Mockup Gate** (UI tasks only — AGENTS.md §1): build the text-based wireframe via the `/plan-sprint` skill (§3 Visualize); save as `mockup_[feature].md`. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
 10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
 
@@ -54,9 +54,10 @@ Execute each step sequentially for every Feature in the sprint.
 19. **PR Review Gate [MANDATORY]:** Output a message to the user asking for review of uncommitted changes. Wait for explicit approval before staging.
 20. Push branch to remote: `git push -u origin <branch-name>`
 21. Create a Pull Request (PR) targeting the correct base branch:
-    - **Sprint task PR** → targets `sprint/<version>-<slug>` (NOT `main`). Use **squash merge** when merging.
-    - **Sprint branch final PR** → targets `main` (opened after all tasks are merged). Use **merge commit** when merging. Include links to all task PRs in the description.
+    - **Sprint task PR** → targets `sprint/<version>-<slug>` (NOT `main`).
+    - **Sprint branch final PR** → targets `main` (opened after all tasks are merged); include links to all task PRs.
     - **Small/standalone work PR** → targets `main` as usual.
+    - *(Merge types — squash for task→sprint, merge-commit for sprint→main — per AGENTS.md §8.)*
     - **Description Requirements**:
         - **Summary**: Brief overview of the implementations and changes.
         - **Lessons Learned**: Any insights or technical hurdles overcome.

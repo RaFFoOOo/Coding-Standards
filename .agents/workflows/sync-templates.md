@@ -13,7 +13,7 @@ It also handles **bidirectional agent-aware transformation**: when the source an
 
 ## Prerequisites
 - This workflow must be executed from **the root directory of the current project repository** (verify with `git rev-parse --show-toplevel`).
-- For the very first execution in a new project, this file (`.agents/workflows/sync-template.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
+- For the very first execution in a new project, this file (`.agents/workflows/sync-templates.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
 
@@ -290,6 +290,15 @@ Before staging, append a new execution record to the **Sync History Ledger** in 
   - Gemini / Generic: `chore(standards): sync template updates`
   - Claude Code: `chore(standards): sync template updates (claude-code)`
 - Push the branch and instruct the user to open a Pull Request in the *Target* repository to merge the updated standards.
+
+#### Step 6c — Self-maintaining template: reconcile `.claude/` shims [MANDATORY when target keeps both `.agents/` and `.claude/`]
+
+The master template repo is a hybrid: `.agents/` is its canonical source **and** it ships its own `.claude/` shims + `CLAUDE.md` so it is natively usable in Claude Code. A Generic/reverse sync (Step 5c) writes only to `.agents/`, so any workflow/skill it **adds or removes** would otherwise leave the local `.claude/` layer stale — the defect that orphaned `recursive-review`, `pause-session`, `resume-session`, and `resolve-workflow` after the #18/#20 syncs.
+
+When the target keeps both trees, after Step 5 reconcile them:
+- For every `.agents/skills/<n>/SKILL.md` and `.agents/workflows/<n>.md` with **no** matching `.claude/skills/<n>/SKILL.md`, generate the shim (copy the source `name:`/`description:` frontmatter; body = `Read the full ... instructions from \`.agents/...\` and execute them.`) and add a row to the `CLAUDE.md` skill table.
+- For every `.claude/skills/<n>/` shim whose `.agents/` source no longer exists, delete the shim and its `CLAUDE.md` row.
+- Quick check (must show no diff): `diff <( { ls .agents/skills; ls .agents/workflows | sed 's/\.md$//'; } | sort -u) <(ls .claude/skills | sort)`.
 
 ### Step 7 — Post-Sync Configuration Checklist
 

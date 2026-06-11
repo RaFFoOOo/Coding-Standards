@@ -34,17 +34,15 @@ The `PLAN.md` file is the source of truth. It must strictly follow this structur
 - [ ] Task 1
 - [x] Task 2 (Completed)
 
-## Trigger — Live Sync Rules [MANDATORY]
+## Live Sync & Archival [MANDATORY]
 
-These are not suggestions. Violations cause plan drift and erode backlog trust.
+The marking cadence is governed by **AGENTS.md §1 (Living Plan Enforcement)**: mark `[x]` the moment a task commits — in **both** the Acceptance Criteria and Task Progress sections, never batched to "end of session"; mark `[-]` (with a one-line note, e.g. `[-] superseded by Sprint X.Y`) for superseded/deferred items in both sections.
 
-1. **Task completed → mark immediately.** The moment a task commit is pushed, mark `[x]` in **both** the Acceptance Criteria and Task Progress sections. Never batch this to "end of session."
-2. **Feature superseded or deferred → mark `[-]`** with a one-line note (e.g., `[-] superseded by Sprint X.Y`) in both sections.
-3. **Sprint closed → archive immediately.** A sprint is closed when all features are `[x]` or `[-]`. At that point:
-   - Add `> **STATUS: CLOSED**` to the plan header.
-   - `git mv` the plan file (and any associated QA report, mockup, or lessons-learned) to `archive/`.
-   - Commit with `chore(archive): close sprint X.Y`.
-   - **Never** leave a closed sprint plan in the project root.
+When a sprint closes (all features `[x]` or `[-]`), follow this archival **procedure**:
+1. Add `> **STATUS: CLOSED**` to the plan header.
+2. `git mv` the plan file (and any associated QA report, mockup, or lessons-learned) to `archive/`.
+3. Commit with `chore(archive): close sprint X.Y`.
+4. **Never** leave a closed sprint plan in the project root.
 
 ## Artifact Index
 The workspace relies on the following key artifacts:
@@ -59,6 +57,5 @@ The workspace relies on the following key artifacts:
 - Update the README whenever new major features are shipped, or setup instructions change.
 
 ## Artifact Lifecycle
-- **Planning & Backlog (TODO.md):** Every time you start a new `PLAN.md`, you MUST check the `TODO.md` file. Evaluate if any tasks in the TODO list are processable in the current sprint. If so, move them from `TODO.md` into `PLAN.md` with full specifications. You can also use `TODO.md` to keep ongoing notes. `TODO.md` is specific to each project.
-- **Archiving:** At the end of a sprint/milestone, do not let artifacts grow indefinitely. Move stale sprint plans or old QA logs to an `archive/` folder, or clear them to start a fresh `PLAN.md`.
+- **Planning & Backlog (TODO.md):** When starting a new `PLAN.md`, check `TODO.md` and promote any sprint-ready items per the **`todo-manager`** skill (§5 promotion gate). `TODO.md` is project-specific.
 - **One Canonical Plan File [STRICT]:** A sprint has exactly one plan file. During active work it is `PLAN.md` at the project root. On completion it is moved to `archive/PLAN_<sprint-name>.md`. A separately named copy (e.g. `PLAN_sprint_007.5_quality.md`) must **never** coexist alongside `PLAN.md` — if one is found and is identical, delete the duplicate before archiving.
