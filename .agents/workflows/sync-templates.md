@@ -234,6 +234,19 @@ When `SOURCE_AGENT = TARGET_AGENT = Claude Code`, both repos use the `.claude/` 
 - **Preserve `reverseTaxonomy`** in the copied `sync-state.json` (the target is still a Claude repo and may later reverse-sync). Keep `skipList` as the approved final list.
 - Apply the **Claude-Code preamble handling** rules from Step 5c only if the target is destined to also serve non-Claude agents; otherwise leave `> **Claude Code:**` notes intact.
 
+#### Step 5f — Agnostic Review Gate [MANDATORY when the Target is a shared template / agnostic source of truth]
+
+`templateSanitization` (regex find/replace) catches **token-level** leaks (class names, resource IDs, `Sprint N lesson` attributions) but **cannot restructure prose** — a sentence like *"Sprint 21 T7 churned ~15 commits…"* needs rewriting to cause-effect, which no substitution rule can do. So after the substitution pass and **before staging**, grep the synced output for residual project-signal patterns and present every hit to the user for manual genericization:
+
+```bash
+grep -rnE "Sprint [0-9]|DECISIONS?\.md|\blc-[a-z]|PR #[0-9]+|le-cementine|provideByMode" \
+  <Target>/AGENTS.md <Target>/.agents/
+```
+
+- Bare `Sprint N` prose attributions, **dated** `DECISIONS.md` citations (e.g. *"see DECISIONS.md (2026-05-22, …)"*), and project-specific class/file/service names that survive the regex pass MUST be hand-genericized (to cause-effect / generic placeholders) before the sync PR is opened. *(This is the lesson of PRs #20/#30, where exactly these slipped through verbatim and were cleaned by hand after merge.)*
+- **Not leaks — skip:** branch-naming examples that illustrate the convention (`sprint/<semver>-<slug>`); factual ledger state (`sync-history.json` `sourceRepo`/`sourceBranch`); `DECISIONS.md` referenced as the standard decision-log **convention** (the Decision Recording rule prescribes every project keep one); and helper names used as explicit generic `e.g.` examples.
+- Record the outcome in the sync PR body: list the hand-fixed leaks, or note "agnostic review: clean".
+
 ### Step 5d — Old Agent Configuration Cleanup
 
 Before staging, remove the **previous** agent's configuration from the target to ensure only **one** agent configuration is active at a time.
