@@ -1,46 +1,42 @@
 # PLAN.md
 
 ### 1. Current Sprint Context
-- **Goal:** Migrate the primary coding agent from Antigravity to Claude Code, making the repository natively usable by Claude Code while keeping `.agents/` as the cross-agent canonical source of truth. Enhance `sync-template` to deploy agent-specific structures to target projects.
-- **Status:** Done
+- **Sprint:** `sprint/1.0-lean-standards`
+- **Goal:** Reduce the token cost of the standards corpus (rules + skills + workflows + `AGENTS.md`) and improve agent retrieval accuracy — **without losing a single `STRICT`/`MANDATORY` rule**. "Performance" here means token cost when loaded + retrieval clarity (structure), not runtime speed.
+- **Approach (Tech-Lead approved):** Scope = rules + skills + workflows. Aggressiveness = **Conservative / dedup-first** — cut duplication and dead prose, preserve every rule's wording and intent.
+- **Status:** Planning (awaiting go to execute T1)
 
 ### 2. Feature Specification
-#### Feature: Claude Code Migration
-- **User Story:** As a Tech Lead migrating from Antigravity to Claude Code, I want the Coding-Standards template to be natively loaded by Claude Code (CLAUDE.md, .claude/skills/ shims) and the sync-template workflow to be agent-aware, so that I can use Claude Code as my primary agent while the template remains cross-agent compatible.
+#### Feature: Lean Standards Corpus
+- **User Story:** As the Tech Lead, I want the rules/skills/workflows to cost fewer tokens and be faster to navigate, so that every session loads cheaper and the agent applies the right rule without wading through duplicated prose — while every governance rule remains intact.
 - **Acceptance Criteria:**
-  - [x] `CLAUDE.md` exists at project root, imports `AGENTS.md`, and lists all available skills/workflows.
-  - [x] `.claude/skills/` shims exist for all 8 skills/workflows, enabling `/slash-command` invocation.
-  - [x] `sync-template` workflow prompts for target agent and performs path/tool transformation for Claude Code targets.
-  - [x] `agent-workarounds.md` has no Antigravity-specific content; includes Claude Code notes.
-  - [x] `TODO.md` reflects migration complete.
-  - [x] `README.md` updated to reflect Claude Code as primary agent and the new agent-agnostic deployment model.
+  - [ ] ~15–20% token reduction across the corpus (measured T1 → T6, bytes/4 proxy).
+  - [ ] **Zero** `STRICT`/`MANDATORY`/`[X]` rules dropped — verified by the T1 rule-inventory diff in T6.
+  - [ ] Each cross-cutting concept (Mockup Gate, 200-line rule, Iterative/Recursive Review, branching/merge strategy) lives in **one** canonical location; all others are one-line cross-references.
+  - [ ] No file's *meaning* changed; only redundancy and verbosity removed.
 
 ### 3. Technical Implementation Plan
-*Approved.*
-- **New Files:**
-  - [x] `CLAUDE.md` — Claude Code entry point (imports AGENTS.md + CC-specific guidance)
-  - [x] `.claude/skills/*/SKILL.md` (×8) — Thin shims delegating to `.agents/`
-- **Modified Files:**
-  - [x] `.agents/sync-state.json` — Add `.claude/` to skipList
-  - [x] `.agents/workflows/sync-template.md` — Agent detection + transformation logic
-  - [x] `.agents/rules/agent-workarounds.md` — Remove Antigravity section, add Claude Code notes
-  - [x] `TODO.md` — Mark migration items complete
-  - [x] `README.md` — Agent references and repo map updates
-- **Risks/Notes:** `.claude/skills/` shims must NOT be synced to target projects (controlled via sync-state.json skipList). Verify shim delegation works correctly in Claude Code session.
+*Pending approval to execute.*
+
+**Baseline (token proxy = bytes/4, captured 2026-06-11):**
+
+| Cluster | Loaded when | ~Tokens |
+|---|---|---|
+| `AGENTS.md` + `CLAUDE.md` | every session | ~5.3k |
+| Stack rules (×3: angular 5.0k, github-actions 3.5k, dotnet 2.8k) | glob-triggered | ~11.4k |
+| Skills (×4) | on invoke | ~3.0k |
+| Workflows (×9: sync-templates 336 ln is the largest) | on invoke | ~10.0k |
+
+**Duplication map (probe counts):** Mockup Gate ×3 files · 200-line rule ×3 · Iterative/recursive review ×4 · branching/merge strategy ×3.
+
+**Meaning-loss guard:** T1 produces a `rule-inventory.md` artifact listing every `STRICT`/`MANDATORY`/`[X]`-tagged rule with its source file:line. T6 re-derives the same inventory and diffs — any missing entry blocks the sprint.
 
 ### 4. Task Progress
-- [x] Archive old PLAN.md → `archive/PLAN_agents-migration.md`
-- [x] Create `CLAUDE.md`
-- [x] Create `.claude/skills/` shims (×8)
-- [x] Update `.agents/sync-state.json` (add `.claude/` skipList)
-- [x] Enhance `sync-template.md` with agent-aware deployment logic
-- [x] Update `agent-workarounds.md`
-- [x] Update `TODO.md`
-- [x] Update `README.md`
+- [ ] **T1 `[S]`** — Baseline + method artifact: per-file token counts, the `rule-inventory.md` (meaning-loss guard), acceptance criteria. *(dep: —)*
+- [ ] **T2 `[M]`** — Cross-file dedup: choose canonical home (usually `AGENTS.md`) for each repeated concept; replace copies with one-line cross-references. *(dep: T1)*
+- [ ] **T3 `[M]`** — Skills lean pass: `run-qa`, `todo-manager`, `manage-artifacts`, `plan-sprint`. *(dep: T1)*
+- [ ] **T4 `[L]`** — Workflows lean pass: `sync-templates` (336 ln) first, then `recursive-review`, `run-feature`, `resolve-*`, session workflows. *(dep: T2)*
+- [ ] **T5 `[S]`** — Light rules pass: apply dedup cross-refs + structure only; **do not** re-trim the prose PR #20 already leaned. *(dep: T2)*
+- [ ] **T6 `[S]`** — Verify: rule-inventory diff (nothing dropped) + final token-delta report + README/metrics note. *(dep: T2–T5)*
 
-### 5. PR #20 Review Refinements
-Reviewer theme: this is a cross-agent **source of truth** — use generic examples, never direct references to a specific project's implementation (no sprint numbers, no project-only service names/tables, no `DECISIONS.md` hard links).
-- [x] `stack-angular.md` §3.7 — replace `IOrderService`/`Order` server-state example with agnostic `IFooService`/`Foo`; genericize the "Why".
-- [x] `stack-angular.md` §4 — drop "Sprint 10" reference; state the rule's motivation as plain cause-effect; soften project-specific paths/classes to illustrative examples.
-- [x] `stack-dotnet-core.md` §8.1 — rewrite role-based-auth bullet as a generic principle; remove `TenantUserRole`/`ITenantScopeAuthorization`/`FunctionAuthorizationMiddleware` specifics and the `DECISIONS.md` date link.
-- [x] `stack-github-actions.md` §1 — drop "Sprint 8.6" and the project-only `ci-preview-swa.yml` filename (line 17); clean the sibling "Sprint 19"/"this repo"/`DECISIONS.md` references in the CodeQL note (line 223).
+**Dependency order:** T1 → T2 → (T3, T5) → T4 → T6. Each task = atomic commit on its own `task/sprint-1.0/<id>-<slug>` branch, PR'd into the sprint branch; Iterative Review Gate (min 3 passes) per task.
