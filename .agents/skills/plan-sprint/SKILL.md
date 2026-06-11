@@ -16,17 +16,14 @@ This skill enables the Agent to act as a Technical Team Lead, interpreting high-
 
 ## Operating Procedure
 When the User provides a Sprint Plan or User Story:
-0.  **Sprint Branch Creation [MANDATORY for sprint-sized work]:** Before decomposing tasks, determine if this is a sprint (multi-task, >3 files expected) or standalone work:
-    - **Sprint:** Create the sprint branch from `main` and immediately open the sprint→main PR:
+0.  **Sprint Branch Creation [MANDATORY for sprint-sized work]:** Determine if this is a sprint (multi-task, >3 files expected) or standalone work (task branch off `main` directly). For a sprint, create the branch and **immediately** open the sprint→main PR so the Tech Lead sees the cumulative diff throughout:
       ```bash
       git checkout main && git pull origin main
       git checkout -b sprint/<semver>-<kebab-slug>
       git push -u origin sprint/<semver>-<kebab-slug>
       gh pr create --title "feat(sprint/<semver>): <title>" --base main --head sprint/<semver>-<kebab-slug> --body "..."
       ```
-      Opening the PR immediately gives the Tech Lead visibility into the cumulative sprint diff at all times. **Do not merge** until all task PRs are squash-merged into the sprint branch and CI is green. Use a **merge commit** (not squash) when merging sprint → `main`.
-      All task branches for this sprint will be cut from this sprint branch, not from `main`.
-    - **Standalone:** No sprint branch needed — task branches target `main` directly.
+    All task branches are cut from this sprint branch. Branch naming and merge types (squash task→sprint; merge-commit sprint→main; **don't merge** until all task PRs are in and CI is green) follow **AGENTS.md §8**.
 1.  **Analyze:** Read the requirements and identify dependencies.
 2.  **Breakdown & Estimate:** Decompose User Stories into technical **Tasks**.
     - **Complexity Tags:** Tag each task in `PLAN.md` with an estimation size (`[S]`, `[M]`, `[L]`, `[XL]`).
