@@ -37,3 +37,10 @@
 - [x] Update `agent-workarounds.md`
 - [x] Update `TODO.md`
 - [x] Update `README.md`
+
+### 5. PR #20 Review Refinements
+Reviewer theme: this is a cross-agent **source of truth** — use generic examples, never direct references to a specific project's implementation (no sprint numbers, no project-only service names/tables, no `DECISIONS.md` hard links).
+- [x] `stack-angular.md` §3.7 — replace `IOrderService`/`Order` server-state example with agnostic `IFooService`/`Foo`; genericize the "Why".
+- [x] `stack-angular.md` §4 — drop "Sprint 10" reference; state the rule's motivation as plain cause-effect; soften project-specific paths/classes to illustrative examples.
+- [x] `stack-dotnet-core.md` §8.1 — rewrite role-based-auth bullet as a generic principle; remove `TenantUserRole`/`ITenantScopeAuthorization`/`FunctionAuthorizationMiddleware` specifics and the `DECISIONS.md` date link.
+- [x] `stack-github-actions.md` §1 — drop "Sprint 8.6" and the project-only `ci-preview-swa.yml` filename (line 17); clean the sibling "Sprint 19"/"this repo"/`DECISIONS.md` references in the CodeQL note (line 223).
