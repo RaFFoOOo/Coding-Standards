@@ -11,7 +11,7 @@ This file contains tasks, ideas, and architectural improvements that are **not p
 - [ ] Evaluate adding a `hooks` section to `.claude/settings.json` in the sync-template output for Claude Code targets (e.g., PostToolUse linting hook on Write/Edit).
 - [ ] Consider adding a `Copilot` (GitHub Copilot) transformation path to `sync-template` once its agent file conventions stabilize.
 - [ ] **Root-cause the sync re-leak (high value):** Back-port the `templateSanitization` pattern into the *source* project's `.claude/sync-state.json` so reverse-transform syncs strip project-specific identifiers (sprint numbers, project-only service/table names like `IOrderService`/`TenantUserRole`, dated `DECISIONS.md` links) automatically. PR #20 had to clean these by hand — without the source-side pattern, every future sync re-introduces them.
-- [ ] **Repo-wide agnostic sweep:** Audit the remaining synced files (`.agents/workflows/**`, `.agents/skills/**`, `.agents/sync-state.json`) for the same direct-project-reference pattern the PR #20 reviewer flagged in the stack rules, and genericize.
+- [x] **Repo-wide agnostic sweep** — PR #30. Genericized `run-qa` (mock path), `recursive-review` (DI specifics, SCSS example), plus 2 leaks that escaped #20: `AGENTS.md` Sprint-21 attribution and `stack-angular` ServiceMode names. `sync-state.json` skipList + `sync-history.json` left intact (functional/factual state, not prose). Branching-diagram `sprint/8.6` examples kept (naming-convention illustration).
 
 ## 📝 Ongoing Notes
 *Architectural notes or reminders for the agent/user.*
