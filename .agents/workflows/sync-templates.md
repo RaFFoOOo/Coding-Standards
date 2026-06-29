@@ -36,7 +36,8 @@ Store the selection as `TARGET_AGENT`.
 ### Step 2 — Identify Source & Target
 
 - **Detect `SOURCE_AGENT` from the filesystem** (do not ask the user — the layout is authoritative):
-  - If `<Source>/.claude/` exists → `SOURCE_AGENT = Claude Code`.
+  - **Hybrid master template — check FIRST:** if the Source has **both** `.agents/` **and** a `.claude/` whose `skills/*/SKILL.md` are thin **shims** (body = `Read the full … from \`.agents/…\``), it is the hybrid master template (canonical content in `.agents/`, `.claude/` is only Claude-native shims). Set `SOURCE_AGENT = Gemini / Generic` and treat `.agents/` as canonical — do **not** misclassify it as Claude Code and copy the shims. Quick check (no output = all shims = hybrid): `grep -L "Read the full" <Source>/.claude/skills/*/SKILL.md`.
+  - Else if `<Source>/.claude/` exists (real skill bodies, no `.agents/`) → `SOURCE_AGENT = Claude Code`.
   - Else if `<Source>/.agents/` exists → `SOURCE_AGENT = Gemini / Generic`.
   - Else → STOP: the Source is not a sync-managed repository.
 - The Target does not need an existing agent configuration; it will be initialized by Step 5.

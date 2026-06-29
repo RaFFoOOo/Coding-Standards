@@ -42,7 +42,7 @@ Identify everything in flight:
 
 ### Step 3 — Generate `__resume_prompt.txt` [MANDATORY]
 
-Write the file at the **project root** (NOT inside `.claude/`). Required sections in order:
+Write the file at the **project root** (NOT inside `.agents/`). Required sections in order:
 
 1. **Context header** — absolute date, active sprint, role assumed by the User.
 2. **PRIORITY 0 — Verification** — what to check BEFORE any code change (PR status, branch state, anything that may have changed overnight). Lead with verification, not action.
