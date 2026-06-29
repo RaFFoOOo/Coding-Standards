@@ -72,6 +72,12 @@
 ## 3. Reliability & Security
 - **Exception Safety:** All external calls (DB, API, File) must be wrapped in error handling blocks that fail gracefully.
 - **Config Separation:** Never hardcode secrets or magic numbers. Use Constants classes or Environment Variables.
+- **Dual-Side Validation [STRICT]:** Every input constraint MUST be enforced on **both** the client and the server — never one side only.
+  - **Client-side validation is UX**, not security: it gives fast feedback and avoids needless round-trips, but it can be bypassed entirely (a direct HTTP call, a disabled-JS client, a crafted request, a stale frontend) and therefore **guarantees nothing**.
+  - **Server-side validation is the security boundary** and is **mandatory for every endpoint**: the backend MUST NOT trust that a request arrived through the app. It independently validates shape, type, range, allowed values (enum/slug patterns), required fields, and authorization, and rejects violations with a typed error (`ProblemDetails` / `4xx`) — *before* any business logic or persistence runs.
+  - This applies to **every** user-influenced value: request bodies, **query parameters**, route values, and headers. Route-level constraints (e.g. a `{id:guid}` segment) count as server-side validation for that value.
+  - Keep the two sides **consistent**: the same rule (e.g. an allowed-value set or a regex) should be expressed on each side so the client never accepts what the server will reject, and vice-versa. When practical, source the rule from one shared definition.
+  - Stack specifics live in the stack rules (`stack-dotnet-core.md §8` server validation; `stack-angular.md` reactive-form validation) but the **both-sides mandate is global and overrides any single-side shortcut**.
 - **Testing:** Unit tests are mandatory for all business logic, covering Happy Path, Edge Cases, and Null Inputs.
 
 ## 4. Operational Protocols

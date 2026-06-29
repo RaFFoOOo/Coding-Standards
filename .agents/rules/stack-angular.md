@@ -26,6 +26,7 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Complex components (Tables, Forms) must accept a `Config` object (e.g., `TableColumnDefinition[]`) rather than hardcoded HTML structures.
 - **Reactive Forms — `FormArray` Hierarchy:**
   - A `formArrayName` directive MUST be present on the parent container element before any `[formGroupName]="index"` children can resolve their controls. Angular reactive forms fail silently without it — the error `Cannot find control with path: 'N -> fieldName'` indicates a missing `formArrayName` ancestor.
+- **Client-side validation is UX, not security [STRICT]:** Form/`Validators` checks exist for fast feedback only — the server re-validates everything and is the real boundary (`AGENTS.md §3 Dual-Side Validation`). Mirror each server constraint (allowed values, patterns, required, range) in the form so the client never submits what the backend will reject, but **never** treat a client check as sufficient, and never ship a constraint that exists only on the client.
 - **Performance:**
   - **Change Detection:** Use `ChangeDetectionStrategy.OnPush` by default for all components to maximize rendering efficiency.
   - **Parallel Loading:** When a page needs multiple data sources, use `forkJoin` (RxJS) to load them in parallel. Never chain independent subscriptions (Waterfall effect).
@@ -100,6 +101,7 @@ description: Frontend stack rules for Angular / TypeScript projects
     - *Benefit:* Avoids clashing/redundant media queries in feature-level SCSS files and maintains a DRY codebase.
     - **[STRICT] Token Scope Awareness:** Hero/landing-page tokens (e.g., `--section-title-size: 3.5rem`) are sized for splash contexts. Inner pages (admin panels, account pages, detail views) MUST define their own smaller heading sizes locally — never reuse hero tokens for inner-page typography.
   - Never use `!important`. Fix the specificity hierarchy instead.
+  - **[STRICT] Shared SCSS class ⇒ `@use` its partial:** When a component template applies a class defined in a shared `src/styles/_*.scss` partial (e.g. a chip or bar class), that component's own `.scss` MUST `@use` the partial. View encapsulation only emits a partial's rules into a component's scoped CSS if the component imports it — otherwise the class is silently unstyled (the element renders in normal flow). Tell-tale: the styled element is correct on some surfaces but not others (the ones missing the `@use`). Related: never put a multi-value **shorthand** custom property (e.g. `--section-padding: 2rem 3rem 3rem`) into a single-value property (`top`, `right`, …) — the declaration is dropped silently; use single-value tokens. Verify positioning by the **computed style**, not the authored rule.
   - **[STRICT] Component Style Budget:** Angular enforces a per-component CSS budget (`anyComponentStyle`). Before adding styles to any component SCSS file or its partials loaded via `@use`, assess the cumulative size.
     - **Shared visual styles** (colors, transitions, borders, typography) that apply to a base element across multiple partials (e.g., grid, list) MUST be defined once in the root component SCSS file. Partials must contain layout-only overrides (sizing, spacing, flex/grid context).
     - **Never duplicate** a style block across two or more partials loaded by the same component — duplication is the primary cause of budget breaches.
@@ -113,6 +115,11 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Empty-states use a single shared component (e.g. an `EmptyStateComponent` with `[icon]` + `[message]` inputs) — never re-roll a fresh `<div class="empty-state">` block per feature.
   - Recurring status / source badges use global SCSS classes defined once in a shared stylesheet (loaded via the root `styles` entry point) — never redefine the same badge styles in component SCSS.
   - **Why:** duplicating badge SCSS across components and hand-rolling empty-state blocks per feature is a maintenance trap — every copy drifts independently on a style change, and each duplicate counts against the per-component CSS budget.
+- **[STRICT] Filter / search / view bar — one shared component:**
+  - Every "list/collection" surface that offers filtering, sorting, free-text search, and/or a view toggle MUST use one shared, config-driven `FilterBarComponent` driven by a declarative config object. Bespoke per-page filter/search/view layouts are **forbidden** — the bar must look and behave identically on every page.
+  - **Model concerns separately:** *data* controls (filter facets + sort — they change *which* records show or *in what order*) are config facets (single-select chip dropdowns); the *presentation* view toggle is its **own** typed slot, rendered set-apart. Never fold view into the facet array or branch on `key === 'view'` (data-driven-state smell, `AGENTS.md §2`). Search is an optional slot.
+  - The bar is dumb (§2): it emits keyed `facetChange` / `viewChange` / `search`; the host owns state + URL sync and builds the config from its signals.
+  - **Why:** when multiple surfaces each grow their own filter row, the layout and the sticky/positioning SCSS drift; unifying onto one config-driven bar kills the drift and the duplication.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
@@ -206,3 +213,21 @@ description: Frontend stack rules for Angular / TypeScript projects
   - When a config value drives conditional behavior across multiple components (e.g., a `businessType`, `userRole`, or `featureFlag`), create a dedicated injectable service that exposes named boolean signals and config methods derived from that value.
   - Direct string comparisons against config values (e.g., `config.type === 'x'`) are **forbidden** in components and templates. Components consume named signals from the centralized service instead.
   - Config methods on the service (e.g., `getDatePickerConfig()`, `getFormValidators()`) return typed config objects — templates bind to their properties rather than containing inline conditional expressions.
+
+## 11. Select / Dropdown Option Labeling [STRICT]
+- **Never render a raw value as an option label.** Every `<select>` / dropdown option (and any user-facing enum) MUST display an **i18n lookup label** resolved per active language — the underlying value (`'grid'`, `'order'`, a status enum, …) is for the form control and persistence only and must never reach the user verbatim.
+- **Option shape:** model options as `{ value, labelKey }[]` and bind `<option [value]="opt.value">{{ opt.labelKey | translate }}</option>`. Do **not** bind `{{ opt }}` over a bare `string[]`.
+- **Consistency:** all selects in a form reuse the same control class as the sibling inputs (e.g. `.form-input`) so the field styling is uniform; do not introduce a parallel select style.
+
+## 12. Testing [STRICT]
+- **Targeted runs during development:** Never run the full test suite while iterating. Pass only the spec files (or directories) touched by the current change:
+  ```bash
+  npx vitest run src/app/path/to/changed/component/ src/app/path/to/other/spec.ts
+  ```
+  Full-suite `npx vitest run` (no filter) is reserved exclusively for the pre-PR QA gate. Running everything on every iteration wastes time and obscures which tests actually relate to the work in progress.
+- **JIT `input()` limitation:** In Vitest JIT mode, signal inputs declared with `input()` / `input.required()` cannot be set via `fixture.componentRef.setInput()` — Angular registers them only under AOT. Override the signal field directly on the instance:
+  ```typescript
+  (component as unknown as { myInput: WritableSignal<T> }).myInput = signal(value);
+  ```
+  AOT (production build) resolves `input()` normally; this workaround is test-only.
+- **`toObservable(signal)` sources flush via `ApplicationRef.tick()`, not `detectChanges()`:** a component-scoped controller that sources data from `toObservable(someSignal).pipe(switchMap(...))` emits **asynchronously** in JIT — reading a derived signal right after `createComponent` returns the `toSignal` `initialValue`, not the data. Do **not** reach for `fixture.detectChanges()` to flush: it renders the full template and mounts heavy child components whose providers a unit test doesn't supply (`NG0201`). Instead **test the controller directly** (provide it in a `TestBed`, `TestBed.inject(TheController)`, mock its deps) and flush its effects with `TestBed.inject(ApplicationRef).tick()` — render-free, so no child providers needed. Keep the *component* spec to the synchronous thin aliases/handlers.

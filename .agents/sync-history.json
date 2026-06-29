@@ -44,6 +44,15 @@
       "targetRepo": "Coding-Standards",
       "targetBranch": "chore/sync-standards-2026-06-10",
       "agent": "generic"
+    },
+    {
+      "date": "2026-06-29T06:36:47Z",
+      "direction": "PUSH",
+      "sourceRepo": "le-cementine",
+      "sourceBranch": "main",
+      "targetRepo": "Coding-Standards",
+      "targetBranch": "chore/sync-standards-2026-06-29",
+      "agent": "generic"
     }
   ]
 }
