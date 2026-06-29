@@ -37,6 +37,16 @@ description: Backend stack rules for ASP.NET Core / C# projects
   1.  **Standard Case:** Typical valid data.
   2.  **Boundary Case:** Min/Max values (e.g., empty strings, max int).
   3.  **Error Case:** Invalid inputs that should trigger specific exceptions.
+- **[STRICT] Targeted runs during development:** Never run the full integration-test suite while
+  iterating. Filter by the class or namespace under change:
+  ```bash
+  dotnet test --filter "FullyQualifiedName~SomeHandlerTests"
+  # or by namespace:
+  dotnet test --filter "FullyQualifiedName~<YourApp>.IntegrationTests.<Area>"
+  ```
+  Full-suite `dotnet test` (no filter) is reserved exclusively for the `/run-qa` gate before opening
+  a PR. Running everything on every iteration wastes significant time and masks which tests actually
+  relate to the work in progress.
 
 ## 5. Async Patterns
 - **Async All The Way:** Always use `async` and `await` for I/O bound operations. Never use `.Result` or `.Wait()` (prevents deadlocks).
