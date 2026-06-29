@@ -24,7 +24,7 @@ Execute each step sequentially for every Feature in the sprint.
    - **Sprint task** (part of a multi-task sprint with >3 files expected): use the Sprint/Task hierarchy (see `AGENTS.md §8`). The sprint branch (`sprint/<version>-<slug>`) must already exist; create a task branch from it: `git checkout sprint/<version>-<slug> && git pull && git checkout -b task/sprint-<version>/<id>-<brief>`
    - **Small/standalone work** (hotfix, chore, single-file, doc): sync `main` and branch directly: `git checkout main && git pull origin main && git checkout -b <bugfix|chore|refactor|docs>/<slug>`
 6. Read relevant skills: `.agents/skills/plan-sprint/SKILL.md`, `.agents/skills/run-qa/SKILL.md` (if exists).
-   **Skill path integrity check:** If any skill referenced in this file was recently renamed, run `grep -rn "<old-name>" .claude/skills/ CLAUDE.md` before proceeding to catch stale references.
+   **Skill path integrity check:** If any skill referenced in this file was recently renamed, run `grep -rn "<old-name>" .agents/skills/ CLAUDE.md` before proceeding to catch stale references.
 7. Read rules: the relevant `.agents/rules/stack-*.md` file for the current tech stack and `AGENTS.md` (user global rules).
 
 ## Implementation Loop (per task)
