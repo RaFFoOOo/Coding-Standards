@@ -66,14 +66,13 @@ Persist the detected profile into `<repo>/<syncRoot>/sync-state.json` under a `s
 | one-talent | `.agents/rules/` | `.claude/skills/` | folded | `.claude/` |
 
 #### Step 2b — Concept Registry
-Every rule/skill/workflow is resolved to a **shape-agnostic concept id**, independent of where each repo happens to store it:
+Every rule/skill/workflow/CI-template is resolved to a **shape-agnostic concept id**, independent of where each repo happens to store it:
 - `rule:<slug>` — filename stem of any file under a repo's `ruleRoot`.
 - `skill:<slug>` — folder name under `skillRoot` (real bodies only, never a shim).
 - `workflow:<slug>` — filename stem under `workflowRoot` (flat mode), or folder name under `skillRoot` classified as `workflow` in that repo's `reverseTaxonomy` (folded mode).
+- `github:<relative-path>` — **not** a directory scan like the other three. `.github/` mixes genuine reusable CI/CD templates with project-only data (tenant config, one-off smoke tests), so a wholesale scan would re-open exactly the leak this sprint's Hub Completeness work closed for rules/skills/workflows. Instead, each repo declares its own allowlist in `githubTemplates` (its `sync-state.json`, alongside `skipList`/`shapeProfile`): `["dependabot.yml", "workflows/ci-angular.yml", ...]`, relative to that repo's `.github/`. Only listed paths become concepts; everything else under `.github/` is invisible to this workflow — excluded by scope, not by `skipList`. `.github/` layout doesn't vary by agent shape (GitHub itself dictates it), so a `github:` concept's relative path is identical across every participant that declares it.
 
 Build one table: rows = concept id, columns = each participant, cell = the concept's literal path in that repo (empty if absent). This registry is the shared coordinate system every later diff/merge/fan-out step operates on — it replaces the old workflow's implicit assumption that "the same relative path" identifies the same file across repos, which the observed profiles above disprove (e.g. `rule:naming-azure-resources` lives at `.claude/rules/naming-azure-resources.md` in le-cementine but `.agents/rules/naming-azure-resources.md` in the hub).
-
-> **Sprint 2.0 status:** the steps below (originally written for the pairwise PUSH/PULL model) still speak of a single `Target`/`Source` and have not yet been generalized to N participants or wired to the Concept Registry above — that lands in tasks T2–T6 of `PLAN.md`. Until then, for a 2-participant run, treat the hub as `Target` and the other participant as `Source` to keep the remaining steps operable. Do not attempt a 3+-participant run before T2–T6 land.
 
 ### Step 3 — Load Local State
 For **every** participant (using its `syncRoot` from Step 2a):
@@ -132,7 +131,7 @@ For every concept id in the Concept Registry (Step 2b), look up its baseline ent
 |---|---|---|
 | **Unchanged** | a baseline exists, and every participant holding the concept matches it | Skip — no action |
 | **Single-repo change** | a baseline exists, and exactly one participant's current digest differs from it (including a deletion — concept present in baseline but missing now) | Fast-path: that participant's current version becomes the canonical candidate (today's PUSH behavior) |
-| **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub. A repo-local concept also requires a `DECISIONS.md` entry on the hub justifying the exclusion (Step 4c) |
+| **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub. For a `rule:`/`skill:`/`workflow:` concept, repo-local *also* requires a `DECISIONS.md` entry on the hub (Step 4c enforces this). A `github:` concept is the one exception: its opt-in `githubTemplates` allowlist (Step 2b) already *is* the "hasn't adopted this" signal, so repo-local needs no `DECISIONS.md` entry — Step 4c's coverage check doesn't re-scan `.github/` at all |
 | **New, converged** | **no baseline exists**, and 2+ participants already hold the concept with an **identical** current digest | Auto-adopt as canonical — every side already independently agrees, nothing to arbitrate |
 | **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (Step 4b) — never resolved automatically here |
 
@@ -183,8 +182,6 @@ After Step 4b lands merge results, verify the hub's tree is actually complete **
 3. **`skipList` check:** for every entry in the hub's own `skipList` (Step 3) that matches the literal path of a real concept in the registry, verify a matching `DECISIONS.md` justification exists. No match is a violation — the fix is either to promote the concept into the hub (remove the skip entry) or to record the missing decision, whichever the Tech Lead confirms. **The hub is never allowed to silently opt out of a standard.**
 4. **Report** every violation found as a table (concept id, current hub state, suggested fix) and **STOP** — do not proceed to Step 5 while any violation is open.
 
-> **T6 status:** Step 6a still needs to actually write the `mode: "SYNC"` ledger entry. Until it does, no baseline persists across runs, so every run is effectively first-sync — Steps 4/4b/4c/4d/5 are fully functional in that mode, they just won't get faster on repeat runs until T6 closes the loop.
-
 ### Step 4d — Agnostic Review Gate [MANDATORY]
 
 `git diff` on the hub's branch already shows exactly what Step 4b wrote — but a regex substitution pass (like the superseded `templateSanitization`, see below) only catches **token-level** leaks (class names, resource IDs, `Sprint N lesson` attributions), never prose. A sentence like *"Sprint 21 T7 churned ~15 commits…"* needs rewriting to cause-effect, which no substitution rule can do. So **before any fan-out begins**, grep the hub's own tree for residual project-signal patterns and present every hit for manual genericization — once, here, not once per target:
@@ -204,8 +201,6 @@ grep -rnE "Sprint [0-9]|DECISIONS?\.md|\blc-[a-z]|PR #[0-9]+|le-cementine|provid
 
 Steps 4b/4c/4d guarantee the hub's tree is complete and clean *before* this step starts. Combined with the locked hub-and-spoke topology (Step 1 — the hub is always one of the participants), this means **fan-out is always hub → each other participant, never participant → participant directly.** The old pairwise model's arbitrary Source/Target matrix collapses: **Steps 5c (Reverse Transformation) and 5e (Claude → Claude sibling) are removed** — both existed only to handle a non-hub Source, which can no longer occur. What's left is one shape-driven projection, run once per non-hub participant, plus a migration-cleanup step reworked below to read `shapeProfile` instead of the retired `TARGET_AGENT` variable.
 
-> **Known gap (T6):** `.github/` fan-out is intentionally left out of the path-resolution table below — the old wholesale `.github/` copy is being replaced with an explicit templated-file allowlist in T6, not carried forward as-is. Until T6 lands, `.github/` is not synced by this step at all.
-
 #### Step 5a — Shape-Driven Projection
 
 For each participant that is not the hub, project every concept from the hub's tree into that participant's own shape using its `shapeProfile` (Step 2a) — never a hardcoded Claude/Generic switch.
@@ -218,6 +213,7 @@ For each participant that is not the hub, project every concept from the hub's t
 | `skill:<slug>` | `<target.skillRoot><slug>/SKILL.md` |
 | `workflow:<slug>`, target `workflowMode = "flat"` | `<target.workflowRoot><slug>.md` |
 | `workflow:<slug>`, target `workflowMode = "folded"` | `<target.skillRoot><slug>/SKILL.md` — add `<slug>` to that target's own `reverseTaxonomy.workflows` if not already listed. **No need to ask the user**, unlike the old Step 5c: the hub's concept id (`workflow:` vs `skill:`) already carries the correct classification, so this is bookkeeping, not a decision. |
+| `github:<relative-path>` | `<target's .github/><relative-path>` — same relative path in every participant (`.github/` layout is GitHub-dictated, not agent-shape-dependent). Flows through the **same** Step 4 classification as every other concept type — no special-casing here: a target with no `githubTemplates` entry for this path was already asked the `new-single-source` adopt-vs-repo-local question back in Step 4, and a `repo-local` answer already excluded it via that target's own `skipList`. On adoption, also add the path to the target's `githubTemplates` allowlist so it's recognized as declared on future runs. |
 | `AGENTS.md` | `AGENTS.md` (copy as-is) |
 
 **Content substitutions** — apply only when the target's shape includes a `.claude/` root (`target.skillRoot` or `target.shimRoot` starts with `.claude/`); skip entirely for a target whose shape is already `.agents/`-rooted like the hub's, since no transformation is needed:
@@ -282,32 +278,32 @@ Proceed to Step 6.
 ### Step 6 — Finalization
 
 #### Step 6a — Update Sync History Ledger [MANDATORY]
-Before staging, append a new execution record to the **Sync History Ledger** in the Target repository.
+Before staging, append the **same** execution record to **every participant's own ledger** — not just the hub's. Step 3b's baseline lookup checks every participant's ledger for the most recent `mode: "SYNC"` entry (a future run might start from any of them), so if only one repo recorded it, the others would never find a baseline and every run would stay stuck in first-sync mode. This is also the step that finally makes T2's baseline mechanism real: until this entry is written, nothing persists between runs.
 
-- **Locate** (or create) the ledger file:
-  - Claude Code targets: `<Target_Repo>/.claude/sync-history.json`
-  - Gemini / Generic targets: `<Target_Repo>/.agents/sync-history.json`
-- **Append** a new entry to the `executions` array:
-  ```json
-  {
-    "date": "<current ISO 8601 UTC timestamp>",
-    "direction": "<PUSH or PULL>",
-    "sourceRepo": "<Source repository name>",
-    "sourceBranch": "<Source branch name at time of sync>",
-    "targetRepo": "<Target repository name>",
-    "targetBranch": "<Target branch name>",
-    "agent": "<TARGET_AGENT lowercase, e.g. claude-code, gemini>"
-  }
-  ```
-- If the file did not exist, create it with the `executions` array containing this single entry.
-- Include the ledger file in the staged changes.
+1. **Recompute `fileDigests`** for every concept in the Concept Registry (Step 2b), using each participant's content **as it now stands after Step 5's fan-out** — this becomes the baseline for the *next* run, so it must reflect the post-sync state, not the pre-merge digests from Step 3b.5.
+2. **Locate** (or create) each participant's ledger at `<repo>/<syncRoot>/sync-history.json` (per its own `shapeProfile`).
+3. **Append the identical entry** to every participant's ledger:
+   ```json
+   {
+     "mode": "SYNC",
+     "date": "<current ISO 8601 UTC timestamp>",
+     "participants": [
+       { "repo": "<repo name>", "path": "<absolute local path>", "branch": "<branch name for this run>" },
+       { "repo": "<repo name 2>", "path": "<absolute local path 2>", "branch": "<branch name for this run>" }
+     ],
+     "fileDigests": {
+       "<conceptId>": { "<repo name>": "<git blob hash>" }
+     }
+   }
+   ```
+4. If a participant's ledger file did not exist, create it with an `executions` array containing this single entry (matching the array name any pre-existing legacy ledger already used). **Never rewrite or remove** legacy (`direction: PUSH`/`PULL`) entries — this workflow only ever appends.
+5. Include each ledger file in *that participant's own* staged changes — it travels in the same PR as that participant's content changes, not a separate commit.
 
 #### Step 6b — Commit & Push
-- In the *Target* repository, stage all added and modified files (including the sync-state and sync-history files).
-- Commit with message:
-  - Gemini / Generic: `chore(standards): sync template updates`
-  - Claude Code: `chore(standards): sync template updates (claude-code)`
-- Push the branch and instruct the user to open a Pull Request in the *Target* repository to merge the updated standards.
+For **every** participant (hub included):
+- Stage all added and modified files in that participant's own repo (including its `sync-state.json` and `sync-history.json`).
+- Commit with a message reflecting that participant's own shape: `chore(standards): sync template updates` (Generic-shaped) or `chore(standards): sync template updates (claude-code)` (a shape whose `skillRoot`/`shimRoot` includes `.claude/`).
+- Push that participant's branch and instruct the user to open a Pull Request in **that** repository. A SYNC run with N participants produces **N independent PRs**, one per repo — never a single cross-repo commit, and never skipping the hub's own PR just because it's "the source."
 
 #### Step 6c — Self-maintaining template: reconcile `.claude/` shims [MANDATORY when target keeps both `.agents/` and `.claude/`]
 
