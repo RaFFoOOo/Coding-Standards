@@ -143,7 +143,7 @@ Ask the user: "Do you approve this classification? Respond 'yes' to proceed, or 
 
 ### Step 4b — N-Way Merge & Contradiction Arbitration
 
-Resolves every concept from Step 4 into one canonical version, written directly into the **hub's own tree** on its already-checked-out sync branch. Per the Sprint 2.0 staging decision, **the hub's branch is the staging area — there is no separate temp or scratch directory.** `git diff` on the hub's branch is the review surface, exactly like any other change in this workflow. This is also the mechanism that satisfies Hub Completeness (validated next, in Step 4c): after this step, the hub's tree holds a resolved version of every concept in the registry. Genericization is not repeated here per-concept — it stays in the existing agnostic review gate (Step 5f), wired into the fan-out sequence in T5.
+Resolves every concept from Step 4 into one canonical version, written directly into the **hub's own tree** on its already-checked-out sync branch. Per the Sprint 2.0 staging decision, **the hub's branch is the staging area — there is no separate temp or scratch directory.** `git diff` on the hub's branch is the review surface, exactly like any other change in this workflow. This is also the mechanism that satisfies Hub Completeness (validated next, in Step 4c): after this step, the hub's tree holds a resolved version of every concept in the registry. Genericization is not repeated here per-concept — it stays in the agnostic review gate (Step 4d), which runs once on the hub's tree right after this step.
 
 **Landing rule, by Step 4 classification:**
 
@@ -183,52 +183,59 @@ After Step 4b lands merge results, verify the hub's tree is actually complete **
 3. **`skipList` check:** for every entry in the hub's own `skipList` (Step 3) that matches the literal path of a real concept in the registry, verify a matching `DECISIONS.md` justification exists. No match is a violation — the fix is either to promote the concept into the hub (remove the skip entry) or to record the missing decision, whichever the Tech Lead confirms. **The hub is never allowed to silently opt out of a standard.**
 4. **Report** every violation found as a table (concept id, current hub state, suggested fix) and **STOP** — do not proceed to Step 5 while any violation is open.
 
-> **T5/T6 status:** shape-driven fan-out to non-hub participants (Step 5, generalized) and Step 6a actually writing the `mode: "SYNC"` ledger entry land next. Until T6 lands, no baseline can persist across runs, so every run is effectively first-sync — Steps 4/4b/4c above are fully functional in that mode, they just won't get faster on repeat runs until T6 closes the loop.
+> **T6 status:** Step 6a still needs to actually write the `mode: "SYNC"` ledger entry. Until it does, no baseline persists across runs, so every run is effectively first-sync — Steps 4/4b/4c/4d/5 are fully functional in that mode, they just won't get faster on repeat runs until T6 closes the loop.
 
-### Step 5 — Execution
+### Step 4d — Agnostic Review Gate [MANDATORY]
 
-#### Step 5a — Gemini / Generic Target
-For all `[ADD]` and `[MODIFY]` files, copy them from the *Source* repository into the exact corresponding relative path in the *Target* repository. Use `mkdir -p` where directories are missing.
+`git diff` on the hub's branch already shows exactly what Step 4b wrote — but a regex substitution pass (like the superseded `templateSanitization`, see below) only catches **token-level** leaks (class names, resource IDs, `Sprint N lesson` attributions), never prose. A sentence like *"Sprint 21 T7 churned ~15 commits…"* needs rewriting to cause-effect, which no substitution rule can do. So **before any fan-out begins**, grep the hub's own tree for residual project-signal patterns and present every hit for manual genericization — once, here, not once per target:
 
-Write the final, approved array of skipped relative paths to `<Target_Repo>/.agents/sync-state.json`.
+```bash
+grep -rnE "Sprint [0-9]|DECISIONS?\.md|\blc-[a-z]|PR #[0-9]+|le-cementine|provideByMode" \
+  <Hub>/AGENTS.md <Hub>/.agents/
+```
 
-#### Step 5b — Claude Code Target
+- Bare `Sprint N` prose attributions, **dated** `DECISIONS.md` citations (e.g. *"see DECISIONS.md (2026-05-22, …)"*), and project-specific class/file/service names that survive the regex pass MUST be hand-genericized (to cause-effect / generic placeholders) before fan-out. *(This is the lesson of PRs #20/#30, where exactly these slipped through verbatim and were cleaned by hand after merge.)*
+- **Not leaks — skip:** branch-naming examples that illustrate the convention (`sprint/<semver>-<slug>`); factual ledger state (`sync-history.json` `sourceRepo`/`sourceBranch`); `DECISIONS.md` referenced as the standard decision-log **convention**; and helper names used as explicit generic `e.g.` examples.
+- Record the outcome in every fan-out PR body: list the hand-fixed leaks, or note "agnostic review: clean".
 
-**Path Mapping (Source → Target):**
+**Why this replaces per-spoke `templateSanitization`:** the old pairwise model ran a spoke's own regex-substitution array (`templateSanitization` in its `sync-state.json`) whenever that spoke acted as Source. Under SYNC, the hub is *always* Source (see Step 5 below), and its tree is already verified clean right here, once, before any spoke ever sees it — so `templateSanitization` arrays are no longer consulted by this workflow. Existing arrays in spoke `sync-state.json` files are harmless to leave (inert for SYNC; still meaningful if a spoke's `sync-state.json` is ever consulted outside this workflow).
 
-| Source Path | Target Path |
+### Step 5 — Fan-Out from Hub
+
+Steps 4b/4c/4d guarantee the hub's tree is complete and clean *before* this step starts. Combined with the locked hub-and-spoke topology (Step 1 — the hub is always one of the participants), this means **fan-out is always hub → each other participant, never participant → participant directly.** The old pairwise model's arbitrary Source/Target matrix collapses: **Steps 5c (Reverse Transformation) and 5e (Claude → Claude sibling) are removed** — both existed only to handle a non-hub Source, which can no longer occur. What's left is one shape-driven projection, run once per non-hub participant, plus a migration-cleanup step reworked below to read `shapeProfile` instead of the retired `TARGET_AGENT` variable.
+
+> **Known gap (T6):** `.github/` fan-out is intentionally left out of the path-resolution table below — the old wholesale `.github/` copy is being replaced with an explicit templated-file allowlist in T6, not carried forward as-is. Until T6 lands, `.github/` is not synced by this step at all.
+
+#### Step 5a — Shape-Driven Projection
+
+For each participant that is not the hub, project every concept from the hub's tree into that participant's own shape using its `shapeProfile` (Step 2a) — never a hardcoded Claude/Generic switch.
+
+**Path resolution, by concept type** (`<target.X>` = that field from the target's own `shapeProfile`):
+
+| Concept | Target path |
 |---|---|
+| `rule:<slug>` | `<target.ruleRoot><slug>.md` |
+| `skill:<slug>` | `<target.skillRoot><slug>/SKILL.md` |
+| `workflow:<slug>`, target `workflowMode = "flat"` | `<target.workflowRoot><slug>.md` |
+| `workflow:<slug>`, target `workflowMode = "folded"` | `<target.skillRoot><slug>/SKILL.md` — add `<slug>` to that target's own `reverseTaxonomy.workflows` if not already listed. **No need to ask the user**, unlike the old Step 5c: the hub's concept id (`workflow:` vs `skill:`) already carries the correct classification, so this is bookkeeping, not a decision. |
 | `AGENTS.md` | `AGENTS.md` (copy as-is) |
-| `.agents/rules/*.md` | `.agents/rules/*.md` |
-| `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
-| `.agents/workflows/X.md` | `.claude/skills/X/SKILL.md` |
-| `.agents/sync-state.json` | `.claude/sync-state.json` |
-| `.agents/sync-history.json` | `.claude/sync-history.json` |
-| `.github/` | `.github/` (copy as-is) |
 
-**Content Substitutions** (apply to every copied `.md` file going into `.claude/`):
+**Content substitutions** — apply only when the target's shape includes a `.claude/` root (`target.skillRoot` or `target.shimRoot` starts with `.claude/`); skip entirely for a target whose shape is already `.agents/`-rooted like the hub's, since no transformation is needed:
 
 | Find | Replace |
 |---|---|
 | `.agents/skills/` | `.claude/skills/` |
-| `.agents/rules/` | `.agents/rules/` |
 | `.agents/workflows/` | `.claude/skills/` |
 | `generate_image` tool calls | Text wireframe instruction: *"Create a markdown wireframe describing the layout, component hierarchy, interactions, and color tokens for this UI task. Save as `mockup_[feature].md` artifact and embed it in `implementation_plan.md`."* |
 | `notify_user` tool calls | *"Output a message to the user asking for explicit approval. Wait for the user's response before proceeding."* |
 | `browser_subagent` tool calls | *"Use the `/test-browser` skill. Note: requires the Playwright MCP server configured in `.mcp.json` (`@playwright/mcp`). If not available, perform browser testing manually and document results."* |
 | `// turbo-all` | *(remove the line entirely)* |
 
-**Workflow-to-Skill Frontmatter Injection** (for each `.agents/workflows/X.md`):
-- If the workflow file already has YAML frontmatter: replace the `name` field with the filename stem `X` (kebab-case) and keep the `description`.
-- If no frontmatter exists: inject:
-  ```yaml
-  ---
-  name: X
-  description: [Extract the first sentence of the workflow's Description/Purpose section]
-  ---
-  ```
+**Workflow-to-Skill Frontmatter Injection** (workflow concepts landing in a `folded`-mode target):
+- If the source workflow file already has YAML frontmatter: replace `name` with the concept's `<slug>` (kebab-case), keep `description`.
+- If no frontmatter exists: inject `name`/`description` (description = first sentence of the workflow's purpose section).
 
-**Generate `CLAUDE.md` in target** (this file is always generated, never a raw copy):
+**`CLAUDE.md` generation** — only for a target whose shape includes `.claude/`; always generated, never copied. `CLAUDE.md` is project-specific operational state, and it was never a fan-out candidate to begin with: the Concept Registry (Step 2b) only ever scans `ruleRoot`/`skillRoot`/`workflowRoot`, so `CLAUDE.md` never enters it. Its skill table is **derived from the hub's Concept Registry** (one `/<slug>` row per `skill:`/`workflow:` concept), never a hardcoded list, so it cannot drift from what's actually being synced:
 ```markdown
 @AGENTS.md
 
@@ -239,122 +246,35 @@ Write the final, approved array of skipped relative paths to `<Target_Repo>/.age
 ### Skills Available
 | Command | Purpose |
 |---|---|
-| `/run-qa` | Pre-merge QA verification (mandatory gate) |
-| `/plan-sprint` | Break sprint into estimated tasks + mockup gate |
-| `/manage-artifacts` | Manage PLAN.md structure and artifact lifecycle |
-| `/run-feature` | Execute a full feature from PLAN.md to merged PR |
-| `/resolve-pr` | Resolve PR review comments |
-| `/sync-templates` | Sync standards to/from a target project repo |
-| `/test-browser` | Plan and execute browser tests |
-| `/deploy-azure` | Build for production and deploy to Azure |
-| `/todo-manager` | Manage TODO.md lifecycle (append, mark done, archive, promote to PLAN.md) |
+| `/<slug>` | <first sentence of that concept's description, for every skill:/workflow: concept in the hub's registry> |
 
 ### Plan Mode
 Claude Code enters plan mode for complex tasks. You (Tech Lead) review and approve the
 plan before any code is written. This enforces the Review Protocol in AGENTS.md §1.
 
 ### Stack Rules
-- Angular/TypeScript projects: `.agents/rules/stack-angular.md`
-- ASP.NET Core/C# projects: `.agents/rules/stack-dotnet-core.md`
+<one line per stack-*.md rule concept present in the hub's registry>
 
 ### Remote Execution
 All rules and skills are version-controlled in `.claude/` and CLAUDE.md.
 Remote/scheduled agents load context directly from this repository.
 ```
 
-Write the final skipList to `<Target_Repo>/.claude/sync-state.json`.
+Write the approved `skipList` to `<target.syncRoot>sync-state.json`, merged with (never overwriting) that target's own existing entries.
 
-#### Step 5c — Reverse Transformation (Claude Code Source → Gemini / Generic Target)
+#### Step 5b — Old Agent Configuration Cleanup
 
-When `SOURCE_AGENT = Claude Code` and `TARGET_AGENT = Gemini / Generic`, apply the inverse of Step 5b. Each item under `.claude/skills/<name>/SKILL.md` must be classified as either a **skill** (folder + `SKILL.md` filename) or a **workflow** (flat `<name>.md` file directly under `.agents/workflows/`). Frontmatter is preserved in both cases — modern Antigravity workflows carry the same `name:` / `description:` frontmatter as Claude skills.
+Before staging, check each target directly for a **stale, superseded** agent configuration left over from before it adopted its current `shapeProfile` (Step 2a) — e.g. its `skillRoot` resolves to `.claude/skills/` today, but a `.agents/skills/` tree from a prior Generic configuration is still sitting on disk. This is an independent filesystem check, not something Step 2a flags on its own (Step 2a only ever picks the one real-body skill root it finds; a leftover second one is exactly what this step exists to catch). Only one configuration may be active per participant.
 
-**Classification source — `reverseTaxonomy` in `<Source>/.claude/sync-state.json`:**
-
-```json
-{
-  "skipList": [],
-  "reverseTaxonomy": {
-    "workflows": ["deploy-azure", "pause-session", "recursive-review", "resolve-pr", "resolve-workflow", "resume-session", "run-feature", "sync-templates", "test-browser"],
-    "skills":    ["manage-artifacts", "plan-sprint", "run-qa", "todo-manager"]
-  }
-}
-```
-
-- Every directory under `<Source>/.claude/skills/` MUST appear in exactly one of the two arrays.
-- If `reverseTaxonomy` is missing, or a skill is unlisted, **ask the user** for each unclassified skill and persist the answer back into the source `sync-state.json` (separate atomic commit, ahead of the sync).
-
-**Path Mapping (Source → Target):**
-
-| Source Path | Target Path |
-|---|---|
-| `AGENTS.md` | `AGENTS.md` (copy as-is) |
-| `CLAUDE.md` | (NOT pushed — agent-specific generated artifact) |
-| `.agents/rules/*.md` | `.agents/rules/*.md` |
-| `.claude/skills/<name>/SKILL.md` (classified as `skill`) | `.agents/skills/<name>/SKILL.md` |
-| `.claude/skills/<name>/SKILL.md` (classified as `workflow`) | `.agents/workflows/<name>.md` |
-| `.claude/sync-state.json` | `.agents/sync-state.json` (drop `reverseTaxonomy`, keep `skipList` only) |
-| `.claude/sync-history.json` | (NOT pushed — target maintains its own ledger per Step 6a) |
-| `.claude/projects/`, `.claude/settings.local.json`, `.claude/scheduled_tasks.lock` | (NEVER pushed — local-only / user-scoped) |
-| `.github/` | `.github/` (copy as-is) |
-
-**Content Substitutions** (apply to every copied `.md` file going into `.agents/`):
-
-| Find | Replace |
-|---|---|
-| `.agents/rules/` | `.agents/rules/` |
-| `.claude/skills/<name>` where `<name>` is in `reverseTaxonomy.skills` | `.agents/skills/<name>` |
-| `.claude/skills/<name>` where `<name>` is in `reverseTaxonomy.workflows` | `.agents/workflows/<name>` |
-| Claude-Code-specific MCP preamble: `> **Claude Code:** This skill references gh CLI commands ... mcp__github__...` (single line, may include the `mcp__github__list_pull_requests` example) | Generic preamble: `> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.` |
-
-**Frontmatter handling:** keep the YAML frontmatter (`name:`, `description:`) intact in both `skill` and `workflow` targets — the existing Antigravity workflows already use the same shape. No injection or stripping required.
-
-Write the final, approved skipList to `<Target_Repo>/.agents/sync-state.json` (strip `reverseTaxonomy` — it belongs to the Claude source only).
-
-#### Step 5e — Claude Code → Claude Code (sibling project sync)
-
-When `SOURCE_AGENT = TARGET_AGENT = Claude Code`, both repos use the `.claude/` layout, so **no path or taxonomy transformation applies** — files map to the identical relative path. But the copy is **not** verbatim:
-
-- **Apply `templateSanitization`** (from `<Source>/.claude/sync-state.json`, in array order — same procedure as Step 5c) to every `.md` file copied into the target's `.claude/`. Without this, the sibling inherits the source project's class names, resource IDs, and `Sprint N lesson` attributions — valid context in the source, noise in the target. If the source has no `templateSanitization`, warn the user that project-specific identifiers will be carried over verbatim and ask whether to proceed.
-- **Never copy `CLAUDE.md`** — it is project-specific operational state (active-sprint pointer, sprint history), not a shared standard. This matches the Step 4 exclusion; copying it would clobber the target's own pointer. The target keeps its existing `CLAUDE.md`.
-- **Preserve `reverseTaxonomy`** in the copied `sync-state.json` (the target is still a Claude repo and may later reverse-sync). Keep `skipList` as the approved final list.
-- Apply the **Claude-Code preamble handling** rules from Step 5c only if the target is destined to also serve non-Claude agents; otherwise leave `> **Claude Code:**` notes intact.
-
-#### Step 5f — Agnostic Review Gate [MANDATORY when the Target is a shared template / agnostic source of truth]
-
-`templateSanitization` (regex find/replace) catches **token-level** leaks (class names, resource IDs, `Sprint N lesson` attributions) but **cannot restructure prose** — a sentence like *"Sprint 21 T7 churned ~15 commits…"* needs rewriting to cause-effect, which no substitution rule can do. So after the substitution pass and **before staging**, grep the synced output for residual project-signal patterns and present every hit to the user for manual genericization:
-
-```bash
-grep -rnE "Sprint [0-9]|DECISIONS?\.md|\blc-[a-z]|PR #[0-9]+|le-cementine|provideByMode" \
-  <Target>/AGENTS.md <Target>/.agents/
-```
-
-- Bare `Sprint N` prose attributions, **dated** `DECISIONS.md` citations (e.g. *"see DECISIONS.md (2026-05-22, …)"*), and project-specific class/file/service names that survive the regex pass MUST be hand-genericized (to cause-effect / generic placeholders) before the sync PR is opened. *(This is the lesson of PRs #20/#30, where exactly these slipped through verbatim and were cleaned by hand after merge.)*
-- **Not leaks — skip:** branch-naming examples that illustrate the convention (`sprint/<semver>-<slug>`); factual ledger state (`sync-history.json` `sourceRepo`/`sourceBranch`); `DECISIONS.md` referenced as the standard decision-log **convention** (the Decision Recording rule prescribes every project keep one); and helper names used as explicit generic `e.g.` examples.
-- Record the outcome in the sync PR body: list the hand-fixed leaks, or note "agnostic review: clean".
-
-### Step 5d — Old Agent Configuration Cleanup
-
-Before staging, remove the **previous** agent's configuration from the target to ensure only **one** agent configuration is active at a time.
-
-**If `TARGET_AGENT = Claude Code`** (new config is `.claude/`):
-- Check if `.agents/` exists in the target repo.
-- If it does, count its files and present to the user:
-  > "The following old Gemini/Generic configuration will be removed from `<Target>`:
-  > - `.agents/rules/` (N files)
-  > - `.agents/skills/` (N files)
-  > - `.agents/workflows/` (N files)
-  > - `.agents/sync-state.json`
-  >
-  > Proceed with cleanup? (yes/no)"
-- On approval: `rm -rf <Target_Repo>/.agents/`
+**Migrating to a Claude-native shape:**
+- Check if a stale `.agents/skills/` and `.agents/workflows/` tree exists (an agnostic `.agents/rules/` may legitimately remain — some shapes, like one-talent's, keep rules there permanently; this cleanup only targets the superseded skill/workflow layer).
+- If found, present the file counts to the user and ask for approval before `rm -rf`.
 - **`AGENTS.md` is always kept** — it is the cross-agent global standard, not agent-specific.
-- If `.agents/` is not found: skip silently.
+- If nothing stale is found: skip silently.
 
-**If `TARGET_AGENT = Gemini / Generic`** (new config is `.agents/`):
-- Check if `.claude/` or `CLAUDE.md` exist in the target repo.
-- If they do, present to the user for approval, then:
-  - `rm -rf <Target_Repo>/.claude/`
-  - `rm -f <Target_Repo>/CLAUDE.md`
+**Migrating to a Generic shape:**
+- Check if `.claude/` or `CLAUDE.md` exist.
+- If they do, present to the user for approval, then `rm -rf` the `.claude/` skills tree and `rm -f CLAUDE.md`.
 - If neither is found: skip silently.
 
 Proceed to Step 6.
@@ -391,7 +311,7 @@ Before staging, append a new execution record to the **Sync History Ledger** in 
 
 #### Step 6c — Self-maintaining template: reconcile `.claude/` shims [MANDATORY when target keeps both `.agents/` and `.claude/`]
 
-The master template repo is a hybrid: `.agents/` is its canonical source **and** it ships its own `.claude/` shims + `CLAUDE.md` so it is natively usable in Claude Code. A Generic/reverse sync (Step 5c) writes only to `.agents/`, so any workflow/skill it **adds or removes** would otherwise leave the local `.claude/` layer stale — the defect that orphaned `recursive-review`, `pause-session`, `resume-session`, and `resolve-workflow` after the #18/#20 syncs.
+The master template repo is a hybrid: `.agents/` is its canonical source **and** it ships its own `.claude/` shims + `CLAUDE.md` so it is natively usable in Claude Code. Step 4b's N-way merge writes only to `.agents/` (that's the hub's `shapeProfile`), so any workflow/skill it **adds or removes** would otherwise leave the local `.claude/` shim layer stale — the same defect that orphaned `recursive-review`, `pause-session`, `resume-session`, and `resolve-workflow` after the pre-SYNC #18/#20 syncs (back when this same drift was caused by the old reverse-transformation path instead).
 
 When the target keeps both trees, after Step 5 reconcile them:
 - For every `.agents/skills/<n>/SKILL.md` and `.agents/workflows/<n>.md` with **no** matching `.claude/skills/<n>/SKILL.md`, generate the shim (copy the source `name:`/`description:` frontmatter; body = `Read the full ... instructions from \`.agents/...\` and execute them.`) and add a row to the `CLAUDE.md` skill table.
