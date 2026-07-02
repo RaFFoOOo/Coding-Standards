@@ -2,7 +2,7 @@
 
 ## 1. Current Sprint Context
 - **Goal:** Replace the directional PUSH/PULL `sync-templates` workflow with a true N-way SYNC that merges divergent standards content across 2+ sibling repos (Coding-Standards as hub, plus any project spokes such as le-cementine, one-talent) into one converged, agent-agnostic concept set, then projects it back into each repo's native shape.
-- **Status:** In Progress (T1, T2, T3 done)
+- **Status:** In Progress (T1, T2, T3, T4 done)
 
 ## 2. Feature Specification
 
@@ -15,7 +15,7 @@
   - [x] Single-repo divergence fast-paths (today's PUSH behavior); multi-repo divergence triggers an **LLM semantic merge** that deduplicates additive changes and raises genuine contradictions in a table for Tech Lead arbitration — never auto-resolved silently. (T3)
   - [ ] The merged canonical concept set passes the existing agnostic-review gate (Step 5f) exactly once, before fan-out to any participant.
   - [ ] Each participant receives its own branch + PR, projected into its native shape via the existing transform/sanitize/shim-reconciliation logic (Steps 5a/5b/5c/5e/6c), now driven by `shapeProfile` instead of a hardcoded Claude/Generic switch.
-  - [ ] **Hub Completeness invariant:** Coding-Standards' `skipList` may only contain entries provably non-standard (project-specific data/config); any concept present in a spoke but absent from the hub is flagged as a violation requiring promotion or explicit non-standard justification — never silently skipped. (Concrete instance already fixed standalone: `naming-azure-resources.md`, see `chore/promote-naming-azure-resources-rule`.)
+  - [x] **Hub Completeness invariant:** Coding-Standards' `skipList` may only contain entries provably non-standard (project-specific data/config); any concept present in a spoke but absent from the hub is flagged as a violation requiring promotion or explicit non-standard justification — never silently skipped. (Concrete instance already fixed standalone: `naming-azure-resources.md`, see `chore/promote-naming-azure-resources-rule`.) (T4 — enforced in Step 4c, justification requires a `DECISIONS.md` entry, not just a bare `skipList` line)
   - [ ] `.github/` sync scope is narrowed to templated CI workflow files; project-specific artifacts (e.g. `tenant-meta.json`, a project's own smoke-test workflow) are excluded by scope definition, not by skipList.
   - [ ] PUSH/PULL language is fully removed from Step 1 — the skill always collects 2+ repo paths and runs SYNC.
   - [ ] Existing `sync-history.json` entries (old `direction`/`sourceRepo`/`targetRepo` shape) remain valid, unmigrated, historical records — no backfill required.
@@ -29,7 +29,7 @@
   - [x] New step — **Concept Registry**: build the shape-agnostic id → per-repo-path mapping across all participants. (T1)
   - [x] New step — **Baseline-aware diff**: classify each concept (unchanged / single-repo-change / new-single-source / new-converged / multi-repo-conflict) using `fileDigests` from the last `sync-history.json` entry. (T2)
   - [x] New step (4b) — **N-way merge**: lands single-repo/new-converged/adopted-new-single-source content into the hub's own tree (the staging area, per the locked design — no separate temp directory); LLM semantic merge + contradiction table (N columns, not hardcoded to 2) + Tech Lead approval gate for multi-repo conflicts. (T3)
-  - [ ] New step — **Hub Completeness validation**: after merge, diff the canonical set against the hub's current `.agents/`; flag any gap.
+  - [x] New step (4c) — **Hub Completeness validation** [MANDATORY]: re-scans the hub's tree post-merge, flags any registry concept missing from it unless backed by an explicit global-retirement or a `DECISIONS.md`-justified repo-local exclusion; also validates the hub's own `skipList` has zero entries matching a real concept. Blocks Step 5 (fan-out) until clean. (T4)
   - [ ] Rework Steps 5a/5b/5c/5e path-mapping tables to read from `shapeProfile` instead of hardcoded literals.
   - [ ] Keep Step 5f (agnostic review) and 6c (shim reconciliation) as-is; 5f now runs once pre-fan-out instead of once per target.
   - [ ] Step 6a rewrite: log `participants[]` + `fileDigests{}` instead of single `sourceRepo`/`targetRepo`.
@@ -46,7 +46,7 @@
 - [x] T1 — Shape Profile Detection + Concept Registry (replaces binary agent detection). Scope note: absorbed old Step 1's peer-path collection and Step 1b's agent question too (inseparable from detection) — new Steps 1–2 replace old Steps 1/1b/2 with no renumbering of Steps 3+, which now carry a transitional banner marking them pending T2–T6.
 - [x] T2 — Baseline digest storage + baseline-aware diff classification. Scope note (found during review): baseline absence is per-concept, not a single global "first sync" mode — split the class set into `unchanged` / `single-repo-change` / `new-single-source` / `new-converged` / `multi-repo-conflict`. Reworked old Steps 3/3b/4 in place (same numbering); Step 6a still writes the legacy ledger shape, so no `SYNC`-mode baseline can exist until T6 lands — every run is effectively first-sync until then.
 - [x] T3 — N-way merge step (semantic merge + contradiction arbitration UX). Locked design: hub's own branch is the staging area (no scratch dir) — see conversation 2026-07-02. Scope note (found during review): a spoke's local deletion must never auto-delete from the hub; added a `single-repo-change — deletion` sub-case that asks global-retirement vs. repo-local-skip, mirroring the `new-single-source` ask. Also generalized the Contradiction Table to N columns (was hardcoded to 2).
-- [ ] T4 — Hub Completeness validation step
+- [x] T4 — Hub Completeness validation step. Found during review: the design text claimed to "reuse the existing Decision Recording convention" via `DECISIONS.md`, but Coding-Standards itself had no `DECISIONS.md` — created one (header/format only, matching le-cementine/one-talent's convention) and extended `AGENTS.md §1` Decision Recording to explicitly cover this new use case, so the claim in the workflow doc is actually true rather than aspirational.
 - [ ] T5 — Generalize fan-out (5a/5b/5c/5e) to `shapeProfile`-driven path mapping
 - [ ] T6 — Rework Step 6a for ledger logging (`participants[]` + `fileDigests{}`); narrow `.github/` scope
 - [ ] T7 — QA gate: dry-run SYNC against Coding-Standards ↔ one-talent (2-participant), verify no data loss vs. current PUSH result

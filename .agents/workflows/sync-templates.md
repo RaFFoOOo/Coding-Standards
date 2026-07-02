@@ -79,7 +79,7 @@ Build one table: rows = concept id, columns = each participant, cell = the conce
 For **every** participant (using its `syncRoot` from Step 2a):
 - Look for `<repo>/<syncRoot>/sync-state.json`.
 - If it exists, read `skipList` (paths/concepts this repo excludes) and any previously stored `shapeProfile`. If the stored profile disagrees with Step 2a's fresh detection, trust the fresh detection — the repo's layout changed since the last sync — and note the discrepancy for the user.
-- Hub `skipList` entries that resolve to a real concept in the Concept Registry (Step 2b) are a **Hub Completeness** flag, not a valid exclusion — full enforcement lands in T4; for now, surface them as a warning.
+- Hub `skipList` entries that resolve to a real concept in the Concept Registry (Step 2b) are a **Hub Completeness** flag, not a valid exclusion — enforced in Step 4c.
 
 ### Step 3b — Sync History Verification & Baseline Load [MANDATORY]
 
@@ -132,18 +132,18 @@ For every concept id in the Concept Registry (Step 2b), look up its baseline ent
 |---|---|---|
 | **Unchanged** | a baseline exists, and every participant holding the concept matches it | Skip — no action |
 | **Single-repo change** | a baseline exists, and exactly one participant's current digest differs from it (including a deletion — concept present in baseline but missing now) | Fast-path: that participant's current version becomes the canonical candidate (today's PUSH behavior) |
-| **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub (Hub Completeness, T4) |
+| **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub. A repo-local concept also requires a `DECISIONS.md` entry on the hub justifying the exclusion (Step 4c) |
 | **New, converged** | **no baseline exists**, and 2+ participants already hold the concept with an **identical** current digest | Auto-adopt as canonical — every side already independently agrees, nothing to arbitrate |
 | **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (Step 4b) — never resolved automatically here |
 
 Present one classification table (concept id, class, participants involved) spanning **all** participants — this replaces the old single-repo `[ADD]/[MODIFY]/[SKIP]` categorization, which only ever compared one Source against one Target.
 
 Ask the user: "Do you approve this classification? Respond 'yes' to proceed, or list concepts to move to a permanent `skipList` on specific repos."
-- A skip requested on the **hub** is rejected per the Hub Completeness invariant unless the user confirms the concept is provably non-standard project data (full enforcement lands in T4).
+- A skip requested on the **hub** is rejected per the Hub Completeness invariant unless the user confirms the concept is provably non-standard project data (enforced in Step 4c, which also requires the matching `DECISIONS.md` entry).
 
 ### Step 4b — N-Way Merge & Contradiction Arbitration
 
-Resolves every concept from Step 4 into one canonical version, written directly into the **hub's own tree** on its already-checked-out sync branch. Per the Sprint 2.0 staging decision, **the hub's branch is the staging area — there is no separate temp or scratch directory.** `git diff` on the hub's branch is the review surface, exactly like any other change in this workflow. This is also the mechanism that satisfies Hub Completeness (Step 4c, T4): after this step, the hub's tree holds a resolved version of every concept in the registry. Genericization is not repeated here per-concept — it stays in the existing agnostic review gate (Step 5f), wired into the fan-out sequence in T5.
+Resolves every concept from Step 4 into one canonical version, written directly into the **hub's own tree** on its already-checked-out sync branch. Per the Sprint 2.0 staging decision, **the hub's branch is the staging area — there is no separate temp or scratch directory.** `git diff` on the hub's branch is the review surface, exactly like any other change in this workflow. This is also the mechanism that satisfies Hub Completeness (validated next, in Step 4c): after this step, the hub's tree holds a resolved version of every concept in the registry. Genericization is not repeated here per-concept — it stays in the existing agnostic review gate (Step 5f), wired into the fan-out sequence in T5.
 
 **Landing rule, by Step 4 classification:**
 
@@ -171,7 +171,19 @@ Resolves every concept from Step 4 into one canonical version, written directly 
 
 **Never:** auto-resolve a genuine contradiction silently, or leave diff3-style conflict markers in a file — both are explicitly forbidden by the Sprint 2.0 design lock.
 
-> **T4/T5/T6 status:** Hub Completeness validation (Step 4c) and shape-driven fan-out to non-hub participants (Step 5, generalized) land next, along with wiring the agnostic review gate into that sequence and Step 6a actually writing the `mode: "SYNC"` ledger entry. Until then, this step lands resolved content into the hub's own tree but does not yet propagate it to other participants, validate hub completeness, or persist a baseline for the next run — every run remains effectively first-sync until T6.
+### Step 4c — Hub Completeness Validation [MANDATORY]
+
+After Step 4b lands merge results, verify the hub's tree is actually complete **before fan-out (Step 5) is allowed to proceed.** This turns the earlier one-off fix (`naming-azure-resources.md` — a real standard that sat `skipList`-excluded from the hub with no justification, see `chore/promote-naming-azure-resources-rule`) into a structural gate instead of something only caught by manual inspection.
+
+1. **Re-scan the hub's tree** (its `ruleRoot`/`skillRoot`/`workflowRoot`, per its own `shapeProfile`) to get its current concept set, post-Step-4b.
+2. **Coverage check:** every concept id present in the pre-merge Concept Registry (Step 2b) must now resolve to a real file in the hub's tree, with exactly two exceptions:
+   - **Explicit global retirement** — the concept was deleted everywhere via Step 4b's `single-repo-change — deletion` global-retirement branch. Legitimately absent by design.
+   - **Confirmed non-standard / repo-local**, *only* when backed by a corresponding entry in the hub's `DECISIONS.md` justifying why this concept will never be promoted (reusing the existing Decision Recording convention from `AGENTS.md §1` rather than inventing new schema for a rare case). This is the **only** way a real rule/skill/workflow concept may be permanently missing from the hub.
+   - Anything missing without one of these two justifications is a **Hub Completeness violation**: Step 4b's landing rule wasn't actually applied for that concept — go back and land it before proceeding.
+3. **`skipList` check:** for every entry in the hub's own `skipList` (Step 3) that matches the literal path of a real concept in the registry, verify a matching `DECISIONS.md` justification exists. No match is a violation — the fix is either to promote the concept into the hub (remove the skip entry) or to record the missing decision, whichever the Tech Lead confirms. **The hub is never allowed to silently opt out of a standard.**
+4. **Report** every violation found as a table (concept id, current hub state, suggested fix) and **STOP** — do not proceed to Step 5 while any violation is open.
+
+> **T5/T6 status:** shape-driven fan-out to non-hub participants (Step 5, generalized) and Step 6a actually writing the `mode: "SYNC"` ledger entry land next. Until T6 lands, no baseline can persist across runs, so every run is effectively first-sync — Steps 4/4b/4c above are fully functional in that mode, they just won't get faster on repeat runs until T6 closes the loop.
 
 ### Step 5 — Execution
 
