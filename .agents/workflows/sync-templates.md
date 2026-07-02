@@ -1,51 +1,79 @@
 ---
 name: sync-templates
-description: Synchronize template artifacts (AGENTS.md, .agents/, .github/) between the current repository and a remote repository (Push or Pull Model), with agent-aware path and tool transformation for the target project.
+description: Synchronize template artifacts (AGENTS.md, .agents/, .github/) across 2 or more local repositories via an N-way merge, with agent-aware path and tool transformation preserving each repo's native shape.
 ---
 
 # Template Synchronization Workflow
 
 > This workflow references `gh` CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
 
-This workflow automates the process of pulling or pushing standard configurations, rules, skills, and CI/CD pipelines between the **current** repository and another local repository (e.g., the `Coding-Standards` template repository). It maintains `.agents/sync-state.json` (or `.claude/sync-state.json` for Claude Code targets) skip lists in the target repository to remember explicit exclusions.
+This workflow merges standard configurations, rules, skills, and CI/CD pipelines across **2 or more** local repositories (the SYNC participants — e.g. `Coding-Standards` plus one or more project repos), converging every participant on the same set of concepts rather than letting one direction's content simply overwrite another's. It maintains a `sync-state.json` (location and shape vary per repo — see Step 2) holding each repo's skip list and detected shape profile.
 
-It also handles **bidirectional agent-aware transformation**: when the source and target use different agents (Claude Code ↔ Gemini / Generic), the workflow rewrites the directory layout (`.claude/` ↔ `.agents/`), promotes/demotes skills to/from workflows according to the source's `reverseTaxonomy`, and applies content substitutions for agent-specific tool references.
+It also handles **shape-aware transformation**: when participants use different agent layouts (Claude Code ↔ Gemini / Generic ↔ hybrid), the workflow rewrites directory layout (`.claude/` ↔ `.agents/`), promotes/demotes skills to/from workflows according to each repo's `reverseTaxonomy`, and applies content substitutions for agent-specific tool references — while never allowing a participant's own project-specific content to leak into another's copy (see the agnostic review gate).
 
 ## Prerequisites
-- This workflow must be executed from **the root directory of the current project repository** (verify with `git rev-parse --show-toplevel`).
+- This workflow can be invoked from any participant repo; verify each participant path with `git -C <path> rev-parse --show-toplevel`.
 - For the very first execution in a new project, this file (`.agents/workflows/sync-templates.md`) must be manually copied from the `Coding-Standards` repo into the target project first.
 
 ## Execution Sequence
 
-### Step 1 — Direction & Peer Path
-- Ask the user: "Do you want to **PULL** templates from another repository into the current one, or **PUSH** templates from the current repository into another?"
-- Define the **Target** repository (the repo receiving changes) and **Source** repository (the repo sending changes) based on the direction.
-- Ask the user for the absolute path of the peer repository.
-- Run `gh pr list` in the **Target** repository. If there are any open, unmerged PRs in the Target repository, **STOP and warn the user**.
-- If clear, checkout a new branch in the **Target** repository: `git checkout -b chore/sync-standards`
+### Step 1 — Collect Participants
+- Ask the user for **2 or more absolute local repo paths** to sync — the SYNC participants. If this workflow is invoked from Coding-Standards, it is always included as the **hub** (the repo expected to hold the complete canonical standards set — see the Hub Completeness check later in this workflow). If invoked from elsewhere and no participant is recognizably the master template (see Step 2's hub signature), ask the user which path is the hub.
+- For each participant path:
+  - Verify it is a git repository: `git -C <path> rev-parse --show-toplevel`.
+  - Run `gh pr list` in it. If there are any open, unmerged PRs touching standards files, **STOP and warn the user** for that repo.
+  - If clear, checkout a new branch in it: `git -C <path> checkout -b chore/sync-standards-<date>`.
 
-### Step 1b — Agent Detection
-Ask the user:
-> "Which coding agent does the **target** project use?
-> 1. **Claude Code** — generates `.claude/` structure + `CLAUDE.md`, replaces Antigravity-specific tools
-> 2. **Gemini / Generic** — copies `.agents/` as-is (existing behavior, no transformation)
-> 3. **Other** — specify the agent name; treat as Generic unless a known transformation exists"
+### Step 2 — Shape Profile Detection & Concept Registry
 
-Store the selection as `TARGET_AGENT`.
+This replaces the old binary "which agent does the target use" question. **The filesystem is authoritative — never ask.** Three distinct shapes are already known to exist across real projects (Coding-Standards, le-cementine, one-talent all differ), so detection must produce a full per-repo profile, not a two-way enum.
 
-### Step 2 — Identify Source & Target
+#### Step 2a — Shape Profile Detection
+For each participant, detect and record:
 
-- **Detect `SOURCE_AGENT` from the filesystem** (do not ask the user — the layout is authoritative):
-  - **Hybrid master template — check FIRST:** if the Source has **both** `.agents/` **and** a `.claude/` whose `skills/*/SKILL.md` are thin **shims** (body = `Read the full … from \`.agents/…\``), it is the hybrid master template (canonical content in `.agents/`, `.claude/` is only Claude-native shims). Set `SOURCE_AGENT = Gemini / Generic` and treat `.agents/` as canonical — do **not** misclassify it as Claude Code and copy the shims. Quick check (no output = all shims = hybrid): `grep -L "Read the full" <Source>/.claude/skills/*/SKILL.md`.
-  - Else if `<Source>/.claude/` exists (real skill bodies, no `.agents/`) → `SOURCE_AGENT = Claude Code`.
-  - Else if `<Source>/.agents/` exists → `SOURCE_AGENT = Gemini / Generic`.
-  - Else → STOP: the Source is not a sync-managed repository.
-- The Target does not need an existing agent configuration; it will be initialized by Step 5.
-- The four supported `(SOURCE_AGENT → TARGET_AGENT)` execution paths and their handlers:
-  - `Gemini → Gemini`: Step 5a (copy `.agents/` as-is).
-  - `Gemini → Claude Code`: Step 5b (forward transformation).
-  - `Claude Code → Gemini`: Step 5c (reverse transformation).
-  - `Claude Code → Claude Code`: Step 5e (copy the `.claude/` tree with sanitization, no path transform).
+| Field | How it's detected |
+|---|---|
+| `ruleRoot` | `.agents/rules/` if present and non-empty, else `.claude/rules/` |
+| `skillRoot` | `.agents/skills/` if it holds real (non-shim) `SKILL.md` bodies, else `.claude/skills/` if it holds real bodies |
+| `shimRoot` | the *other* skill dir, if it exists and holds only thin shims (body = `Read the full … from \`.agents/…\``) — quick check (no output = all shims): `grep -L "Read the full" <repo>/.claude/skills/*/SKILL.md` |
+| `workflowRoot` / `workflowMode` | `"flat"` with `workflowRoot = .agents/workflows/` if such files exist; otherwise `"folded"` (workflows live as `.claude/skills/<n>/SKILL.md`, classified via that repo's `reverseTaxonomy.workflows`) |
+| `syncRoot` | wherever `sync-state.json` / `sync-history.json` actually live today (`.claude/` or `.agents/`) |
+
+A repo with **all three** of `ruleRoot`, `skillRoot`, and `workflowRoot` pointing at a non-empty `.agents/` tree, plus a `shimRoot` of Claude shims, is the **hub signature** (currently only Coding-Standards matches it).
+
+Persist the detected profile into `<repo>/<syncRoot>/sync-state.json` under a `shapeProfile` key so future runs don't re-derive it from scratch — but always re-verify against the filesystem before trusting a stored value, since a repo's layout can change between syncs.
+
+**`shapeProfile` schema** (fields omitted when not applicable, e.g. no hybrid shim layer or no flat workflow dir):
+```json
+{
+  "shapeProfile": {
+    "ruleRoot": ".agents/rules/",
+    "skillRoot": ".agents/skills/",
+    "shimRoot": ".claude/skills/",
+    "workflowRoot": ".agents/workflows/",
+    "workflowMode": "flat",
+    "syncRoot": ".agents/"
+  }
+}
+```
+
+**Observed profiles (for reference, re-verify — do not assume these are still current):**
+
+| Repo | ruleRoot | skillRoot | workflowMode | syncRoot |
+|---|---|---|---|---|
+| Coding-Standards (hub) | `.agents/rules/` | `.agents/skills/` (+ `.claude/skills/` shims) | flat | `.agents/` |
+| le-cementine | `.claude/rules/` | `.claude/skills/` | folded | `.claude/` |
+| one-talent | `.agents/rules/` | `.claude/skills/` | folded | `.claude/` |
+
+#### Step 2b — Concept Registry
+Every rule/skill/workflow is resolved to a **shape-agnostic concept id**, independent of where each repo happens to store it:
+- `rule:<slug>` — filename stem of any file under a repo's `ruleRoot`.
+- `skill:<slug>` — folder name under `skillRoot` (real bodies only, never a shim).
+- `workflow:<slug>` — filename stem under `workflowRoot` (flat mode), or folder name under `skillRoot` classified as `workflow` in that repo's `reverseTaxonomy` (folded mode).
+
+Build one table: rows = concept id, columns = each participant, cell = the concept's literal path in that repo (empty if absent). This registry is the shared coordinate system every later diff/merge/fan-out step operates on — it replaces the old workflow's implicit assumption that "the same relative path" identifies the same file across repos, which the observed profiles above disprove (e.g. `rule:naming-azure-resources` lives at `.claude/rules/naming-azure-resources.md` in le-cementine but `.agents/rules/naming-azure-resources.md` in the hub).
+
+> **Sprint 2.0 status:** the steps below (originally written for the pairwise PUSH/PULL model) still speak of a single `Target`/`Source` and have not yet been generalized to N participants or wired to the Concept Registry above — that lands in tasks T2–T6 of `PLAN.md`. Until then, for a 2-participant run, treat the hub as `Target` and the other participant as `Source` to keep the remaining steps operable. Do not attempt a 3+-participant run before T2–T6 land.
 
 ### Step 3 — Load Local State
 - If `TARGET_AGENT = Claude Code`:

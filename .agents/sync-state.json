@@ -4,5 +4,13 @@
     ".claude/rules/naming-azure-resources.md",
     ".github/tenant-meta.json",
     ".github/workflows/smoke-dev.yml"
-  ]
+  ],
+  "shapeProfile": {
+    "ruleRoot": ".agents/rules/",
+    "skillRoot": ".agents/skills/",
+    "shimRoot": ".claude/skills/",
+    "workflowRoot": ".agents/workflows/",
+    "workflowMode": "flat",
+    "syncRoot": ".agents/"
+  }
 }
