@@ -76,58 +76,72 @@ Build one table: rows = concept id, columns = each participant, cell = the conce
 > **Sprint 2.0 status:** the steps below (originally written for the pairwise PUSH/PULL model) still speak of a single `Target`/`Source` and have not yet been generalized to N participants or wired to the Concept Registry above — that lands in tasks T2–T6 of `PLAN.md`. Until then, for a 2-participant run, treat the hub as `Target` and the other participant as `Source` to keep the remaining steps operable. Do not attempt a 3+-participant run before T2–T6 land.
 
 ### Step 3 — Load Local State
-- If `TARGET_AGENT = Claude Code`:
-  - Look for `<Target_Repo>/.claude/sync-state.json`.
-- Otherwise (Gemini / Generic):
-  - Look for `<Target_Repo>/.agents/sync-state.json`.
-- If it exists, read the `skipList` array. Files matching these paths must be completely ignored during the diff/sync phase.
+For **every** participant (using its `syncRoot` from Step 2a):
+- Look for `<repo>/<syncRoot>/sync-state.json`.
+- If it exists, read `skipList` (paths/concepts this repo excludes) and any previously stored `shapeProfile`. If the stored profile disagrees with Step 2a's fresh detection, trust the fresh detection — the repo's layout changed since the last sync — and note the discrepancy for the user.
+- Hub `skipList` entries that resolve to a real concept in the Concept Registry (Step 2b) are a **Hub Completeness** flag, not a valid exclusion — full enforcement lands in T4; for now, surface them as a warning.
 
-### Step 3b — Sync History Verification [MANDATORY]
+### Step 3b — Sync History Verification & Baseline Load [MANDATORY]
 
-Before proceeding with the diff, verify that this sync will not overwrite more recent changes by checking the **Sync History Ledger**.
+Before diffing, load the **merge baseline**: the content digest of every concept in every repo as of the last SYNC. This is what makes the diff in Step 4 a real three-way merge instead of a blind "current state wins" comparison — without it, a repo that intentionally deleted a sentence looks identical to a repo that never had it.
 
-1. **Locate the ledger** in the **Target** repository:
-   - Claude Code targets: `<Target_Repo>/.claude/sync-history.json`
-   - Gemini / Generic targets: `<Target_Repo>/.agents/sync-history.json`
+1. **Locate each participant's ledger** at `<repo>/<syncRoot>/sync-history.json`.
+2. **Find the most recent `mode: "SYNC"` entry** across all participants' ledgers (a participant can join a later sync than another, so check every ledger, not just the hub's — the entry with the latest `date` wins as the baseline source).
+3. **If a SYNC-mode entry exists**, load its `fileDigests` map (`{ conceptId: { repoName: <git blob hash> } }`) as the baseline for Step 4.
+   - **Staleness check:** if any participant's ledger records a `SYNC` entry **newer** than the one just selected as baseline, STOP and warn the user — a more recent sync happened that this run doesn't know about; re-run against that repo's latest branch first.
+4. **If only legacy (`direction: PUSH`/`PULL`) entries exist, or no ledger exists at all:** there is no usable baseline anywhere (legacy entries carry no `fileDigests`) — every concept enters Step 4 with an empty baseline. Warn the user this first SYNC will surface more concepts for review than steady-state runs will, precisely because there's nothing to diff against yet. Note that baseline absence is evaluated **per concept**, not just globally: even with a valid ledger, a concept added independently by two repos since the last recorded sync has no baseline entry of its own — Step 4's classification handles that the same way as a fully first-sync repo, it is not a separate mode.
+5. **Compute each current digest** via `git hash-object <resolved-path>` (git's own blob hash — no external hashing tool needed) for every concept × participant cell in the registry that has a path. Absence of a key means the repo doesn't have that concept; never store an empty-string digest for "missing."
 
-2. **If the ledger exists**, read the `executions` array and find the **most recent entry** (last element).
-   - Compare the `sourceBranch` of the last entry against the **current** Source branch (`git rev-parse --abbrev-ref HEAD` in the Source repo).
-   - Compare the `targetBranch` of the last entry against the **current** Target branch being created/used.
-   - **Staleness Check:** If the last sync `date` is **more recent** than the latest commit date on the Source's current branch (`git log -1 --format=%aI`), the Source may contain stale content. **STOP** and warn the user:
-     > "The target was last synced on `<date>` from `<sourceRepo>@<sourceBranch>`, but the source branch's latest commit is older than that sync. This means the target may already have newer standards. Proceeding could overwrite more recent changes. Continue anyway? (yes/no)"
-   - If the user declines, abort the workflow.
-
-3. **If the ledger does not exist**, this is the first tracked sync — proceed normally.
-
-**Sync History Ledger schema** (`sync-history.json`):
+**`sync-history.json` entry schema — SYNC mode (new, written by this workflow going forward):**
 ```json
 {
-  "executions": [
-    {
-      "date": "2026-03-30T14:30:00Z",
-      "direction": "PUSH",
-      "sourceRepo": "Coding-Standards",
-      "sourceBranch": "main",
-      "targetRepo": "<your-project>",
-      "targetBranch": "chore/sync-standards",
-      "agent": "claude-code"
+  "mode": "SYNC",
+  "date": "2026-07-02T00:00:00Z",
+  "participants": [
+    { "repo": "Coding-Standards", "path": "/abs/path/Coding-Standards", "branch": "chore/sync-standards-2026-07-02" },
+    { "repo": "le-cementine", "path": "/abs/path/le-cementine", "branch": "chore/sync-standards-2026-07-02" }
+  ],
+  "fileDigests": {
+    "rule:naming-azure-resources": {
+      "Coding-Standards": "3f2504e...",
+      "le-cementine": "9e107d9..."
     }
-  ]
+  }
 }
 ```
 
-### Step 4 — Diff & Plan Review
-- Determine the effective source file set based on `SOURCE_AGENT`:
-  - **Gemini / Generic source**: `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.agents/workflows/`, `.agents/sync-state.json`, `.agents/sync-history.json`, `.github/`.
-  - **Claude Code source**: `AGENTS.md`, `.agents/rules/`, `.claude/skills/`, `.claude/sync-state.json`, `.github/`. **Never** include `CLAUDE.md` (agent-specific), `.claude/projects/`, `.claude/settings.local.json`, `.claude/scheduled_tasks.lock`, or `.claude/sync-history.json` — those are local-only or owned by the target's ledger (Step 6a).
-- For each source file, determine its **target path** using the matrix in Step 5b (forward) or Step 5c (reverse). When `SOURCE_AGENT = TARGET_AGENT`, the target path is the same relative path with no transformation.
-- Filter out any files matching the `skipList`.
-- Present a categorization to the user:
-  - `[ADD]`: File missing in Target repo.
-  - `[MODIFY]`: Target file differs from the Source.
-  - `[SKIP]`: Skipped due to `sync-state.json`.
-- Ask the user: "Do you approve this synchronization plan? Respond 'yes' to proceed, or list specific files to add to the `[SKIP]` list permanently."
-  - If new skips provided: update internal list, recalculate, repeat review.
+**Legacy entry schema (still valid, read-only — SYNC mode never writes this shape again):**
+```json
+{
+  "date": "2026-03-30T14:30:00Z",
+  "direction": "PUSH",
+  "sourceRepo": "Coding-Standards",
+  "sourceBranch": "main",
+  "targetRepo": "<your-project>",
+  "targetBranch": "chore/sync-standards",
+  "agent": "claude-code"
+}
+```
+Legacy entries have no `fileDigests` and cannot serve as a baseline — treat their presence the same as "no ledger" (first-sync mode), but still tell the user pre-SYNC history exists so they understand why this run needs a fuller review pass.
+
+### Step 4 — Baseline-Aware Diff & Classification
+
+For every concept id in the Concept Registry (Step 2b), look up its baseline entry (Step 3b) — which may be **absent** for that concept alone even in a run that otherwise has a valid ledger (see Step 3b.4) — and classify:
+
+| Class | Condition | Handling |
+|---|---|---|
+| **Unchanged** | a baseline exists, and every participant holding the concept matches it | Skip — no action |
+| **Single-repo change** | a baseline exists, and exactly one participant's current digest differs from it (including a deletion — concept present in baseline but missing now) | Fast-path: that participant's current version becomes the canonical candidate (today's PUSH behavior) |
+| **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub (Hub Completeness, T4) |
+| **New, converged** | **no baseline exists**, and 2+ participants already hold the concept with an **identical** current digest | Auto-adopt as canonical — every side already independently agrees, nothing to arbitrate |
+| **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (lands in T3) — never resolved automatically here |
+
+Present one classification table (concept id, class, participants involved) spanning **all** participants — this replaces the old single-repo `[ADD]/[MODIFY]/[SKIP]` categorization, which only ever compared one Source against one Target.
+
+Ask the user: "Do you approve this classification? Respond 'yes' to proceed, or list concepts to move to a permanent `skipList` on specific repos."
+- A skip requested on the **hub** is rejected per the Hub Completeness invariant unless the user confirms the concept is provably non-standard project data (full enforcement lands in T4).
+
+> **T3/T4/T5/T6 status:** N-way merge resolution for multi-repo conflicts, Hub Completeness enforcement, shape-driven fan-out, and — critically — actually **writing** the new `mode: "SYNC"` ledger entry (Step 6a still writes the legacy shape until T6) are not yet implemented; they land in the next tasks of this sprint (see `PLAN.md`). Until T6 lands, Step 3b will never find a `SYNC`-mode baseline in practice, so every concept classifies with an absent baseline. Until then, Step 4 only classifies; Step 5 below still executes the old pairwise copy logic and only correctly handles the **unchanged** and **single-repo-change** classes for a 2-participant run — **new-single-source**, **new-converged**, and **multi-repo-conflict** classifications are correctly identified but have no execution path yet.
 
 ### Step 5 — Execution
 
