@@ -134,14 +134,44 @@ For every concept id in the Concept Registry (Step 2b), look up its baseline ent
 | **Single-repo change** | a baseline exists, and exactly one participant's current digest differs from it (including a deletion — concept present in baseline but missing now) | Fast-path: that participant's current version becomes the canonical candidate (today's PUSH behavior) |
 | **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub (Hub Completeness, T4) |
 | **New, converged** | **no baseline exists**, and 2+ participants already hold the concept with an **identical** current digest | Auto-adopt as canonical — every side already independently agrees, nothing to arbitrate |
-| **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (lands in T3) — never resolved automatically here |
+| **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (Step 4b) — never resolved automatically here |
 
 Present one classification table (concept id, class, participants involved) spanning **all** participants — this replaces the old single-repo `[ADD]/[MODIFY]/[SKIP]` categorization, which only ever compared one Source against one Target.
 
 Ask the user: "Do you approve this classification? Respond 'yes' to proceed, or list concepts to move to a permanent `skipList` on specific repos."
 - A skip requested on the **hub** is rejected per the Hub Completeness invariant unless the user confirms the concept is provably non-standard project data (full enforcement lands in T4).
 
-> **T3/T4/T5/T6 status:** N-way merge resolution for multi-repo conflicts, Hub Completeness enforcement, shape-driven fan-out, and — critically — actually **writing** the new `mode: "SYNC"` ledger entry (Step 6a still writes the legacy shape until T6) are not yet implemented; they land in the next tasks of this sprint (see `PLAN.md`). Until T6 lands, Step 3b will never find a `SYNC`-mode baseline in practice, so every concept classifies with an absent baseline. Until then, Step 4 only classifies; Step 5 below still executes the old pairwise copy logic and only correctly handles the **unchanged** and **single-repo-change** classes for a 2-participant run — **new-single-source**, **new-converged**, and **multi-repo-conflict** classifications are correctly identified but have no execution path yet.
+### Step 4b — N-Way Merge & Contradiction Arbitration
+
+Resolves every concept from Step 4 into one canonical version, written directly into the **hub's own tree** on its already-checked-out sync branch. Per the Sprint 2.0 staging decision, **the hub's branch is the staging area — there is no separate temp or scratch directory.** `git diff` on the hub's branch is the review surface, exactly like any other change in this workflow. This is also the mechanism that satisfies Hub Completeness (Step 4c, T4): after this step, the hub's tree holds a resolved version of every concept in the registry. Genericization is not repeated here per-concept — it stays in the existing agnostic review gate (Step 5f), wired into the fan-out sequence in T5.
+
+**Landing rule, by Step 4 classification:**
+
+| Class | Action |
+|---|---|
+| `unchanged` | nothing to do |
+| `single-repo-change` — content edit | if the winning participant is not the hub, copy its content into the hub's tree at the concept's canonical path (per the hub's own `shapeProfile`); if the winner *is* the hub, it's already there |
+| `single-repo-change` — **deletion** (concept existed at baseline, now absent from that one participant) | **Never auto-delete from the hub.** Ask once, same pattern as `new-single-source`: is this an intentional retirement of the standard (delete from the hub's tree — it will then propagate as a deletion to every participant in fan-out, T5), or does the standard simply no longer apply to that one repo (add a `skipList` entry for the concept **on that repo only**; the hub and every other participant keep it unchanged) |
+| `new-converged` | write the (already-identical) agreed content into the hub's tree — no arbitration needed |
+| `new-single-source`, **adopted** branch only | if the adopted source is not the hub, copy its content in. (**Repo-local** answers never reach this table — Step 4 already recorded them as `skipList` entries on the other participants and they don't touch the hub.) |
+| `multi-repo-conflict` | run the N-way merge procedure below |
+
+**N-way merge procedure (`multi-repo-conflict` only):**
+1. Gather every participant's current content for the concept via the Concept Registry (Step 2b).
+2. **LLM semantic merge — never a mechanical line-based diff3.** Prose rule/skill docs cannot be safely merged line-by-line: it risks interleaving contradictory instructions or leaving literal `<<<<<<<` conflict markers in a SKILL.md. Read every variant and synthesize one version that unions every distinct instruction, deduplicates near-identical restatements, and preserves each variant's rationale where the rationales don't conflict.
+3. Distinguish **additive difference** (one variant simply has more content than another) from **genuine contradiction** (variants give incompatible instructions — e.g. "always X" vs. "never X", or assign different values to the same convention). Additive differences are unioned silently in step 2; only genuine contradictions require arbitration.
+4. For every genuine contradiction, add a row to the **Contradiction Table** — one column per participant that holds a differing version of that concept (2 columns for a 2-way conflict, N columns for an N-way one; do not hardcode a fixed "Repo A / Repo B" shape):
+
+| Concept | Contradiction | `<Repo 1>` says | `<Repo 2>` says | … `<Repo N>` says | Proposed resolution |
+|---|---|---|---|---|---|
+| `rule:<slug>` | one-line statement of what's actually incompatible | quote/paraphrase | quote/paraphrase | … | agent's suggested pick, clearly marked as a suggestion, not a decision |
+
+5. Present the full table to the Tech Lead **before writing the affected concepts** (non-conflicting concepts from the landing rule above may already be staged). Ask: "Approve the proposed resolutions, or specify per-row overrides?"
+6. On approval, write the final merged content into the hub's tree at the concept's canonical path.
+
+**Never:** auto-resolve a genuine contradiction silently, or leave diff3-style conflict markers in a file — both are explicitly forbidden by the Sprint 2.0 design lock.
+
+> **T4/T5/T6 status:** Hub Completeness validation (Step 4c) and shape-driven fan-out to non-hub participants (Step 5, generalized) land next, along with wiring the agnostic review gate into that sequence and Step 6a actually writing the `mode: "SYNC"` ledger entry. Until then, this step lands resolved content into the hub's own tree but does not yet propagate it to other participants, validate hub completeness, or persist a baseline for the next run — every run remains effectively first-sync until T6.
 
 ### Step 5 — Execution
 
