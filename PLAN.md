@@ -2,15 +2,15 @@
 
 ## 1. Current Sprint Context
 - **Goal:** Replace the directional PUSH/PULL `sync-templates` workflow with a true N-way SYNC that merges divergent standards content across 2+ sibling repos (Coding-Standards as hub, plus any project spokes such as le-cementine, one-talent) into one converged, agent-agnostic concept set, then projects it back into each repo's native shape.
-- **Status:** Planning (awaiting Tech Lead approval — no task branches opened yet)
+- **Status:** In Progress (T1 done)
 
 ## 2. Feature Specification
 
 #### Feature: N-Way Standards Sync
 - **User Story:** As the Tech Lead maintaining standards across multiple independent project repos, I want one sync operation that merges every repo's local improvements together — instead of a one-directional push/pull that only lets one repo's version win — so that no repo's contribution is silently lost or overwritten, while every repo keeps operating in its own agent shape (Claude Code `.claude/` vs Generic `.agents/`).
 - **Acceptance Criteria:**
-  - [ ] Given 2+ repo paths, the workflow auto-detects each repo's **shape profile** (rule root, skill root, workflow mode, sync-tracking root) instead of asking a binary Claude-Code/Generic question — this fixes the already-observed drift where le-cementine keeps rules under `.claude/rules/` but the current workflow assumes `.agents/rules/`.
-  - [ ] Every rule/skill/workflow is resolved through a shape-agnostic **concept id** (e.g. `rule:naming-azure-resources`, `skill:run-qa`), so the same standard can be compared across repos that store it at different paths.
+  - [x] Given 2+ repo paths, the workflow auto-detects each repo's **shape profile** (rule root, skill root, workflow mode, sync-tracking root) instead of asking a binary Claude-Code/Generic question — this fixes the already-observed drift where le-cementine keeps rules under `.claude/rules/` but the current workflow assumes `.agents/rules/`. (T1)
+  - [x] Every rule/skill/workflow is resolved through a shape-agnostic **concept id** (e.g. `rule:naming-azure-resources`, `skill:run-qa`), so the same standard can be compared across repos that store it at different paths. (T1)
   - [ ] Given content that diverged in 2+ repos since the last recorded sync, the workflow performs a **baseline-aware classification** (unchanged / single-repo change / multi-repo conflict) using digests persisted in `sync-history.json` from the prior run — not a blind "current state wins" diff.
   - [ ] Single-repo divergence fast-paths (today's PUSH behavior); multi-repo divergence triggers an **LLM semantic merge** that deduplicates additive changes and raises genuine contradictions in a table for Tech Lead arbitration — never auto-resolved silently.
   - [ ] The merged canonical concept set passes the existing agnostic-review gate (Step 5f) exactly once, before fan-out to any participant.
@@ -24,9 +24,9 @@
 *Must be approved before any task branch is opened.*
 
 - **Workflow Changes (`.agents/workflows/sync-templates.md`):**
-  - [ ] Step 1 rewrite: collect N repo paths (2+), no PUSH/PULL prompt.
-  - [ ] New step — **Shape Profile Detection**: auto-detect `ruleRoot`/`skillRoot`/`workflowMode`/`syncRoot` per repo from the filesystem, replacing the binary Claude Code / Gemini-Generic detection.
-  - [ ] New step — **Concept Registry**: build the shape-agnostic id → per-repo-path mapping across all participants.
+  - [x] Step 1 rewrite: collect N repo paths (2+), no PUSH/PULL prompt. (T1 — pulled forward from T6 since it's inseparable from shape detection; T6 now scopes to Step 6a ledger rework + `.github/` narrowing only)
+  - [x] New step — **Shape Profile Detection**: auto-detect `ruleRoot`/`skillRoot`/`workflowMode`/`syncRoot` per repo from the filesystem, replacing the binary Claude Code / Gemini-Generic detection. (T1)
+  - [x] New step — **Concept Registry**: build the shape-agnostic id → per-repo-path mapping across all participants. (T1)
   - [ ] New step — **Baseline-aware diff**: classify each concept (unchanged / single-repo / multi-repo-conflict) using `fileDigests` from the last `sync-history.json` entry.
   - [ ] New step — **N-way merge**: fast-path single-repo changes; LLM semantic merge + contradiction table + Tech Lead approval gate for multi-repo conflicts.
   - [ ] New step — **Hub Completeness validation**: after merge, diff the canonical set against the hub's current `.agents/`; flag any gap.
@@ -35,7 +35,7 @@
   - [ ] Step 6a rewrite: log `participants[]` + `fileDigests{}` instead of single `sourceRepo`/`targetRepo`.
   - [ ] Redefine `.github/` sync surface to explicit templated-file patterns, dropping wholesale-directory copy.
 - **Schema Changes:**
-  - [ ] `sync-state.json`: add optional `shapeProfile` object per repo (`ruleRoot`, `skillRoot`, `workflowMode`, `syncRoot`).
+  - [x] `sync-state.json`: add optional `shapeProfile` object per repo (`ruleRoot`, `skillRoot`, `workflowMode`, `syncRoot`). (T1 — landed in Coding-Standards' own file as the reference example)
   - [ ] `sync-history.json`: new entry shape for future runs — `mode: "SYNC"`, `participants: [{repo, path, branch}]`, `fileDigests: {conceptId: {repo: sha256}}`. Old entries untouched.
 - **Risks/Notes:**
   - Token cost is materially higher than the old copy-based sync (full semantic merge pass across N repos' rules/skills) — recommend running the merge/arbitration step on Opus, not Sonnet.
@@ -43,10 +43,10 @@
   - This is a meta-change to the tooling itself, not an app feature — "Backend/Frontend" labels above are adapted to "Workflow/Schema" per this repo's nature.
 
 ## 4. Task Progress
-- [ ] T1 — Shape Profile Detection + Concept Registry (replaces binary agent detection)
+- [x] T1 — Shape Profile Detection + Concept Registry (replaces binary agent detection). Scope note: absorbed old Step 1's peer-path collection and Step 1b's agent question too (inseparable from detection) — new Steps 1–2 replace old Steps 1/1b/2 with no renumbering of Steps 3+, which now carry a transitional banner marking them pending T2–T6.
 - [ ] T2 — Baseline digest storage + baseline-aware diff classification
 - [ ] T3 — N-way merge step (semantic merge + contradiction arbitration UX)
 - [ ] T4 — Hub Completeness validation step
 - [ ] T5 — Generalize fan-out (5a/5b/5c/5e) to `shapeProfile`-driven path mapping
-- [ ] T6 — Rework Step 1 / Step 6a for N-participant collection and ledger logging; narrow `.github/` scope
+- [ ] T6 — Rework Step 6a for ledger logging (`participants[]` + `fileDigests{}`); narrow `.github/` scope
 - [ ] T7 — QA gate: dry-run SYNC against Coding-Standards ↔ one-talent (2-participant), verify no data loss vs. current PUSH result
