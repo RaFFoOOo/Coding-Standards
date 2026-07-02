@@ -102,6 +102,7 @@
   - **Secrets** (deployment tokens, SAS tokens, credentials): Must adhere strictly to the schema `<operation>_<cloud>_<resource>_<variable_name>` where `operation` is `ci|cd`, `cloud` is `azure`, and `resource` is `sta|swa`. Non-applicable segments must be omitted.
   - **CI vs CD secret split [STRICT]:** When the same Azure resource (e.g., an SWA deployment token) is needed in both a CI workflow (PR/preview, repository-level secret) and a CD workflow (production, environment-scoped secret), register two separate secrets with the appropriate `CI_` / `CD_` prefix. Never share a single secret across both scopes. Document the split in `README.md`.
   - **Variables** (feature flags, configuration values): Use plain `UPPER_SNAKE_CASE` names without `CI_`/`CD_` prefix (e.g., `ENABLE_TENANT_SELECTOR`, `ENABLE_LOGIN_FEATURES`). The GitHub environment already provides scoping — different environments can hold different values for the same variable name.
+- **Azure Infrastructure Resources:** Delegated to `.agents/rules/naming-azure-resources.md` — the `{region}{env}{region-suffix}{app-prefix}{resource-type}{index}` scheme for provisioned Azure resources themselves (distinct from the CI/CD secret/variable naming above, which governs GitHub-side references to them).
 - **File Naming:** Delegated to stack-specific rules (e.g., `kebab-case` for Angular).
 
 ## 6. Documentation Policy

@@ -62,6 +62,16 @@
       "targetRepo": "Coding-Standards",
       "targetBranch": "chore/sync-standards-2026-06-29-2",
       "agent": "generic"
+    },
+    {
+      "date": "2026-07-02T00:00:00Z",
+      "direction": "PUSH",
+      "sourceRepo": "le-cementine",
+      "sourceBranch": "main",
+      "targetRepo": "Coding-Standards",
+      "targetBranch": "chore/promote-naming-azure-resources-rule",
+      "agent": "generic",
+      "note": "Hub Completeness remediation: naming-azure-resources.md was skipList-excluded and never promoted to .agents/rules/. Genericized (dropped le-cementine resource inventory + app-prefix) and added to the canonical set."
     }
   ]
 }
