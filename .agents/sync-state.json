@@ -1,9 +1,5 @@
 {
-  "skipList": [
-    ".claude/",
-    ".github/tenant-meta.json",
-    ".github/workflows/smoke-dev.yml"
-  ],
+  "skipList": [],
   "shapeProfile": {
     "ruleRoot": ".agents/rules/",
     "skillRoot": ".agents/skills/",
@@ -11,5 +7,21 @@
     "workflowRoot": ".agents/workflows/",
     "workflowMode": "flat",
     "syncRoot": ".agents/"
-  }
+  },
+  "githubTemplates": [
+    "dependabot.yml",
+    "workflows/ci-backend.yml",
+    "workflows/cd-angular-azure-static-web-apps.yml",
+    "workflows/cd-angular-azure-storage.yml",
+    "workflows/cd-backend-azure-functions.yml",
+    "workflows/ci-angular.yml",
+    "workflows/ci-preview-swa.yml",
+    "workflows/codeql.yml",
+    "workflows/shared-build-angular.yml",
+    "workflows/shared-build-dotnet.yml",
+    "workflows/smoke-frontend.yml",
+    "workflows/validate-archive.yml",
+    "actions/deploy-functions/action.yml",
+    "actions/deploy-swa/action.yml"
+  ]
 }
