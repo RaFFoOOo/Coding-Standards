@@ -1,0 +1,5 @@
+{
+  "env": {
+    "CLAUDE_AFK_TIMEOUT_MS": "2147483647"
+  }
+}
