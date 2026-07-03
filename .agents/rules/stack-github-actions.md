@@ -28,6 +28,12 @@ description: CI/CD workflow rules for GitHub Actions pipelines
       branches: ['feature/**']
   ```
 
+### Trigger Path Scoping [STRICT — action economy]
+- A workflow MUST scope its triggers with `on.<event>.paths` to the files it actually consumes — never let it fire on **every** PR/push when only an unrelated subtree changed. An unscoped workflow spins up a billed runner (and shows a red ❌ on failure) for changes it cannot possibly be affected by. *(Concrete failure this prevents: a `.claude/`-only standards-sync PR tripping a repo-hygiene guard that validates root `PLAN_*` artifacts it never touched.)*
+- **Scope to inputs — including a global-state guard's inputs.** Even a guard that validates whole-repo state (e.g. "no stray closed `PLAN_*.md` at root") has a finite input set: the artifact patterns it scans + its pointer files (`CLAUDE.md`/`AGENTS.md`) + its script + the workflow file itself. `paths:` is workflow-level, so list the **union** across all jobs. This still catches drift at introduction (the PR that adds the stray file matches the pattern) while no longer blocking unrelated PRs on ambient state.
+- **Always include the workflow's own file and its scripts** (`.github/workflows/<name>.yml`, `scripts/ci/**`) in `paths:`, so edits to the guard itself re-run it.
+- **Required-check gotcha [STRICT]:** a `paths:`-filtered check MUST NOT be marked a **required** status check as-is. When a PR doesn't match the paths the check never reports its context, so the required check hangs **pending forever** and blocks merge. If it must be required, keep the workflow unfiltered and move scoping to a **job-level `if:`** driven by a `dorny/paths-filter` (or equivalent) result — the job then still reports success when skipped — or add a companion always-runs job that reports the required context.
+
 ## 2. Permissions
 
 ### Workflow-level `permissions` for reusable workflow calls
