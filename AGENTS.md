@@ -52,7 +52,7 @@
   - Check `.agents/skills/` for applicable skills
   - Read and follow the relevant `SKILL.md` instructions
   - Key skills: `QUALITY_ASSURANCE` (before marking done), `ARTIFACT_MANAGER` (for PLAN.md updates), `SPRINT_MANAGER` (for new features)
-- **Decision Recording [MANDATORY]:** Any deviation from a previously-approved plan that introduces or removes a major dependency, library, or architectural pattern must produce a one-paragraph entry in `DECISIONS.md` in the same PR.
+- **Decision Recording [MANDATORY]:** Any deviation from a previously-approved plan that introduces or removes a major dependency, library, or architectural pattern must produce a one-paragraph entry in `DECISIONS.md` in the same PR. The same ledger is the required justification for a template hub's Hub Completeness gate (`sync-templates.md` Step 4c) whenever a real rule/skill/workflow standard is confirmed repo-local and permanently excluded from the hub's canonical set — a bare `skipList` entry is never sufficient on its own.
 
 ## 2. Code Quality & Structure
 - **Access Modifiers:**
