@@ -72,6 +72,161 @@
       "targetBranch": "chore/promote-naming-azure-resources-rule",
       "agent": "generic",
       "note": "Hub Completeness remediation: naming-azure-resources.md was skipList-excluded and never promoted to .agents/rules/. Genericized (dropped le-cementine resource inventory + app-prefix) and added to the canonical set."
+    },
+    {
+      "mode": "SYNC",
+      "date": "2026-07-03T12:38:30Z",
+      "participants": [
+        {
+          "repo": "Coding-Standards",
+          "path": "/home/raffoooo/Projects/Coding-Standards",
+          "branch": "task/sprint-2.0/7-real-nway-sync"
+        },
+        {
+          "repo": "le-cementine",
+          "path": "/home/raffoooo/Projects/le-cementine",
+          "branch": "chore/sync-standards-2026-07-03"
+        },
+        {
+          "repo": "one-talent",
+          "path": "/home/raffoooo/Projects/one-talent",
+          "branch": "chore/sync-standards-2026-07-03"
+        }
+      ],
+      "fileDigests": {
+        "rule:agent-workarounds": {
+          "Coding-Standards": "c8897bc7b158f3dd65bd500fe16667ebd910991a",
+          "le-cementine": "c8897bc7b158f3dd65bd500fe16667ebd910991a",
+          "one-talent": "c8897bc7b158f3dd65bd500fe16667ebd910991a"
+        },
+        "rule:naming-azure-resources": {
+          "Coding-Standards": "fb2d4d0d81e3a2eb131e50a07de793d0e6cbca8a",
+          "le-cementine": "f2cc9a462a5d556f8f4828f634e3706c1c8d6484",
+          "one-talent": "fb2d4d0d81e3a2eb131e50a07de793d0e6cbca8a"
+        },
+        "rule:stack-angular": {
+          "Coding-Standards": "a6fa1c224a11ca56bc13703322b1766c3c284197",
+          "le-cementine": "3f2eff3f8774876c96dbf13754098cd69a2136db",
+          "one-talent": "d03f021480593a45757232d9e93b78d25f8b1a72"
+        },
+        "rule:stack-dotnet-core": {
+          "Coding-Standards": "b91faebde5ce95d7b9a695ed06e2f2521acd8717",
+          "le-cementine": "e2b405a183ae928a5c348a5e3a1d15e02d9856b5",
+          "one-talent": "b91faebde5ce95d7b9a695ed06e2f2521acd8717"
+        },
+        "rule:stack-github-actions": {
+          "Coding-Standards": "f1fb90b4ebd614bb8ae8d1991cce9c34c561f0a9",
+          "le-cementine": "2e22eadbbf9ba30c989cf43fa18f92d39c416a0c",
+          "one-talent": "407d8334759c309e19a95f47778669ce4f9a8e8c"
+        },
+        "skill:manage-artifacts": {
+          "Coding-Standards": "4352f403bab2c82fbd02835654a291abe2774fba",
+          "le-cementine": "e048c6ba1f000aeeab795805f9dfb66954401b80",
+          "one-talent": "4352f403bab2c82fbd02835654a291abe2774fba"
+        },
+        "skill:plan-sprint": {
+          "Coding-Standards": "04bda4054ef48bd2a1d2061b719bdee3346909b9",
+          "le-cementine": "2107aad7dac6d6299105ae20cbb13ac9fbd7cf9c",
+          "one-talent": "04bda4054ef48bd2a1d2061b719bdee3346909b9"
+        },
+        "skill:run-qa": {
+          "Coding-Standards": "4ecc8ad80873e211e1139ccd9657abfd31a1f832",
+          "le-cementine": "edd2ca083d52c278c43ff42376a1441feb5148be",
+          "one-talent": "4ecc8ad80873e211e1139ccd9657abfd31a1f832"
+        },
+        "skill:todo-manager": {
+          "Coding-Standards": "97347cd17ea15002a040cda542defd5cba044aad",
+          "le-cementine": "97347cd17ea15002a040cda542defd5cba044aad",
+          "one-talent": "97347cd17ea15002a040cda542defd5cba044aad"
+        },
+        "workflow:deploy-azure": {
+          "Coding-Standards": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "le-cementine": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "one-talent": "2072e3f5571568769416250208eb2764fac0e6ba"
+        },
+        "workflow:pause-session": {
+          "Coding-Standards": "0c0f612238f97ec20f6ed85a6000d8d7cac4613f",
+          "le-cementine": "721bab35c0f5850fab621711294158e9fc01906e",
+          "one-talent": "0c0f612238f97ec20f6ed85a6000d8d7cac4613f"
+        },
+        "workflow:recursive-review": {
+          "Coding-Standards": "8115dcf61477b0c13a18a7e92ed27ca05b264bb3",
+          "le-cementine": "ba8b632df5f0d2b5879ec7169abd0d3b34ad0667",
+          "one-talent": "8115dcf61477b0c13a18a7e92ed27ca05b264bb3"
+        },
+        "workflow:resolve-pr": {
+          "Coding-Standards": "c0781a0e8e27771727ed465a156945f92dc3fd87",
+          "le-cementine": "a42669f2ae2fe80cd546c14a086cc41012b527a3",
+          "one-talent": "2cc057d4486fbfce1b2996f9253576a4b75df762"
+        },
+        "workflow:resolve-workflow": {
+          "Coding-Standards": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353",
+          "le-cementine": "16c1bc3101928a5ccdcf8a2d00460fb8c05b305d",
+          "one-talent": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353"
+        },
+        "workflow:resume-session": {
+          "Coding-Standards": "cac226e4bcadd7151586160b60416994e63dba86",
+          "le-cementine": "cac226e4bcadd7151586160b60416994e63dba86",
+          "one-talent": "cac226e4bcadd7151586160b60416994e63dba86"
+        },
+        "workflow:run-feature": {
+          "Coding-Standards": "60aed772aa79d749dd7387b56de9d56cb7f44d63",
+          "le-cementine": "39a9b0ddd6373852a712b1ecc31779a00da91d9c",
+          "one-talent": "9ccb2982b9708311d3107d25942c8b2040925dc3"
+        },
+        "workflow:sync-templates": {
+          "Coding-Standards": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "le-cementine": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "one-talent": "483bd5e62a81b097d6fad59722d2e29466bbfa3a"
+        },
+        "workflow:test-browser": {
+          "Coding-Standards": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "le-cementine": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "one-talent": "61f912016d549ba8b165eecc135891c3a87bc60d"
+        },
+        "github:dependabot.yml": {
+          "Coding-Standards": "7ba71a724b97ca62b48b337280139b4f3f9e7ac1"
+        },
+        "github:workflows/ci-backend.yml": {
+          "Coding-Standards": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a"
+        },
+        "github:workflows/cd-angular-azure-static-web-apps.yml": {
+          "Coding-Standards": "10f88a71f9c0e07da32c473dca88bd4efc4e5c47"
+        },
+        "github:workflows/cd-angular-azure-storage.yml": {
+          "Coding-Standards": "f01edfa65a0a65bc039c3bd467e039452ff7bcca"
+        },
+        "github:workflows/cd-backend-azure-functions.yml": {
+          "Coding-Standards": "3895e5b3f764b6a7eef41b459676343c68bb7d49"
+        },
+        "github:workflows/ci-angular.yml": {
+          "Coding-Standards": "6e206302e04381ba091cd92a9ed869ef33cb993f"
+        },
+        "github:workflows/ci-preview-swa.yml": {
+          "Coding-Standards": "a43270866a70a5ceb53df4b87867200afeaa3ba9"
+        },
+        "github:workflows/codeql.yml": {
+          "Coding-Standards": "e69f7dd28dca7fbed5a2fafe2342dcab4dedda04"
+        },
+        "github:workflows/shared-build-angular.yml": {
+          "Coding-Standards": "75b038da0fbcbeda88a4d5285b092a10702612fc"
+        },
+        "github:workflows/shared-build-dotnet.yml": {
+          "Coding-Standards": "5f1063cd0a9adc7e5946ffaba4cf3a5f7d263a6c"
+        },
+        "github:workflows/smoke-frontend.yml": {
+          "Coding-Standards": "d4fe2d654132add169741f4ae044700ba71000c5"
+        },
+        "github:workflows/validate-archive.yml": {
+          "Coding-Standards": "df75cbb4952360d8e300ea46c0796ed5a9ebc52f"
+        },
+        "github:actions/deploy-functions/action.yml": {
+          "Coding-Standards": "32d8ab01374f36647f539716e44dca33d26c0f2b"
+        },
+        "github:actions/deploy-swa/action.yml": {
+          "Coding-Standards": "5e7de4318bf7d7aec156c4ec3cd37a4a4226b313"
+        }
+      }
     }
   ]
 }

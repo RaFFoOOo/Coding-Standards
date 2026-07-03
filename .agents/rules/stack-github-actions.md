@@ -83,6 +83,12 @@ The identity used by the CD pipeline to deploy resources MUST be a dedicated **A
 ### Variables (feature flags, configuration) — no CI/CD prefix
 - Per `AGENTS.md §5`: environment-scoped variables use plain `UPPER_SNAKE_CASE` with no `CI_`/`CD_` prefix (the GitHub environment provides scoping). The `CI_`/`CD_` prefix applies **only** to secrets that need repository-vs-environment isolation.
 
+### `DISABLE_PIPELINES_FOR_TEMPLATE` — gate app pipelines on a scaffolded repo [STRICT]
+- Every app CI/CD workflow (build/test/deploy for the frontend + backend, the SWA preview, and the `Validate Artifacts` hygiene guards) is job-guarded with `if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'`. **CodeQL is intentionally *not* guarded** — security scanning should run even on an empty repo.
+- **When a repo is scaffolded from the standards template but has no app yet** (no webapp/backend directory, no `scripts/ci/*`), set the **repository variable** `DISABLE_PIPELINES_FOR_TEMPLATE=true` (Settings → Secrets and variables → Actions → Variables, or `gh variable set DISABLE_PIPELINES_FOR_TEMPLATE --body true`). Guarded jobs then **skip** (green), instead of failing on missing sources.
+- **Unset it (or set `false`) the moment the app lands** — i.e. in the first sprint PR that adds the buildable app — so build, test, deploy, and the hygiene guards activate. Leaving it `true` once there is real code to verify is a silent-coverage bug.
+- This flag gates *workflow jobs only*; **Dependabot does not honor it** — keep `dependabot.yml`'s `directory:` targets pointing at paths that actually exist, or its updaters fail independently.
+
 ## 4. Reusable Workflows (`workflow_call`)
 
 - Pass `secrets: inherit` from the caller to avoid re-listing every secret.
