@@ -1,5 +1,7 @@
 # PLAN — Sprint 2.0: N-Way Standards Sync Engine
 
+> **STATUS: CLOSED** — all tasks T1–T7 complete and merged to `main` (sprint→main #47, 2026-07-03). Archived.
+
 ## 1. Current Sprint Context
 - **Goal:** Replace the directional PUSH/PULL `sync-templates` workflow with a true N-way SYNC that merges divergent standards content across 2+ sibling repos (Coding-Standards as hub, plus any project spokes such as le-cementine, one-talent) into one converged, agent-agnostic concept set, then projects it back into each repo's native shape.
 - **Status:** Complete (T1–T7 done)
