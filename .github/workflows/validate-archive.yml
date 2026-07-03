@@ -12,11 +12,45 @@ name: Validate Artifacts
 # pushes to main. `branches: [main]` filters the TARGET branch per
 # stack-github-actions.md §1.
 
+# Path-scoped per stack-github-actions.md §1 (Trigger Path Scoping): fire only when a
+# file one of the guards actually reads changes — the union of all three guards' inputs
+# plus the scripts and this workflow itself. Unrelated PRs (e.g. a .claude/-only sync) no
+# longer spin a runner or show a false ❌. NOT a required check (path-filtered — see the rule).
 on:
   pull_request:
     branches: [main]
+    # Keep this list identical to the push paths below (GitHub Actions does not
+    # support YAML anchors, so the union is duplicated intentionally).
+    paths:
+      - 'PLAN_*.md'
+      - 'TEST_PLAN_*.md'
+      - 'EPIC_*.md'
+      - 'QA_REPORT_*.md'
+      - 'archive/**'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'README.md'
+      - '**/environment.production.ts'
+      - '**/TenantRegistry.cs'
+      - '**/tenants.json'
+      - 'scripts/ci/**'
+      - '.github/workflows/validate-archive.yml'
   push:
     branches: [main]
+    paths:
+      - 'PLAN_*.md'
+      - 'TEST_PLAN_*.md'
+      - 'EPIC_*.md'
+      - 'QA_REPORT_*.md'
+      - 'archive/**'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'README.md'
+      - '**/environment.production.ts'
+      - '**/TenantRegistry.cs'
+      - '**/tenants.json'
+      - 'scripts/ci/**'
+      - '.github/workflows/validate-archive.yml'
 
 permissions:
   contents: read
