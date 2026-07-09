@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Validate archive hygiene
         run: bash scripts/ci/validate-archive.sh
 
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Validate README service-mode docs
         run: bash scripts/ci/check-readme-modes.sh
 
@@ -82,6 +82,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Validate tenant container GUID single source (BE == FE)
         run: bash scripts/ci/check-tenant-guid-drift.sh

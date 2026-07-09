@@ -117,7 +117,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download Build Artifact
         uses: actions/download-artifact@v8

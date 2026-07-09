@@ -52,7 +52,7 @@ jobs:
     environment: development
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Deploy Preview to SWA
         id: deploy
