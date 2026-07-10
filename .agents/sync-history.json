@@ -227,6 +227,188 @@
           "Coding-Standards": "5e7de4318bf7d7aec156c4ec3cd37a4a4226b313"
         }
       }
+    },
+    {
+      "mode": "SYNC",
+      "date": "2026-07-10T09:14:06Z",
+      "participants": [
+        {
+          "repo": "Coding-Standards",
+          "path": "/home/raffoooo/Projects/Coding-Standards",
+          "branch": "chore/sync-standards-2026-07-10"
+        },
+        {
+          "repo": "le-cementine",
+          "path": "/home/raffoooo/Projects/le-cementine",
+          "branch": "chore/sync-standards-2026-07-10"
+        },
+        {
+          "repo": "one-talent",
+          "path": "/home/raffoooo/Projects/one-talent",
+          "branch": "chore/sync-standards-2026-07-10"
+        }
+      ],
+      "fileDigests": {
+        "github:actions/deploy-functions/action.yml": {
+          "Coding-Standards": "be27a40addeea3823fb6fe888724626ea22a8f17",
+          "le-cementine": "be27a40addeea3823fb6fe888724626ea22a8f17",
+          "one-talent": "be27a40addeea3823fb6fe888724626ea22a8f17"
+        },
+        "github:actions/deploy-swa/action.yml": {
+          "Coding-Standards": "8cfb1316cbb4c81214f81927f85447ffe5ac646e",
+          "le-cementine": "8cfb1316cbb4c81214f81927f85447ffe5ac646e",
+          "one-talent": "8cfb1316cbb4c81214f81927f85447ffe5ac646e"
+        },
+        "github:dependabot.yml": {
+          "Coding-Standards": "7ba71a724b97ca62b48b337280139b4f3f9e7ac1",
+          "le-cementine": "7ba71a724b97ca62b48b337280139b4f3f9e7ac1"
+        },
+        "github:workflows/cd-angular-azure-static-web-apps.yml": {
+          "Coding-Standards": "132ccafbb9c23a1b180ea79eaa85ba1f27f42ccd",
+          "le-cementine": "132ccafbb9c23a1b180ea79eaa85ba1f27f42ccd",
+          "one-talent": "132ccafbb9c23a1b180ea79eaa85ba1f27f42ccd"
+        },
+        "github:workflows/cd-angular-azure-storage.yml": {
+          "Coding-Standards": "fe9d658677eb3409851e2eb2f8ff5750d12104e0",
+          "le-cementine": "fe9d658677eb3409851e2eb2f8ff5750d12104e0",
+          "one-talent": "fe9d658677eb3409851e2eb2f8ff5750d12104e0"
+        },
+        "github:workflows/cd-backend-azure-functions.yml": {
+          "Coding-Standards": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0",
+          "le-cementine": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0",
+          "one-talent": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0"
+        },
+        "github:workflows/ci-angular.yml": {
+          "Coding-Standards": "6e206302e04381ba091cd92a9ed869ef33cb993f",
+          "le-cementine": "6e206302e04381ba091cd92a9ed869ef33cb993f",
+          "one-talent": "6e206302e04381ba091cd92a9ed869ef33cb993f"
+        },
+        "github:workflows/ci-backend.yml": {
+          "Coding-Standards": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a",
+          "le-cementine": "482f0434a3370d0ad76d85bf0ee949bd6b1d4f26",
+          "one-talent": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a"
+        },
+        "github:workflows/ci-preview-swa.yml": {
+          "Coding-Standards": "084cd54aff40b8da09cacf1571607e597933ac5b",
+          "le-cementine": "084cd54aff40b8da09cacf1571607e597933ac5b",
+          "one-talent": "084cd54aff40b8da09cacf1571607e597933ac5b"
+        },
+        "github:workflows/codeql.yml": {
+          "Coding-Standards": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e",
+          "le-cementine": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e",
+          "one-talent": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e"
+        },
+        "github:workflows/shared-build-angular.yml": {
+          "Coding-Standards": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3",
+          "le-cementine": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3",
+          "one-talent": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3"
+        },
+        "github:workflows/shared-build-dotnet.yml": {
+          "Coding-Standards": "15112e7443c55448151da635ee6aba7580edd255",
+          "le-cementine": "15112e7443c55448151da635ee6aba7580edd255",
+          "one-talent": "15112e7443c55448151da635ee6aba7580edd255"
+        },
+        "github:workflows/smoke-frontend.yml": {
+          "Coding-Standards": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1",
+          "le-cementine": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1",
+          "one-talent": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1"
+        },
+        "github:workflows/validate-archive.yml": {
+          "Coding-Standards": "21ed4e9841113d6410f22276e372fd3622052b69",
+          "le-cementine": "031411982b4612857f438b9233acd337a381684a",
+          "one-talent": "21ed4e9841113d6410f22276e372fd3622052b69"
+        },
+        "rule:agent-workarounds": {
+          "Coding-Standards": "c8897bc7b158f3dd65bd500fe16667ebd910991a",
+          "le-cementine": "c8897bc7b158f3dd65bd500fe16667ebd910991a",
+          "one-talent": "c8897bc7b158f3dd65bd500fe16667ebd910991a"
+        },
+        "rule:naming-azure-resources": {
+          "Coding-Standards": "fb2d4d0d81e3a2eb131e50a07de793d0e6cbca8a",
+          "le-cementine": "f2cc9a462a5d556f8f4828f634e3706c1c8d6484",
+          "one-talent": "fb2d4d0d81e3a2eb131e50a07de793d0e6cbca8a"
+        },
+        "rule:stack-angular": {
+          "Coding-Standards": "fe2fca7a69df1de3cb329d55f8ee64823b3fd34a",
+          "le-cementine": "d573b03469a9cfef56ebd06545ad9d14e6484cbb",
+          "one-talent": "faa0420d3ae1fc9596829f7723bfdc69b684fe55"
+        },
+        "rule:stack-dotnet-core": {
+          "Coding-Standards": "b91faebde5ce95d7b9a695ed06e2f2521acd8717",
+          "le-cementine": "e2b405a183ae928a5c348a5e3a1d15e02d9856b5",
+          "one-talent": "b91faebde5ce95d7b9a695ed06e2f2521acd8717"
+        },
+        "rule:stack-github-actions": {
+          "Coding-Standards": "16450d9cfba0979f8689c1359091a9dba7c41bfa",
+          "le-cementine": "fa1072bdbba61c9fc71d0ba8dc24013117b80784",
+          "one-talent": "16450d9cfba0979f8689c1359091a9dba7c41bfa"
+        },
+        "skill:manage-artifacts": {
+          "Coding-Standards": "4352f403bab2c82fbd02835654a291abe2774fba",
+          "le-cementine": "e048c6ba1f000aeeab795805f9dfb66954401b80",
+          "one-talent": "4352f403bab2c82fbd02835654a291abe2774fba"
+        },
+        "skill:plan-sprint": {
+          "Coding-Standards": "04bda4054ef48bd2a1d2061b719bdee3346909b9",
+          "le-cementine": "2107aad7dac6d6299105ae20cbb13ac9fbd7cf9c",
+          "one-talent": "04bda4054ef48bd2a1d2061b719bdee3346909b9"
+        },
+        "skill:run-qa": {
+          "Coding-Standards": "4ecc8ad80873e211e1139ccd9657abfd31a1f832",
+          "le-cementine": "edd2ca083d52c278c43ff42376a1441feb5148be",
+          "one-talent": "4ecc8ad80873e211e1139ccd9657abfd31a1f832"
+        },
+        "skill:todo-manager": {
+          "Coding-Standards": "97347cd17ea15002a040cda542defd5cba044aad",
+          "le-cementine": "97347cd17ea15002a040cda542defd5cba044aad",
+          "one-talent": "97347cd17ea15002a040cda542defd5cba044aad"
+        },
+        "workflow:deploy-azure": {
+          "Coding-Standards": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "le-cementine": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "one-talent": "2072e3f5571568769416250208eb2764fac0e6ba"
+        },
+        "workflow:pause-session": {
+          "Coding-Standards": "0c0f612238f97ec20f6ed85a6000d8d7cac4613f",
+          "le-cementine": "721bab35c0f5850fab621711294158e9fc01906e",
+          "one-talent": "0c0f612238f97ec20f6ed85a6000d8d7cac4613f"
+        },
+        "workflow:recursive-review": {
+          "Coding-Standards": "8115dcf61477b0c13a18a7e92ed27ca05b264bb3",
+          "le-cementine": "ba8b632df5f0d2b5879ec7169abd0d3b34ad0667",
+          "one-talent": "8115dcf61477b0c13a18a7e92ed27ca05b264bb3"
+        },
+        "workflow:resolve-pr": {
+          "Coding-Standards": "c0781a0e8e27771727ed465a156945f92dc3fd87",
+          "le-cementine": "a42669f2ae2fe80cd546c14a086cc41012b527a3",
+          "one-talent": "2cc057d4486fbfce1b2996f9253576a4b75df762"
+        },
+        "workflow:resolve-workflow": {
+          "Coding-Standards": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353",
+          "le-cementine": "16c1bc3101928a5ccdcf8a2d00460fb8c05b305d",
+          "one-talent": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353"
+        },
+        "workflow:resume-session": {
+          "Coding-Standards": "cac226e4bcadd7151586160b60416994e63dba86",
+          "le-cementine": "cac226e4bcadd7151586160b60416994e63dba86",
+          "one-talent": "cac226e4bcadd7151586160b60416994e63dba86"
+        },
+        "workflow:run-feature": {
+          "Coding-Standards": "60aed772aa79d749dd7387b56de9d56cb7f44d63",
+          "le-cementine": "39a9b0ddd6373852a712b1ecc31779a00da91d9c",
+          "one-talent": "9ccb2982b9708311d3107d25942c8b2040925dc3"
+        },
+        "workflow:sync-templates": {
+          "Coding-Standards": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "le-cementine": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "one-talent": "483bd5e62a81b097d6fad59722d2e29466bbfa3a"
+        },
+        "workflow:test-browser": {
+          "Coding-Standards": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "le-cementine": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "one-talent": "61f912016d549ba8b165eecc135891c3a87bc60d"
+        }
+      }
     }
   ]
 }

@@ -121,3 +121,19 @@ runs:
           --src-path publish.zip \
           --type zip \
           --async true
+
+    - name: Restart Function App
+      shell: bash
+      # `az resource invoke-action --action syncfunctiontriggers` (tried in a prior commit)
+      # completed successfully (empty {} response, no error) but did NOT fix a real, reproduced
+      # 404 on a brand-new HTTP route — ruling out "just needs a trigger resync". For the .NET
+      # isolated-worker model specifically, the function list is reported by the *worker process*
+      # to the host via a gRPC handshake at worker startup, not read directly from disk by the
+      # host — a host-side trigger sync doesn't necessarily make the worker re-announce its
+      # functions. An explicit restart forces the worker process to terminate and restart,
+      # redoing that handshake against the freshly-deployed assembly.
+      run: |
+        az functionapp restart \
+          --name "${{ inputs.function-app-name }}" \
+          --resource-group "${{ inputs.resource-group }}"
+        sleep 30

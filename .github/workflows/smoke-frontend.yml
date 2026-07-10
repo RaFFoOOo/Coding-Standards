@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run frontend smoke script
         run: bash scripts/smoke/frontend.sh "${{ inputs.swa-url }}" "${{ inputs.api-base-url }}"

@@ -1,23 +1,36 @@
 name: CI - Preview on Azure Static Web Apps
 
 on:
-  workflow_dispatch:
-  # Auto-deploy a preview whenever frontend (or this pipeline) changes on an active
-  # feature branch. Branch prefixes are mandated by stack-github-actions.md §1; `main`
-  # is intentionally excluded (it goes through cd-angular-azure-static-web-apps.yml).
+  # Cost-reduction policy (stack-github-actions.md §1 rev.4 — 2026-07-08): previews trigger
+  # automatically on push to `main` (path-filtered to Angular-relevant changes) or on demand via
+  # workflow_dispatch for any other branch. There is no preview backend slot, so every automatic
+  # preview builds fully-Mocked (environment.preview.ts) — a UX-only sandbox, never calling the
+  # real dev backend. Validating against the real dev backend is done via the `development`
+  # environment/config instead (local `ng serve` or a manual `build-config: production` dispatch),
+  # never this shared preview slot. The push trigger stays narrowly scoped to `main` + the paths
+  # below rather than every branch, since GitHub Actions minutes are a hard, exhaustible cap on
+  # this Free private repo. Dispatch from the GitHub Actions tab to preview a non-main branch.
   push:
     branches:
-      - 'feature/**'
-      - 'chore/**'
-      - 'bugfix/**'
-      - 'refactor/**'
-      - 'sprint/**'
-      - 'task/**'
+      - main
     paths:
       - 'lc-webapp/**'
       - '.github/workflows/ci-preview-swa.yml'
       - '.github/workflows/shared-build-angular.yml'
-      - '.github/actions/deploy-swa/**'
+  workflow_dispatch:
+    inputs:
+      build-config:
+        description: >
+          Angular build configuration. "production" calls the real dev Function App/DB (needs it
+          redeployed with matching backend endpoints to work). "preview" is fully Mock — every
+          service serves static/in-memory data, no backend dependency at all — for isolated FE-only
+          verification (style, layout, interaction flows) independent of backend deploy state.
+        type: choice
+        options:
+          - production
+          - preview
+        default: preview   # preview shares the dev Function App with the "development" env —
+                            # default to the Mock build so ad-hoc previews validate FE only
 
 # Shared preview slot — a newer push supersedes an in-flight preview deploy.
 concurrency:
@@ -36,12 +49,14 @@ jobs:
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
       # Angular CLI configuration (`--configuration`), NOT a GitHub environment.
-      # MUST be `production` for any deployed bundle: the `development` config bakes
-      # in environment.development.ts (apiBaseUrl http://localhost:7071) — a preview
-      # built with it calls localhost and is CSP-blocked. The production config emits
-      # __API_BASE_URL__ / __MSAL_*__ token placeholders that the deploy step fills
-      # from the development-scoped vars below.
-      environment: production
+      # NEVER `development`: that config bakes in environment.development.ts
+      # (apiBaseUrl http://localhost:7071) — a preview built with it calls localhost and is
+      # CSP-blocked. "production" emits __API_BASE_URL__ / __MSAL_*__ token placeholders
+      # that the deploy step below fills from the development-scoped vars (real dev backend).
+      # "preview" (environment.preview.ts, all services Mock) hardcodes its own dummy values
+      # instead of those tokens, so the same deploy-step substitution below is a harmless
+      # no-op for it — no separate deploy path needed per config.
+      environment: ${{ inputs.build-config || 'preview' }}
       deploy-tag-prefix: 'ci-azure-swa'
       deploy-tag-suffix: ${{ github.ref_name }}
     secrets: inherit
@@ -52,7 +67,7 @@ jobs:
     environment: development
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Deploy Preview to SWA
         id: deploy
@@ -105,6 +120,7 @@ jobs:
                 `**Branch:** \`${branch}\``,
                 `**Commit:** \`${sha}\``,
                 `**Build Tag:** \`${buildTag}\``,
+                `**Build Config:** \`${{ inputs.build-config || 'production' }}\``,
                 '',
                 '_This is a shared preview slot — the latest push overwrites the previous preview._'
               ].join('\n')

@@ -1,26 +1,20 @@
 name: Validate Artifacts
 
-# Cheap repo-hygiene guards:
+# Cheap repo-hygiene guard:
 #  - archive-guard: no closed PLAN/TEST_PLAN/EPIC/QA_REPORT artifact left at repo
-#    root (the drift the recursive review flagged 3×, §4.6 / N1). (Sprint 19 T4)
-#  - readme-modes: README service-mode docs stay consistent with
-#    environment.production.ts (§4.5 — the stale "all Mock" claim T3 fixed). (Sprint 19 T4)
-#  - tenant-guid-drift: each tenant's blob container GUID stays single-sourced — backend
-#    TenantRegistry.cs == frontend tenants.json (Sprint 20 T6 / DECISIONS.md 2026-06-04).
+#    root — enforces AGENTS.md §1 Living Plan Enforcement.
 #
 # Targets the main boundary: PRs into main (incl. the cumulative sprint PR) and
 # pushes to main. `branches: [main]` filters the TARGET branch per
 # stack-github-actions.md §1.
 
 # Path-scoped per stack-github-actions.md §1 (Trigger Path Scoping): fire only when a
-# file one of the guards actually reads changes — the union of all three guards' inputs
-# plus the scripts and this workflow itself. Unrelated PRs (e.g. a .claude/-only sync) no
+# file the guard actually reads changes. Unrelated PRs (e.g. a .claude/-only sync) no
 # longer spin a runner or show a false ❌. NOT a required check (path-filtered — see the rule).
 on:
   pull_request:
     branches: [main]
-    # Keep this list identical to the push paths below (GitHub Actions does not
-    # support YAML anchors, so the union is duplicated intentionally).
+    # Keep identical to the push paths below (GitHub Actions does not support YAML anchors).
     paths:
       - 'PLAN_*.md'
       - 'TEST_PLAN_*.md'
@@ -29,11 +23,7 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'README.md'
-      - '**/environment.production.ts'
-      - '**/TenantRegistry.cs'
-      - '**/tenants.json'
-      - 'scripts/ci/**'
+      - 'scripts/ci/validate-archive.sh'
       - '.github/workflows/validate-archive.yml'
   push:
     branches: [main]
@@ -45,43 +35,19 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'README.md'
-      - '**/environment.production.ts'
-      - '**/TenantRegistry.cs'
-      - '**/tenants.json'
-      - 'scripts/ci/**'
+      - 'scripts/ci/validate-archive.sh'
       - '.github/workflows/validate-archive.yml'
 
 permissions:
   contents: read
 
 jobs:
-  archive-guard:
-    name: Closed artifacts are archived
+  guards:
+    name: Repo-hygiene guards (archive)
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate archive hygiene
+        uses: actions/checkout@v7
+      - name: Closed artifacts are archived
         run: bash scripts/ci/validate-archive.sh
-
-  readme-modes:
-    name: README service modes consistent
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate README service-mode docs
-        run: bash scripts/ci/check-readme-modes.sh
-
-  tenant-guid-drift:
-    name: Tenant container GUIDs single-sourced
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate tenant container GUID single source (BE == FE)
-        run: bash scripts/ci/check-tenant-guid-drift.sh

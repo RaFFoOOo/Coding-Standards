@@ -53,6 +53,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: development
+    # Surfaces vars.API_BASE_URL (resolved within this job's `environment: development` scope) for
+    # the smoke job below — a job that calls a reusable workflow via `uses:` cannot itself declare
+    # `environment:` (unsupported key for that job shape), so the value must be passed as an output.
+    outputs:
+      api-base-url: ${{ vars.API_BASE_URL }}
     concurrency:
       group: cd-backend-development
       cancel-in-progress: true
@@ -62,14 +67,14 @@ jobs:
 
     steps:
       - name: Check out repository (composite action + migration source)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/actions/
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2.3.0 — pinned per A08
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43  # v3.0.0 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
@@ -99,6 +104,8 @@ jobs:
       needs.deploy-dev.result == 'success'
     needs: deploy-dev
     uses: ./.github/workflows/smoke-dev.yml
+    with:
+      base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
     secrets: inherit
 
   # Runs only on manual dispatch — prod is never auto-deployed on push to main.
@@ -129,14 +136,14 @@ jobs:
 
     steps:
       - name: Check out repository (composite action + migration source)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/actions/
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2.3.0 — pinned per A08
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43  # v3.0.0 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
