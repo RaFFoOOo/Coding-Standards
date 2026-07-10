@@ -9,6 +9,10 @@ inputs:
     description: 'Value for __ENABLE_LOGIN_FEATURES__ token replacement'
     required: false
     default: 'false'
+  enable-error-diagnostics:
+    description: 'Value for __ENABLE_ERROR_DIAGNOSTICS__ token replacement — appends [status] METHOD /url to error toasts. Fail-closed default: never leave unset for a production deploy.'
+    required: false
+    default: 'false'
   build-version:
     description: 'Value for __BUILD_VERSION__ token replacement'
     required: true
@@ -85,6 +89,7 @@ runs:
       env:
         TOKEN_ENABLE_TENANT_SELECTOR: ${{ inputs.enable-tenant-selector }}
         TOKEN_ENABLE_LOGIN_FEATURES: ${{ inputs.enable-login-features }}
+        TOKEN_ENABLE_ERROR_DIAGNOSTICS: ${{ inputs.enable-error-diagnostics }}
         TOKEN_BUILD_VERSION: ${{ inputs.build-version }}
         TOKEN_MSAL_CLIENT_ID: ${{ inputs.msal-client-id }}
         TOKEN_MSAL_AUTHORITY: ${{ inputs.msal-authority }}
@@ -112,6 +117,7 @@ runs:
         sed -i \
           -e "s|__ENABLE_TENANT_SELECTOR__|$(esc "${TOKEN_ENABLE_TENANT_SELECTOR:-false}")|g" \
           -e "s|__ENABLE_LOGIN_FEATURES__|$(esc "${TOKEN_ENABLE_LOGIN_FEATURES:-false}")|g" \
+          -e "s|__ENABLE_ERROR_DIAGNOSTICS__|$(esc "${TOKEN_ENABLE_ERROR_DIAGNOSTICS:-false}")|g" \
           "$BROWSER_DIR/feature-flags.js"
         find "$BROWSER_DIR" -name "*.js" ! -name "feature-flags.js" -exec sed -i \
           -e "s|__BUILD_VERSION__|$(esc "${TOKEN_BUILD_VERSION:-unknown}")|g" \

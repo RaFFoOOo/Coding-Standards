@@ -70,7 +70,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Deploy to Dev SWA
         id: deploy
@@ -78,6 +78,10 @@ jobs:
         with:
           enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
           enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          # Hardcoded per-job, not a vars.* toggle — this gates whether error toasts leak
+          # [status] METHOD /url + backend detail text, so its value must never depend on an
+          # operator-editable GitHub variable that could be flipped on for prod by mistake.
+          enable-error-diagnostics: 'true'
           build-version: ${{ needs.build.outputs.build-tag }}
           msal-client-id: ${{ vars.MSAL_CLIENT_ID }}
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
@@ -123,13 +127,16 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Deploy to Prod SWA
         uses: ./.github/actions/deploy-swa
         with:
           enable-tenant-selector: ${{ vars.ENABLE_TENANT_SELECTOR }}
           enable-login-features: ${{ vars.ENABLE_LOGIN_FEATURES }}
+          # Explicit 'false' (not just relying on the action's default) — this is the one flag
+          # that must never accidentally end up true in a customer-facing deploy.
+          enable-error-diagnostics: 'false'
           build-version: ${{ needs.build.outputs.build-tag }}
           msal-client-id: ${{ vars.MSAL_CLIENT_ID }}
           msal-authority: ${{ vars.MSAL_AUTHORITY }}

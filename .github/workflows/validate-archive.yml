@@ -19,8 +19,7 @@ name: Validate Artifacts
 on:
   pull_request:
     branches: [main]
-    # Keep this list identical to the push paths below (GitHub Actions does not
-    # support YAML anchors, so the union is duplicated intentionally).
+    # Keep identical to the push paths below (GitHub Actions does not support YAML anchors).
     paths:
       - 'PLAN_*.md'
       - 'TEST_PLAN_*.md'
@@ -56,32 +55,20 @@ permissions:
   contents: read
 
 jobs:
-  archive-guard:
-    name: Closed artifacts are archived
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+  # Cost-reduction (stack-github-actions.md §1): the three guards are sub-second bash
+  # scripts but GitHub bills each JOB rounded up to a whole minute, so three jobs cost
+  # ~3 minutes for ~10 seconds of work. They share one checkout + runner and run
+  # sequentially in a single job; each step still names its guard so a failure is
+  # attributable. `set -e` per step means the first failing guard fails the job.
+  guards:
+    name: Repo-hygiene guards (archive / readme-modes / tenant-guid)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate archive hygiene
+        uses: actions/checkout@v7
+      - name: Closed artifacts are archived
         run: bash scripts/ci/validate-archive.sh
-
-  readme-modes:
-    name: README service modes consistent
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate README service-mode docs
+      - name: README service modes consistent
         run: bash scripts/ci/check-readme-modes.sh
-
-  tenant-guid-drift:
-    name: Tenant container GUIDs single-sourced
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Validate tenant container GUID single source (BE == FE)
+      - name: Tenant container GUIDs single-sourced (BE == FE)
         run: bash scripts/ci/check-tenant-guid-drift.sh

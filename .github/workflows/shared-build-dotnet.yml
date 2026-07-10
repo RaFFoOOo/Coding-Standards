@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -80,13 +80,17 @@ jobs:
             -p:InformationalVersion="$BUILD_TAG" \
             --output "$GITHUB_WORKSPACE/publish"
 
-          # Copy .azurefunctions/ into the publish output — required by Functions host v4.1000+.
-          # The SDK generates this folder in the build OutputPath but dotnet publish --output
-          # does not carry it to the custom destination directory.
+          # Merge .azurefunctions/ into the publish output — required by Functions host v4.1000+.
+          # The SDK generates this folder in the build OutputPath; some SDK versions also emit it
+          # directly under --output, others don't. Merge contents (trailing "/." on the source,
+          # mkdir -p + trailing "/" on the destination) rather than `cp -r SRC DST`, which nests
+          # into DST/.azurefunctions/.azurefunctions when DST already exists — confirmed in a
+          # 2026-07-04 CD run's publish.zip listing (harmless bloat here, but never correct).
           PROJ_DIR=$(dirname "${{ inputs.publish-project }}")
           AZFUNC_SRC="$PROJ_DIR/bin/Release/net10.0/.azurefunctions"
           if [ -d "$AZFUNC_SRC" ]; then
-            cp -r "$AZFUNC_SRC" "$GITHUB_WORKSPACE/publish/.azurefunctions"
+            mkdir -p "$GITHUB_WORKSPACE/publish/.azurefunctions"
+            cp -r "$AZFUNC_SRC/." "$GITHUB_WORKSPACE/publish/.azurefunctions/"
           fi
 
       - name: Upload Build Artifact

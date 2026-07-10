@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'lc-services/**'
+      - 'scripts/ci/check-schema-drift.sh'
       - '.github/workflows/ci-backend.yml'
       - '.github/workflows/shared-build-dotnet.yml'
 
@@ -20,3 +21,21 @@ jobs:
     with:
       run-tests: true
     secrets: inherit
+
+  schema-drift:
+    # The committed EF script (Database/schema.sql) must match the migrations. A migration
+    # added without regenerating the script fails here (regenerate + non-empty git-diff guard).
+    name: EF schema.sql is up to date
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+      - name: Restore (warms the cache so `dotnet ef` build is fast)
+        run: dotnet restore lc-services/lc-services.sln
+      - name: Check schema.sql drift
+        run: bash scripts/ci/check-schema-drift.sh

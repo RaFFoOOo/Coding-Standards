@@ -101,6 +101,37 @@ The identity used by the CD pipeline to deploy resources MUST be a dedicated **A
 - The `environment:` input on a reusable workflow maps to a GitHub environment, which controls which secrets/vars are available to the job. For CI/preview builds, use `environment: development` — this avoids environment protection rules and grants access to development-scoped vars without exposing production secrets.
 - If the target environment does not exist in the repository, GitHub skips environment protection but still runs the job. This is acceptable for non-production environments.
 
+### A job cannot mix `environment:` with `uses:` [STRICT]
+GitHub Actions job schemas are mutually exclusive: a job either **runs steps** (`runs-on` + `steps`,
+optionally `environment:`) or **calls a reusable workflow** (`uses:` + `with:`/`secrets:`) — never
+both. Adding `environment:` to a `uses:` job doesn't get silently ignored; it breaks the whole
+workflow file with a misleading cascade: `Required property is missing: runs-on` on the job, plus
+`Unexpected value 'uses'/'with'/'secrets'` on that job's own keys (hit in a reusable-workflow `smoke`
+job added in a follow-up fix commit, unnoticed until dispatch failed).
+
+When a `uses:` job needs a value that must resolve inside a specific GitHub environment (e.g. an
+environment-scoped `vars.*`), resolve it in a **preceding `runs-on` job that already has
+`environment:`**, expose it via that job's `outputs:`, and have the `uses:` job read
+`needs.<job>.outputs.<name>` instead of reading `vars.*` directly itself:
+```yaml
+# ✅ Correct — resolve the env-scoped var where environment: is legal, pass it as an output
+deploy-dev:
+  runs-on: ubuntu-latest
+  environment: development
+  outputs:
+    api-base-url: ${{ vars.API_BASE_URL }}
+  steps: [...]
+
+smoke:                                  # calls a reusable workflow — no environment: here
+  needs: deploy-dev
+  uses: ./.github/workflows/smoke-dev.yml
+  with:
+    base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
+  secrets: inherit
+```
+Reference: `cd-backend-azure-functions.yml`'s `deploy-dev`/`smoke` pair, mirroring the identical
+pattern already in `cd-angular-azure-static-web-apps.yml`'s `deploy-dev`/`smoke` pair.
+
 ### Shared Build Extraction [STRICT]
 When two or more workflows share the same build steps (restore → audit → build → optional test/publish), extract those steps into a `shared-build-<stack>.yml` reusable workflow. **Never duplicate steps across CI and CD callers.**
 
