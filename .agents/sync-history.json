@@ -284,9 +284,9 @@
           "one-talent": "6e206302e04381ba091cd92a9ed869ef33cb993f"
         },
         "github:workflows/ci-backend.yml": {
-          "Coding-Standards": "482f0434a3370d0ad76d85bf0ee949bd6b1d4f26",
+          "Coding-Standards": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a",
           "le-cementine": "482f0434a3370d0ad76d85bf0ee949bd6b1d4f26",
-          "one-talent": "482f0434a3370d0ad76d85bf0ee949bd6b1d4f26"
+          "one-talent": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a"
         },
         "github:workflows/ci-preview-swa.yml": {
           "Coding-Standards": "084cd54aff40b8da09cacf1571607e597933ac5b",
@@ -314,9 +314,9 @@
           "one-talent": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1"
         },
         "github:workflows/validate-archive.yml": {
-          "Coding-Standards": "031411982b4612857f438b9233acd337a381684a",
+          "Coding-Standards": "21ed4e9841113d6410f22276e372fd3622052b69",
           "le-cementine": "031411982b4612857f438b9233acd337a381684a",
-          "one-talent": "031411982b4612857f438b9233acd337a381684a"
+          "one-talent": "21ed4e9841113d6410f22276e372fd3622052b69"
         },
         "rule:agent-workarounds": {
           "Coding-Standards": "c8897bc7b158f3dd65bd500fe16667ebd910991a",
@@ -329,9 +329,9 @@
           "one-talent": "fb2d4d0d81e3a2eb131e50a07de793d0e6cbca8a"
         },
         "rule:stack-angular": {
-          "Coding-Standards": "d573b03469a9cfef56ebd06545ad9d14e6484cbb",
+          "Coding-Standards": "fe2fca7a69df1de3cb329d55f8ee64823b3fd34a",
           "le-cementine": "d573b03469a9cfef56ebd06545ad9d14e6484cbb",
-          "one-talent": "d573b03469a9cfef56ebd06545ad9d14e6484cbb"
+          "one-talent": "faa0420d3ae1fc9596829f7723bfdc69b684fe55"
         },
         "rule:stack-dotnet-core": {
           "Coding-Standards": "b91faebde5ce95d7b9a695ed06e2f2521acd8717",
@@ -340,7 +340,7 @@
         },
         "rule:stack-github-actions": {
           "Coding-Standards": "16450d9cfba0979f8689c1359091a9dba7c41bfa",
-          "le-cementine": "16450d9cfba0979f8689c1359091a9dba7c41bfa",
+          "le-cementine": "fa1072bdbba61c9fc71d0ba8dc24013117b80784",
           "one-talent": "16450d9cfba0979f8689c1359091a9dba7c41bfa"
         },
         "skill:manage-artifacts": {

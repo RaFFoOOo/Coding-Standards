@@ -123,6 +123,9 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Empty-states use a single shared component (e.g. an `EmptyStateComponent` with `[icon]` + `[message]` inputs) — never re-roll a fresh `<div class="empty-state">` block per feature.
   - Recurring status / source badges use global SCSS classes defined once in a shared stylesheet (loaded via the root `styles` entry point) — never redefine the same badge styles in component SCSS.
   - **Why:** duplicated badge SCSS across components and hand-rolled empty-state blocks are a maintenance trap — each copy is a style-drift risk and a CSS-budget consumer.
+  - **Consistency across pages [STRICT]:** once a primitive exists, every surface consumes it — a user must never meet the "same" control (search bar, filter panel, confirm/cancel action bar, pagination, cards, badges, empty/loading states) in a different shape, position, or behavior between pages. A second, page-local re-implementation of an existing primitive is a rule violation, not a shortcut: consume the shared component (config-driven via `input()`, per §2) instead of hand-rolling its markup/logic.
+  - **Extend, don't fork:** when a page needs a variant, add a config option/input to the shared primitive rather than cloning it. Forking is only allowed when the interaction is genuinely different — and that divergence is recorded, not incidental.
+  - **Cross-project candidates:** a primitive generic enough to serve more than one product (e.g. a config-driven `FilterBarComponent`) is a candidate for a shared UX library — evaluate promoting it there before duplicating it into another repo.
 - **[STRICT] Filter / search / view bar — one shared component:**
   - Every "list/collection" surface that offers filtering, sorting, free-text search, and/or a view toggle
     MUST use one shared, config-driven `FilterBarComponent` driven by a declarative config object. Bespoke

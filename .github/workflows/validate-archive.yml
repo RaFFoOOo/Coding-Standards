@@ -1,20 +1,15 @@
 name: Validate Artifacts
 
-# Cheap repo-hygiene guards:
+# Cheap repo-hygiene guard:
 #  - archive-guard: no closed PLAN/TEST_PLAN/EPIC/QA_REPORT artifact left at repo
-#    root (the drift the recursive review flagged 3×, §4.6 / N1). (Sprint 19 T4)
-#  - readme-modes: README service-mode docs stay consistent with
-#    environment.production.ts (§4.5 — the stale "all Mock" claim T3 fixed). (Sprint 19 T4)
-#  - tenant-guid-drift: each tenant's blob container GUID stays single-sourced — backend
-#    TenantRegistry.cs == frontend tenants.json (Sprint 20 T6 / DECISIONS.md 2026-06-04).
+#    root — enforces AGENTS.md §1 Living Plan Enforcement.
 #
 # Targets the main boundary: PRs into main (incl. the cumulative sprint PR) and
 # pushes to main. `branches: [main]` filters the TARGET branch per
 # stack-github-actions.md §1.
 
 # Path-scoped per stack-github-actions.md §1 (Trigger Path Scoping): fire only when a
-# file one of the guards actually reads changes — the union of all three guards' inputs
-# plus the scripts and this workflow itself. Unrelated PRs (e.g. a .claude/-only sync) no
+# file the guard actually reads changes. Unrelated PRs (e.g. a .claude/-only sync) no
 # longer spin a runner or show a false ❌. NOT a required check (path-filtered — see the rule).
 on:
   pull_request:
@@ -28,11 +23,7 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'README.md'
-      - '**/environment.production.ts'
-      - '**/TenantRegistry.cs'
-      - '**/tenants.json'
-      - 'scripts/ci/**'
+      - 'scripts/ci/validate-archive.sh'
       - '.github/workflows/validate-archive.yml'
   push:
     branches: [main]
@@ -44,31 +35,19 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'README.md'
-      - '**/environment.production.ts'
-      - '**/TenantRegistry.cs'
-      - '**/tenants.json'
-      - 'scripts/ci/**'
+      - 'scripts/ci/validate-archive.sh'
       - '.github/workflows/validate-archive.yml'
 
 permissions:
   contents: read
 
 jobs:
-  # Cost-reduction (stack-github-actions.md §1): the three guards are sub-second bash
-  # scripts but GitHub bills each JOB rounded up to a whole minute, so three jobs cost
-  # ~3 minutes for ~10 seconds of work. They share one checkout + runner and run
-  # sequentially in a single job; each step still names its guard so a failure is
-  # attributable. `set -e` per step means the first failing guard fails the job.
   guards:
-    name: Repo-hygiene guards (archive / readme-modes / tenant-guid)
+    name: Repo-hygiene guards (archive)
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
       - name: Closed artifacts are archived
         run: bash scripts/ci/validate-archive.sh
-      - name: README service modes consistent
-        run: bash scripts/ci/check-readme-modes.sh
-      - name: Tenant container GUIDs single-sourced (BE == FE)
-        run: bash scripts/ci/check-tenant-guid-drift.sh
