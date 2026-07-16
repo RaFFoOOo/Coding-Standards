@@ -14,7 +14,11 @@ Execute this workflow when a Pull Request has received review comments that need
    - **Sprint task PR** → base is `sprint/<version>-<slug>` (not `main`)
    - **Sprint final PR** or **standalone PR** → base is `main`
    Keep the base branch in mind — all merges, pushes, and conflict resolution must target it.
-2. **Fetch Comments**: Run `gh pr view <branch-name-or-pr-number> --comments` to retrieve all active review comments and threads.
+2. **Fetch Comments [BOTH KINDS — MANDATORY]**: `gh pr view <branch-name-or-pr-number> --comments` only returns **issue-level** comments (the PR's own conversation tab) — it silently returns nothing for **inline review comments** (attached to a specific file/line as part of a review), even when they exist. Always fetch both:
+   - Issue-level: `gh pr view <pr> --comments`
+   - Inline review comments: `gh api repos/<owner>/<repo>/pulls/<pr>/comments`
+   - Reviews (for review-level summary bodies, may be empty even when inline comments exist): `gh api repos/<owner>/<repo>/pulls/<pr>/reviews`
+   An empty result from the first command is **not** evidence that no comments exist — a real review comment can be sitting in the second/third and be missed entirely if only `--comments` is checked. If the Tech Lead references a comment you can't find, re-check the inline endpoint before concluding it doesn't exist.
 3. **Analyze Feedback**: Read through all the comments carefully to understand the reviewer's requests, raised issues, or suggestions.
 
 ## 2. Planning the Resolution
@@ -26,7 +30,11 @@ Execute this workflow when a Pull Request has received review comments that need
 6. Implement the requested code changes following standard rules.
 7. **Quick Pre-QA Scan [MANDATORY]**: Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md` strictly on the modified files to ensure the new changes adhere to repo standards.
 8. **Atomic Commit [MANDATORY]**: Per AGENTS.md §8, commit each comment separately (unless two or more are intimately related).
-9. **Comment Resolution [MANDATORY]**: Using the GitHub CLI (`gh pr review` or `gh api`), reply directly to the specific PR comment thread with a concise explanation of the resolution. This enables the reviewer to quickly audit all fixes.
+9. **Comment Resolution [MANDATORY]**: Reply directly to the specific PR comment thread with a concise explanation of the resolution — this enables the reviewer to quickly audit all fixes.
+   - **Inline review comment** (has an `id` from the fetch above): reply in the same thread via
+     `gh api repos/<owner>/<repo>/pulls/<pr>/comments -f body="<resolution>" -F in_reply_to=<comment_id>`
+     (do not pass `commit_id`/`path` — they're inherited from the parent comment and a stale/foreign SHA will 422).
+   - **Issue-level comment / no pre-existing thread** (feedback given verbally or in chat, not as a GitHub comment): post a new summary comment via `gh pr comment <pr> --body "..."` instead — there is no thread to reply into.
 10. Mark the corresponding task as `[x]` in `PLAN.md` once thoroughly addressed.
 
 ## 4. Validation & Push
