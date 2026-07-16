@@ -173,6 +173,33 @@ description: Frontend stack rules for Angular / TypeScript projects
     sheet's lower content and scroll. A comment in one file didn't stop the mistake recurring in another —
     this is now a named, searchable rule instead.
 
+- **[STRICT] A toggleable panel's own open/closed CSS class MUST stay separate from an "active-descendant"
+  highlight class — never reuse one class binding for both:**
+  - When a collapsed trigger (dropdown, "More" button, nav-group) needs an active-descendant indicator
+    (highlighting the trigger because the current route is one of its *contents*, without the panel being
+    open) alongside its own real toggle state, these are two independent concerns and MUST bind to two
+    separate classes. A shared CSS rule keyed off one class for both the panel's `display`/visibility AND
+    the trigger's highlight color means "active-descendant" silently pins the panel visually open the
+    moment the route matches — not just highlighted — even though the user never clicked to open it.
+  - ❌ `[class.open]="isActiveDescendant() || isManuallyOpened()"` when the SCSS has
+    `&.open .panel { display: block }` — visiting a page inside the panel renders it permanently expanded.
+  - ✅ `[class.open]="isManuallyOpened()"` (unchanged, drives panel visibility only) +
+    `[class.is-active]="isActiveDescendant() || isManuallyOpened()"` (new, drives only the trigger's
+    highlight color via `&.is-active .trigger { color: var(--primary) }`) — both classes apply together
+    when genuinely open, but only `.is-active` applies when merely active-descendant.
+  - This exact bug shipped to production once (a desktop header dropdown highlighted as "active" via
+    route match, which also silently forced the panel visually open) and was caught only because live
+    QA — a real browser + interaction test, not a unit test with a mocked DOM — happened to be available
+    for that PR; a full unit-test pass had already gone green and completely missed it, since it never
+    rendered the real CSS cascade. It then **recurred** in a second, unrelated feature that added
+    active-descendant highlighting to a different trigger, making the identical mistake — caught again
+    only by that PR's own live QA pass. **Grep-on-touch:** before writing a new
+    `[class.open]`/visibility binding on any collapsed trigger, grep this file for "active-descendant" —
+    if the task's own description matches this rule's trigger condition, re-read this bullet against the
+    specific change, not just at session start. Verify any new active-descendant indicator by reading
+    the actual `getComputedStyle` of the panel/chevron in a live browser, not just the trigger's own
+    signal value in a unit test.
+
 ## 5. Debugging & Reliability
 - **Error Interception:**
   - Implement a global `HttpInterceptor` to catch errors.
@@ -295,14 +322,29 @@ description: Frontend stack rules for Angular / TypeScript projects
 
 ## 12. Testing [STRICT]
 
-- **Targeted runs during development:** Never run the full vitest suite while iterating. Pass only the
-  spec files (or directories) touched by the current change:
-  ```bash
-  npx vitest run src/app/path/to/changed/component/ src/app/path/to/other/spec.ts
-  ```
-  Full-suite `npx vitest run` (no filter) is reserved exclusively for the `/run-qa` gate before
-  opening a PR. Running everything on every iteration wastes ~25 s per cycle and obscures which tests
-  actually relate to the work in progress.
+- **Targeted runs during development:** Never run the full suite while iterating. Pass only the spec
+  files (or directories) touched by the current change — the exact command depends on whether the
+  project has its own standalone `vitest.config.ts`:
+  - **Project has a standalone `vitest.config.ts`** (a hand-built config that mirrors Angular's
+    `templateUrl`/`styleUrls` inlining so bare Vitest can JIT-compile components): run it directly —
+    ```bash
+    npx vitest run src/app/path/to/changed/component/ src/app/path/to/other/spec.ts
+    ```
+  - **Project has no standalone `vitest.config.ts`** (relies solely on the integrated
+    `@angular/build:unit-test` builder to bootstrap Vitest + `TestBed`): a bare `npx vitest run` skips
+    that bootstrap and fails immediately with `Need to call TestBed.initTestEnvironment() first`, even
+    for specs that are otherwise valid. Use the builder's own filter instead:
+    ```bash
+    ng test --include 'src/app/path/to/changed/component/**/*.spec.ts' --watch=false
+    ```
+  - **Don't confuse this with vitest-cache corruption:** the identical `TestBed.initTestEnvironment()`
+    error can also come from a stale `node_modules/.vite`/`.vitest` cache on a project that DOES have a
+    working `vitest.config.ts` — that class clears with `rm -rf node_modules/.vite node_modules/.vitest`
+    and doesn't recur. If the error persists after that, or the project has no `vitest.config.ts` at
+    all, it's this config gap, not cache corruption.
+  - Full-suite `ng test --watch=false` / `npx vitest run` (no filter) is reserved exclusively for the
+    `/run-qa` gate before opening a PR. Running everything on every iteration wastes cycle time and
+    obscures which tests actually relate to the work in progress.
 
 - **JIT `input()` limitation:** In Vitest JIT mode, signal inputs declared with `input()` /
   `input.required()` cannot be set via `fixture.componentRef.setInput()` — Angular registers them
@@ -335,11 +377,11 @@ description: Frontend stack rules for Angular / TypeScript projects
     (or redirects straight to login) for an unauthenticated visitor, gated by a login-features flag +
     `isAuthenticated()` — an entry placed only there is invisible to exactly the audience a public page
     needs to reach.
-  - A route meant only for an **authenticated role that already has a natural hub** (e.g. the owner's
-    `/dashboard`) MAY be reachable one hop from that hub (a dashboard card) without its own persistent
-    header entry. This is the established, intentional pattern for admin management routes — do not
-    treat it as license to bury a *public-facing* page the same way just because an owner also happens
-    to manage it there.
+  - A route meant only for an **authenticated role that already has a natural hub** (e.g. an owner's
+    `/admin`) MAY be reachable one hop from that hub (a dashboard card) without its own persistent
+    header entry. This is the established, intentional pattern for admin-only management routes (e.g.
+    a user-management or availability-settings page one hop from `/admin`) — do not treat it as license
+    to bury a *public-facing* page the same way just because an owner also happens to manage it there.
 - **Inline content links are additive, never exclusive:** a "see more" CTA embedded in another page's
   content (e.g. the homepage → a new feature route) is good UX *in addition to* persistent chrome,
   never a substitute for it.
@@ -347,3 +389,61 @@ description: Frontend stack rules for Angular / TypeScript projects
   get back" experience — the user has no durable mental model of where the feature lives. Codified
   after a new public-facing page shipped with only an inline homepage link and a dashboard card,
   missing a header entry point anonymous visitors could use.)*
+- **Breadcrumb required on every page NOT directly reachable from persistent nav:** a detail/drill-down
+  page — reached only by clicking a card/row from a list page, never a direct nav entry (e.g. an entity
+  detail route like `/clubs/:id`, `/players/:id`) — is legitimate (it doesn't need its own header/nav
+  entry, unlike the orphan-route case above), but it still leaves the user without a durable "where am
+  I / how do I get back" cue once they're on it. Every such page MUST render a shared, config-driven
+  `BreadcrumbComponent` as the **first element** in its template, before the page header: one crumb per
+  level back to the entry list (`routerLink` set, resolved i18n label), ending with the current page's
+  own name/title (no link, even if a `routerLink` is supplied for that last item — the component itself
+  enforces this).
+  - Config-driven, not hardcoded per page: build the trail as a `computed()` `BreadcrumbItem[]` when any
+    crumb label is signal-derived (e.g. the entity's own name once resolved) — never a static array
+    when the current-page label can change (loading vs. resolved vs. not-found).
+  - This is a **STRICT, global** rule (§4's "Consistency across pages" primitive-reuse principle) — an
+    in-page "back" link or relying on the browser's own back button is not a substitute; the breadcrumb
+    is the uniform mechanism for every surface of this shape, not a per-page judgment call.
+
+## 14. Compact Forms — 12-Column Grid [STRICT]
+- **`.form-row` is a Bootstrap-like 12-column CSS Grid**, not an equal-width flex row. Any owner/admin
+  form with 2+ fields on a conceptual "row" MUST wrap them in a shared `.form-row` class (defined once,
+  e.g. `src/styles/_forms.scss`) and give each direct `.form-field` child an explicit width via
+  `.form-col-{n}` — never rely on equal flex-basis distribution (`flex: 1 1 0`) to size fields, and
+  never leave a field's width unset inside a `.form-row`.
+- **Values are restricted to Bootstrap's common divisors of 12 — `2, 3, 4, 6, 12`** — so every field
+  lands on a clean fraction (1/6, 1/4, 1/3, 1/2, full) instead of an ad-hoc percentage. Size each field
+  to its actual content, not to "however many siblings it has": a small trigger (icon picker) gets a
+  small column (`form-col-2`/`form-col-3`); a free-text title gets a wide one (`form-col-8`+). A row's
+  columns do **not** need to sum to 12 — unfilled columns are intentional compactness, not a bug;
+  `.form-row` never redistributes leftover space to fill the row.
+- **Mobile-first, Bootstrap-named breakpoint override:** the unprefixed `.form-col-{n}` is the
+  **default that applies at every size** (including mobile) unless overridden; `.form-col-md-{n}` (a
+  desktop breakpoint matching `.form-row`'s own mobile breakpoint) overrides it on desktop only. A
+  field MUST NOT always be `form-col-12` (full width) on mobile by default — compact 2-up pairing
+  (`form-col-6`) is the mobile baseline for short fields (single-line text inputs, small dropdowns);
+  reserve `form-col-12` for content that genuinely needs the full line (a textarea, a 3-way dropdown
+  row where the third field is the natural odd-one-out).
+  ```html
+  <!-- ✅ Mobile pairs 6+6; desktop compacts to 4+8 (title gets more room, id stays narrow) -->
+  <div class="form-row">
+    <div class="form-field form-col-6 form-col-md-4"> ... type ... </div>
+    <div class="form-field form-col-6 form-col-md-8"> ... title ... </div>
+  </div>
+  <!-- ❌ Equal flex distribution — wastes space when one field's content is much narrower than its
+       sibling -->
+  <div class="form-row">
+    <div class="form-field form-field--inline"> ... icon-picker (small) ... </div>
+    <div class="form-field form-field--inline"> ... currency dropdown ... </div>
+  </div>
+  ```
+- **A conditionally-shown field group stays in the same `.form-row` as its trigger control**, not a
+  separate nested row below it — e.g. a "Limit bookings" toggle and the two capacity fields it reveals
+  sit in one `.form-row` (`toggle: form-col-md-4`, each revealed field `form-col-md-4`) so the revealed
+  fields appear *beside* the toggle on desktop, not stacked underneath it. CSS Grid re-flows
+  automatically when a conditionally-rendered grid item is added/removed — no extra layout code needed.
+- *(Rationale: an equal-flex-distribution approach splits every row's fields evenly regardless of
+  content — a small icon-picker trigger next to a currency dropdown each take 50%, leaving a large dead
+  gap between them; mobile falls back to full-width stacking even for short single-line inputs that
+  could easily pair up. A Bootstrap-like 2/3/4/6/12 proportion system fixes both as a general, durable
+  pattern, not a one-off fix to a single form.)*

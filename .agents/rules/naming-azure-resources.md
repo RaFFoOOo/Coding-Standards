@@ -11,16 +11,22 @@ All Azure resources in a project follow a structured naming scheme derived from 
 physical/logical context of the resource:
 
 ```
-{region}{env}{region-suffix}{app-prefix}{resource-type}{index}
+{region}{region-suffix}{env}{app-prefix}{resource-type}{index}
 ```
+
+**Segment order note:** region and its suffix come first, together, then environment. A project
+that instead provisions `{region}{env}{region-suffix}...` (environment before the suffix) has the
+order backwards; if resources already exist under that order, don't rename them retroactively (see
+the Rules section below) — but start any **new** project on the order above, never repeat a
+known-inconsistent scheme just because an earlier project shipped one.
 
 ## Segments
 
 | Segment | Values | Example | Notes |
 |---|---|---|---|
 | `region` | two-letter ISO region code | `eu` | e.g. `eu` for West Europe |
-| `env` | `d` (dev), `p` (prod) | `d` | environment the resource belongs to |
 | `region-suffix` | project-defined | `w` | e.g. `w` for "west" — pick once per project and keep it consistent across environments; if an inconsistency is discovered later, document it rather than renaming live resources |
+| `env` | `d` (dev), `p` (prod) | `d` | environment the resource belongs to |
 | `app-prefix` | project-defined, short (2-4 letters) | `app` | application identifier, fixed for the life of the project |
 | `resource-type` | see table below | `azf` | lowercase acronym identifying the Azure resource type |
 | `index` | `01`, `02`… | `01` | per-type progressive index within the same environment |
@@ -54,12 +60,12 @@ physical/logical context of the resource:
 
 | Name | Type | Purpose |
 |---|---|---|
-| `eudwapprsg01` | Resource Group | Per-environment resource group |
-| `eudwappswa01` | Static Web App | Frontend SPA |
-| `eudwappazf01` | Function App | Backend API |
-| `eudwappsta01` | Storage Account | Application content storage |
-| `eudwappumi01` | User-Assigned Managed Identity | Runtime identity (data-plane only) |
-| `eudwappspn01` | App Registration / SPN | CD identity (control-plane only), one per environment |
+| `euwdapprsg01` | Resource Group | Per-environment resource group |
+| `euwdappswa01` | Static Web App | Frontend SPA |
+| `euwdappazf01` | Function App | Backend API |
+| `euwdappsta01` | Storage Account | Application content storage |
+| `euwdappumi01` | User-Assigned Managed Identity | Runtime identity (data-plane only) |
+| `euwdappspn01` | App Registration / SPN | CD identity (control-plane only), one per environment |
 
 ## Rules
 
