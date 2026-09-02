@@ -2,28 +2,14 @@ name: CI - .NET Backend Build & Test
 
 on:
   pull_request:
-    # Backend inputs ONLY, as of 2026-09-01. This list previously carried six FRONTEND paths —
-    # `lc-webapp/src/assets/i18n/**`, `app.routes.ts`, `index.html`, `VALIDATION_MATRIX.md`,
-    # `tenant-constraints.models.ts`, `tenant-config-style-options.controller.ts` — because the
-    # bash guards reading them were hosted in this workflow's .NET job, and a workflow's trigger
-    # must be the union of its jobs' inputs.
-    #
-    # The effect was a .NET build with a frontend trigger. Measured on #852: its ONLY match was
-    # the two i18n bundles, and it cost 7m38s of restore + build + 517 tests to reach a grep. Over
-    # the last 40 commits on `main`, 4 of the 18 that fired this workflow touched no `lc-services/`
-    # file at all. Those guards now live in validate-archive.yml's stack-neutral `guards` job
-    # (~20s, no SDK, no Node), so the paths could follow them out.
-    #
-    # `check-schema-drift.sh` stays because it needs the SDK — hence its script path below.
     paths:
       - 'lc-services/**'
-      - 'scripts/ci/check-schema-drift.sh'
       - '.github/workflows/ci-backend.yml'
       - '.github/workflows/shared-build-dotnet.yml'
 
-  # Opt-in manual run, added 2026-08-23 so CI can be executed on a self-hosted runner while the
-  # GitHub-hosted Actions allowance is exhausted. This trigger adds NO automatic runs: a PR still
-  # fires the `pull_request` trigger above, always on GitHub-hosted. Only a person dispatching this
+  # Opt-in manual run, so CI can be executed on a self-hosted runner while the GitHub-hosted
+  # Actions allowance is exhausted. This trigger adds NO automatic runs: a PR still fires the
+  # `pull_request` trigger above, always on GitHub-hosted. Only a person dispatching this
   # workflow by hand can choose otherwise.
   workflow_dispatch:
     inputs:
@@ -47,10 +33,6 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/shared-build-dotnet.yml
     with:
-      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       run-tests: true
-      # The former `schema-drift` job's work rides on this job's restore instead of repeating
-      # Setup .NET + dotnet restore to reach the same state (2026-08-26). See §7.1.
-      run-guards: true
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     secrets: inherit
-
