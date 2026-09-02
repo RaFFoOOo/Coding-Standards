@@ -3,6 +3,11 @@ name: Shared Angular Build
 on:
   workflow_call:
     inputs:
+      runner:
+        description: 'Where to execute. "ubuntu-latest" = GitHub-hosted (bills Actions minutes); "self-hosted" = your own runner (free). Callers compute this; see stack-github-actions.md §8.'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
       node-version:
         description: 'Version of Node.js to use'
         required: false
@@ -38,6 +43,11 @@ on:
         required: false
         type: boolean
         default: true
+      run-lint:
+        description: 'Whether to run `ng lint`. CI sets true; CD omits (false) — a deploy must not be gated on style.'
+        required: false
+        type: boolean
+        default: false
       run-tests:
         description: 'Whether to run the unit test suite (ng test). CI sets true; CD omits (false).'
         required: false
@@ -50,7 +60,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || vars.CI_RUNNER || 'ubuntu-latest' }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -61,11 +71,28 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
+        # A self-hosted runner keeps ~/.npm between runs (4.1 GB on RaFFoOOo's box), so restoring
+        # the Actions npm cache there downloads ~1013 MB over the network to duplicate a directory
+        # that is already populated — measured at 218 s + 274 s across this PR's two Angular jobs,
+        # i.e. ~8 min per PR for nothing. A GitHub-hosted runner is ephemeral and genuinely needs it.
+        # `runner.environment` resolves ON the runner, so this is correct however the runner was
+        # chosen (dispatch input, vars.CI_RUNNER, or the ubuntu-latest fallback).
+        #
+        # BOTH inputs are required. Clearing `cache` alone does nothing: setup-node falls through to
+        # `else if (packagemanagercache)`, which DEFAULTS TO TRUE and re-derives the manager from
+        # package.json's `packageManager` field ("npm@11.6.2" here) — restoring the identical cache.
+        # Verified against actions/setup-node@v7 src/main.ts, not inferred.
+        # NOTE the direction of this ternary. `A && B || C` collapses to C whenever B is falsy
+        # (stack-github-actions.md §8.1), so the obvious form — `== 'self-hosted' && '' || 'npm'` —
+        # has an EMPTY STRING as B and therefore always yields 'npm', silently leaving the cache on.
+        # That exact version shipped in this PR's first commit and measured 190 s, i.e. unchanged.
+        # Inverted so B is 'npm' (truthy) and the falsy branch is the one that disables.
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
           cache-dependency-path: '${{ inputs.working-directory }}/package-lock.json'
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install Dependencies
         # --legacy-peer-deps required: @angular/build@21.2.11 declares typescript@">=5.9 <6.0"
@@ -77,6 +104,22 @@ jobs:
         # OWASP A06 — fail the workflow on any moderate-or-higher CVE.
         # See `.claude/rules/stack-github-actions.md` §6 Security Gates.
         run: npm audit --audit-level=moderate
+
+      # Placed BEFORE the tests and the build, deliberately: lint is 70 s against their combined
+      # 203 s, so failing here first is the cheapest possible failure. Folded into this job rather
+      # than taking its own, and the arithmetic (stack-github-actions.md §7.1) is why — measured on
+      # run 32955607380 at 182 ci-angular PR runs per fortnight:
+      #
+      #   this job today            280 s -> 5 billed min
+      #   with lint folded in       350 s -> 6 billed min   (+1 per run)
+      #   lint as its OWN job       ~135 s -> 3 billed min   (+3 per run, checkout + node + npm ci)
+      #
+      # So folding is 3x cheaper — NOT free, which an earlier version of this plan claimed. Adding
+      # 70 s crosses a whole-minute boundary. On a self-hosted runner both cost zero Actions minutes;
+      # this arithmetic governs the GitHub-hosted fallback.
+      - name: Lint
+        if: inputs.run-lint
+        run: npm run lint
 
       - name: Run Unit Tests
         if: inputs.run-tests

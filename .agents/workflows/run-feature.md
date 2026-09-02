@@ -5,7 +5,7 @@ description: Standard workflow for implementing a feature from PLAN.md
 
 # Feature Implementation Cycle
 
-> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent MCP tools (e.g., `mcp__github__list_pull_requests` for `gh pr list`, `mcp__github__create_pull_request` for `gh pr create`).
 
 Execute each step sequentially for every Feature in the sprint.
 
@@ -16,7 +16,7 @@ Execute each step sequentially for every Feature in the sprint.
    - If the list is empty, log "no stale branches" and continue.
    - If 1+ branches are returned, **STOP and ask the user** before deleting: present the count + the list (truncate to first 20 if longer), then explicitly request confirmation. Never `git branch -d`/`-D` without affirmative user approval, even though the branches are already merged remotely.
    - On approval, batch-delete with `xargs -n 20 git branch -D` (force-delete is safe for the gone-upstream subset because GitHub only deletes the remote after a successful merge; squash-merge changes the commit SHA so plain `-d` would refuse). Branches WITHOUT a `gone` upstream are NEVER touched by this step.
-   - **Rationale:** branches accumulate per-task as merged PRs leave stranded locals. Pruning per-task (at run-feature pre-flight, not at sprint-close) keeps the local count under control without a 80+-item sweep at sprint end. Single batch confirmation per task = low friction.
+   - **Rationale:** pruning gone-upstream locals per-task (not at sprint-close) avoids a large stranded-branch sweep later, at one batch confirmation per task.
 3. **Source → PLAN.md Promotion [MANDATORY]:** If the task was picked up from `TODO.md` (not already in `PLAN.md`), you MUST create a `PLAN.md` first — decompose the item into Acceptance Criteria, Technical Implementation steps, and Task Progress — and present it to the user for approval before any execution. Never execute directly from `TODO.md`.
    Read the Feature tasks from the project `PLAN.md`.
 4. Mark the Feature and its first task as `[/]` in `PLAN.md`.
@@ -29,7 +29,7 @@ Execute each step sequentially for every Feature in the sprint.
 
 ## Implementation Loop (per task)
 
-8. **Mockup Gate** (UI tasks only — AGENTS.md §1): build the text-based wireframe via the `/plan-sprint` skill (§3 Visualize); save as `mockup_[feature].md`. Skip for backend/service tasks.
+8. **Mockup Gate** (UI tasks only): Use the `/plan-sprint` skill to create a text-based wireframe (markdown layout, component hierarchy, interactions, color tokens). Save as `mockup_[feature].md` artifact. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
 10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
 
@@ -46,7 +46,7 @@ Execute each step sequentially for every Feature in the sprint.
 14. Check build output for errors and warnings. Fix any issues.
 15. **Browser Test [OPTIONAL]:** Ask the user if they want to execute structured browser tests. If confirmed, use the `/test-browser` skill (requires Playwright MCP server in `.mcp.json`). If unavailable, perform manual testing and document results. Fix any failures. If skipped, proceed to the next step.
 16. **PLAN.md Full Sync Gate [MANDATORY]:** Verify ALL checkboxes for the Feature are marked `[x]` in EVERY section of `PLAN.md` (Acceptance Criteria, Technical Implementation, Task Progress). Hard gate — do NOT proceed until consistent.
-17. **QUALITY_ASSURANCE Strict Gate [MANDATORY]:** Do not stage files or create a PR unless `QA_REPORT.md` exists and contains `STATUS: PASS`. If not, run `.agents/skills/run-qa/SKILL.md` immediately.
+17. **run-qa Strict Gate [MANDATORY]:** Do not stage files or create a PR unless `QA_REPORT.md` exists and contains `STATUS: PASS`. If not, run `.agents/skills/run-qa/SKILL.md` immediately.
 18. **Merge with base branch [MANDATORY]:** Determine the correct base branch:
     - **Sprint task:** `git fetch origin && git merge origin/sprint/<version>-<slug>`
     - **Small/standalone work:** `git fetch origin && git merge origin/main`
@@ -54,10 +54,9 @@ Execute each step sequentially for every Feature in the sprint.
 19. **PR Review Gate [MANDATORY]:** Output a message to the user asking for review of uncommitted changes. Wait for explicit approval before staging.
 20. Push branch to remote: `git push -u origin <branch-name>`
 21. Create a Pull Request (PR) targeting the correct base branch:
-    - **Sprint task PR** → targets `sprint/<version>-<slug>` (NOT `main`).
-    - **Sprint branch final PR** → targets `main` (opened after all tasks are merged); include links to all task PRs.
+    - **Sprint task PR** → targets `sprint/<version>-<slug>` (NOT `main`). Use **squash merge** when merging.
+    - **Sprint branch final PR** → targets `main` (opened after all tasks are merged). Use **merge commit** when merging. Include links to all task PRs in the description.
     - **Small/standalone work PR** → targets `main` as usual.
-    - *(Merge types — squash for task→sprint, merge-commit for sprint→main — per AGENTS.md §8.)*
     - **Description Requirements**:
         - **Summary**: Brief overview of the implementations and changes.
         - **Lessons Learned**: Any insights or technical hurdles overcome.
@@ -89,8 +88,8 @@ Execute each step sequentially for every Feature in the sprint.
     - If **all** features are `[x]` or `[-]` (superseded/deferred): add `> **STATUS: CLOSED**` to the plan header, move the file to `archive/`, and remove any associated QA reports and mockup files from the root.
     - If any features remain open: leave the file in the root and continue.
     - **Never** leave a closed sprint plan at the project root — it pollutes the active artifact space.
-23. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail.
-24. **TODO Audit [MANDATORY — End of Sprint]:** Run the `/todo-manager` skill § 6 audit. Cross-reference every `- [ ]` item in `TODO.md` against the recent git log (`git log --oneline -20`). Mark delivered items `[x]` with a PR reference comment and archive any fully-completed sections. This is not optional — stale TODO entries erode backlog trust.
+23. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail. **Enforced, not just stated:** the sprint-closing QA run (`run-qa/SKILL.md §5`) now checks for a current-sprint `LESSONS_LEARNED.md` commit before it can issue `STATUS: PASS` — do this step before running that QA gate, not after (added 2026-07-18 after 4 sprints closed without it despite this MANDATORY wording alone).
+24. **TODO Sweep [MANDATORY — End of Sprint]:** Run the `/todo-manager` skill's **§ 7 full sweep** — all five passes, not the § 6 audit alone. Report the before/after numbers it asks for (`sections`, `lines`, archived, reconciled); a sweep that reports no numbers is indistinguishable from one that did nothing. This is not optional — stale TODO entries erode backlog trust. **Widened from "§ 6 audit", because the narrow version was already MANDATORY here and still left one project's `TODO.md` at 5 428 lines / 167 sections with 12 headings reading `✅ RESOLVED`:** § 6 and § 4 are both checkbox-keyed, and a third of the file is prose, so the mandated step ran and was structurally blind to 96% of it. **A close-out step that cannot fail is not a gate** — this one reported success every sprint while the file it governs grew **2.2×**, from 2 439 lines when it was made MANDATORY to 5 428.
 25. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
 26. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
 

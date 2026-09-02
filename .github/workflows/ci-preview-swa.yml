@@ -10,15 +10,30 @@ on:
   # never this shared preview slot. The push trigger stays narrowly scoped to `main` + the paths
   # below rather than every branch, since GitHub Actions minutes are a hard, exhaustible cap on
   # this Free private repo. Dispatch from the GitHub Actions tab to preview a non-main branch.
-  push:
-    branches:
-      - main
-    paths:
-      - 'lc-webapp/**'
-      - '.github/workflows/ci-preview-swa.yml'
-      - '.github/workflows/shared-build-angular.yml'
+  # ── The `push:` trigger on `main` was REMOVED 2026-09-01 ────────────────────────────────────
+  # It fired on `main` under `lc-webapp/**` — the SAME branch and the SAME paths as
+  # cd-angular-azure-static-web-apps.yml, which deploys `main` to the development environment. So
+  # every merge touching the frontend ran two full build-and-deploy pipelines to publish the same
+  # commit to two places, and the preview half had no audience: `main` is already on dev, which is
+  # where you would look at it.
+  #
+  # It also actively harmed the case previews exist for. The slot is shared
+  # (`concurrency: ci-preview-swa`, `cancel-in-progress`), so a merge to `main` and a dispatch of a
+  # PR branch RACE for it. On 2026-09-01 both were in flight: the dispatch won and the `main` run
+  # was cancelled — but had the order flipped, the preview URL would have served `main`'s build
+  # while being reported as the PR's, and nothing would have said so.
+  #
+  # A preview is now always an explicit act: you dispatch it for the branch you want to look at.
   workflow_dispatch:
     inputs:
+      runner:
+        description: 'Where to run. "self-hosted" uses your own runner and bills NO Actions minutes; "github" uses GitHub-hosted. Only a manual dispatch can choose — every automatic trigger stays GitHub-hosted.'
+        type: choice
+        options:
+          - github
+          - self-hosted
+        default: github
+        required: false
       build-config:
         description: >
           Angular build configuration. "production" calls the real dev Function App/DB (needs it
@@ -46,6 +61,7 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
       # Angular CLI configuration (`--configuration`), NOT a GitHub environment.
@@ -63,7 +79,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     environment: development
     steps:
       - name: Checkout Code
@@ -82,6 +98,7 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
           api-base-url: ${{ vars.API_BASE_URL }}
+          app-insights-connection-string: ${{ vars.APP_INSIGHTS_CONNECTION_STRING }}
           tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CI_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

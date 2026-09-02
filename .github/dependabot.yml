@@ -45,8 +45,17 @@ updates:
           - "patch"
 
   # ── GitHub Actions (keeps A08 SHA-pins current) ──────────────────────────
+  # `directories`, not `directory` — the singular form with "/" scans `.github/workflows/` ONLY, so
+  # a composite action under `.github/actions/**` is invisible to Dependabot and drifts silently
+  # forever. Measured 2026-08-26 (S49 T6): `deploy-functions/action.yml` sat on
+  # `actions/setup-dotnet@v5` while Dependabot was proposing v6 for the workflow that calls it —
+  # merging that PR alone would have left v5 and v6 live simultaneously, the exact drift
+  # `stack-github-actions.md §5` warns about and the same shape as S44's `setup-node` v6/v7 finding.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/deploy-functions"
+      - "/.github/actions/deploy-swa"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

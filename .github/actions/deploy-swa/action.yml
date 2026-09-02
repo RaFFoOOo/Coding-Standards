@@ -38,6 +38,10 @@ inputs:
     description: 'Value for __API_BASE_URL__ token replacement — the Angular app calls this URL directly'
     required: false
     default: ''
+  app-insights-connection-string:
+    description: 'Value for __APP_INSIGHTS_CONNECTION_STRING__ token replacement (frontend telemetry — Sprint 33 T3)'
+    required: false
+    default: ''
   tenant-key:
     description: 'Tenant slug selecting the entry in .github/tenant-meta.json (e.g. la-cremeria, le-cementine). Resolves __BRAND_TITLE__, __FAVICON_URL__, __OG_TITLE__, __OG_DESCRIPTION__, __OG_IMAGE_URL__, __OG_URL__.'
     required: true
@@ -95,6 +99,7 @@ runs:
         TOKEN_MSAL_AUTHORITY: ${{ inputs.msal-authority }}
         TOKEN_MSAL_API_SCOPE: ${{ inputs.msal-api-scope }}
         TOKEN_API_BASE_URL: ${{ inputs.api-base-url }}
+        TOKEN_APP_INSIGHTS_CONNECTION_STRING: ${{ inputs.app-insights-connection-string }}
         # TOKEN_BRAND_TITLE / FAVICON_URL / OG_* inherited from $GITHUB_ENV
         # (set by the "Resolve Tenant Meta" step from .github/tenant-meta.json).
       run: |
@@ -125,6 +130,7 @@ runs:
           -e "s|__MSAL_AUTHORITY__|$(esc "${TOKEN_MSAL_AUTHORITY}")|g" \
           -e "s|__MSAL_API_SCOPE__|$(esc "${TOKEN_MSAL_API_SCOPE}")|g" \
           -e "s|__API_BASE_URL__|$(esc "${TOKEN_API_BASE_URL}")|g" \
+          -e "s|__APP_INSIGHTS_CONNECTION_STRING__|$(esc "${TOKEN_APP_INSIGHTS_CONNECTION_STRING}")|g" \
           {} +
         # Static HTML meta tokens (Sprint 16 Track F) — substituted into
         # index.html so social-share crawlers (facebookexternalhit, WhatsApp,

@@ -5,7 +5,9 @@ description: Periodic, honest audit of the project — rules, skills, sprints, c
 
 # SKILL: recursive-review
 
-> This workflow references gh CLI commands for GitHub operations. Substitute with your platform's equivalent GitHub tools where available.
+> **Claude Code:** This skill references `gh` CLI commands for GitHub operations. In Claude
+> Code environments with MCP GitHub tools, substitute all `gh` commands with the equivalent
+> MCP tools (e.g., `mcp__github__list_pull_requests` for `gh pr list`).
 
 > **Cron note:** This skill is invoked manually (`/recursive-review` or `/recursive-review YYYY-MM-DD`).
 > If you want it to fire automatically on a schedule, wire `CronCreate` from a separate
@@ -37,10 +39,16 @@ followed by a PR.
 3. Run `gh pr list --state open` — note any open PRs that may invalidate the audit.
 4. Read the active sprint plan called out in `CLAUDE.md`.
 
-## § 2. Inventory Phase [MANDATORY — delegate to Explore subagent]
+## § 2. Inventory Phase [MANDATORY — the grep targets, not the delegation]
 
-Spawn an Explore subagent with the prompt template below. **Do not skip the grep targets** —
-they encode lessons from prior reviews and prevent the audit from missing rule violations.
+Run the inventory below. **Delegate it to an Explore subagent where agent spawning is enabled**
+(it keeps large dumps out of the main thread); otherwise run the same targets inline with
+`grep`/`wc`/`git`. **The mandate is the target list, not the mechanism** — some harnesses refuse to
+spawn agents unless the user asks, and a skill whose first mandatory step cannot execute reads as a
+skipped step rather than an adapted one. Whichever way it runs, say which in the deliverable.
+
+**Do not skip the grep targets** — they encode lessons from prior reviews and prevent the audit from
+missing rule violations.
 
 ```
 You are auditing <repo-name> for a recursive review. Working directory: <abs-path>.
@@ -48,8 +56,8 @@ Report findings in the EXACT order below. ≤ 200 words per section. No code cha
 
 ### 1. Frontend service inventory
 For every IFooService interface in <frontend-src>: list the interface path, the Mock*Service
-sibling path, whether an Http*Service exists, and where it's bound in the app's DI/provider
-config. Flag every interface still showing a `TODO [<ticket>]` in its provider registration.
+sibling path, whether an Http*Service exists, and where it's bound in app.providers.ts /
+app.config.ts. Flag every interface still showing TODO [Sprint-N] in its provideByMode call.
 
 ### 2. Backend endpoint inventory
 List every [Function(...)] HTTP endpoint in <backend-src>. For each: name, route, methods,
@@ -64,7 +72,7 @@ Files > 200 lines, sorted desc, top 15. Note: 200-line rule applies to LOGIC fil
 ### 4. Framework-specific size budgets [DO NOT SKIP]
 Read <frontend>/angular.json. For every component .scss whose byte size exceeds the
 production `anyComponentStyle.maximumError` setting, report file path + size + budget +
-multiplier-over-error. **Note: line count is not the right gate for SCSS.**
+multiplier-over-error. **line count is not the right gate for SCSS.**
 
 ### 5. STRICT-rule grep targets [MANDATORY]
 For each STRICT rule in .agents/rules/*.md, grep the codebase for the explicit forbidden
@@ -98,6 +106,15 @@ For every workflow in .github/workflows/, check: does any deploy workflow have a
 smoke step? If no, flag as 🔴 (5 sequential bugfix PRs all shipped
 "successful" CI without a smoke gate).
 
+Also grep every workflow for `pull_request:` triggers scoped with `branches:\s*\[main\]` (or
+quoted). This filters the PR's *target* branch, not its source — a workflow meant to validate every
+PR in a multi-level branch hierarchy (sprint → task, per `AGENTS.md §8`) silently skips every
+task-branch PR with no error visible anywhere (a skipped check shows no red ❌, it just shows
+nothing). Flag every hit as 🔴 unless the workflow's own comments document the restriction as
+deliberate (e.g. a hygiene guard that only needs to fire at the main-merge boundary). *(Added
+2026-07-18 after `ci-angular.yml` carried exactly this gap, undetected by the 2026-07-16 review's
+own pass, only caught reactively by a later sprint's QA gate.)*
+
 ### 10. Anything else flagged by the rules
 Up to 5 violations of any rule in .agents/rules/. Cite rule + file:line evidence.
 
@@ -121,7 +138,7 @@ of Scope" or "deferred", the rationale MUST include the command (with output) th
 mechanically proves the deferral is safe. Example:
 
 ```
-"Out of Scope: SCSS audit. Verified: ls -la <frontend>/src/app/**/*.scss | sort -k5 -n -r |
+"Out of Scope: SCSS audit. Verified: ls -la <spa-app>/src/app/**/*.scss | sort -k5 -n -r |
 head -3 → top 3 files at 13.0/10.9/5.5 KB; production anyComponentStyle error budget = 8 KB
 → FAIL. Promote to in-scope."
 ```
@@ -176,6 +193,16 @@ Keep the file under 500 lines. The Tech Lead should be able to read it in 15 min
    - **Explicit ownership block** copied from §5 of the doc (the agent self-criticism)
 5. Do NOT implement any of the findings in the same PR. The deliverable is the doc only.
    Findings get tracked into existing or new sprint plans as separate PRs.
+6. **[MANDATORY] Translate every Tech-Lead decision into a `TODO.md` entry in the same resolution
+   pass — never leave it as review-doc prose alone.** The Tech Lead typically answers §9 as PR
+   review comments on the open PR, not by editing the doc directly — resolving that feedback (via
+   `/resolve-pr` or equivalent) is the moment every resulting "approved" or "decided" item MUST get
+   a real `TODO.md` entry (or sprint task, if concrete enough), created in the same PR that records
+   the resolution. A decision that exists only inside a review PR's comment thread or the doc's §9b
+   prose is functionally identical to an unapproved idea — it has no owner and decays the same way.
+   *(Codified 2026-07-18 after `PLAN_recursive_review_2026-07-16.md` §9b item 3 — approved-per-
+   no-objection — sat with zero downstream tracking for a full review cycle; see
+   `PLAN_recursive_review_2026-07-18.md` §4.1/§5.3 for the full account.)*
 
 ## § 7. Carry-forward Rule
 

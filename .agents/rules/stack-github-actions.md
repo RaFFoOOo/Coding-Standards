@@ -14,9 +14,10 @@ description: CI/CD workflow rules for GitHub Actions pipelines
   - `push` events carry no PR payload. The PR number would require an extra API call, adding latency and a failure mode.
   - `pull_request` events expose `github.event.number`, `context.issue.number`, and `github.head_ref` natively.
   - **Exception — Azure SWA preview deployments:** When a stable `deployment_environment` URL is required (e.g., for pre-configured auth redirect URIs), use `push` instead. Azure SWA generates PR-numbered URLs for `pull_request`-triggered deployments regardless of the `deployment_environment` parameter. Use `pulls.list({ head })` to resolve the PR number for commenting.
+  - **Preview CI: `push` to `main` (path-filtered) + `workflow_dispatch`, Mock-only by default [cost-reduction + no-preview-backend policy, 2026-07-08 rev.4]:** `<preview-deploy-workflow>` triggers automatically on `push` to `main`, scoped to `paths: ['<spa-app>/**', ...]` so it only fires when Angular-relevant code actually changed — plus `workflow_dispatch` for previewing any other branch on demand. There is no preview backend slot, so the build-config fallback (`inputs.build-config || 'preview'`) defaults every automatic push-triggered preview to the fully-Mocked `preview` config (`environment.preview.ts`) — a stable, backend-independent UX sandbox that a later automatic trigger can't silently flip back to calling the real dev backend. Validating against the real dev backend uses the `development` environment/config instead (local `ng serve`, or an explicit manual `build-config: production` dispatch) — never this shared preview slot. GitHub Actions minutes are a hard, exhaustible cap on this Free private repo, so the `push` trigger stays narrowly scoped to `main` rather than every branch (which is what made the pre-rev.2 `task/**` trigger too expensive); task-branch previews remain opt-in via manual dispatch. *(Revises the 2026-07-06 rev.3 policy, whose fallback defaulted to `production` — see DECISIONS.md 2026-07-08.)*
+  - **One job per logical gate, except trivial guards [cost]:** GitHub bills each **job** rounded up to a whole minute. Sub-second checks (the repo-hygiene bash guards in `validate-archive.yml`) MUST share a **single** job with one checkout and sequential steps, not one job each — three trivial jobs cost ~3 billed minutes for ~10 seconds of work. Keep heavyweight, independently-parallelisable work (build vs. test vs. schema-drift) in separate jobs where wall-clock matters.
   - **Branch coverage for preview CI [STRICT]:** A push-triggered preview-deployment workflow MUST include all active branch prefixes: `feature/**`, `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`. Otherwise preview deployments silently skip branches in the sprint/task hierarchy, and a contributor on an uncovered prefix gets no preview URL.
   - **Preview cost awareness [cost]:** Each preview is a full production build + deploy (typically several billed minutes), and on a Free/private repo Actions minutes are a hard, exhaustible cap. If every branch class already has a validation build elsewhere (e.g. PRs into `main` run the CI build), an auto-preview on push duplicates that coverage and burns minutes — consider making the preview `workflow_dispatch`-only (dispatch on demand) or restricting it to the prefixes that genuinely need a live URL. Record the chosen trade-off in the project's decision log.
-  - **One job per logical gate, except trivial guards [cost]:** GitHub bills each **job** rounded up to a whole minute. Sub-second checks (e.g. repo-hygiene bash guards) MUST share a **single** job with one checkout and sequential steps, not one job each — three trivial jobs cost ~3 billed minutes for ~10 seconds of work. Keep heavyweight, independently-parallelisable work (build vs. test vs. schema-drift) in separate jobs where wall-clock matters.
 - **Branch-prefix filtering** on `pull_request` triggers MUST use a job-level `if` condition, not the `branches:` key:
   ```yaml
   # ✅ Correct — filters by source branch (head_ref)
@@ -106,8 +107,9 @@ GitHub Actions job schemas are mutually exclusive: a job either **runs steps** (
 optionally `environment:`) or **calls a reusable workflow** (`uses:` + `with:`/`secrets:`) — never
 both. Adding `environment:` to a `uses:` job doesn't get silently ignored; it breaks the whole
 workflow file with a misleading cascade: `Required property is missing: runs-on` on the job, plus
-`Unexpected value 'uses'/'with'/'secrets'` on that job's own keys (hit in a reusable-workflow `smoke`
-job added in a follow-up fix commit, unnoticed until dispatch failed).
+`Unexpected value 'uses'/'with'/'secrets'` on that job's own keys (2026-07-05, `cd-backend-azure-
+functions.yml`'s `smoke` job — introduced in a follow-up fix commit, unnoticed until dispatch
+failed).
 
 When a `uses:` job needs a value that must resolve inside a specific GitHub environment (e.g. an
 environment-scoped `vars.*`), resolve it in a **preceding `runs-on` job that already has
@@ -193,7 +195,10 @@ Two pitfalls were hit on the same pipeline within hours:
 
 **Pitfall 1 — `dotnet publish --output <custom-path>` does not copy `.azurefunctions/`:**
 The SDK target writes to `$(OutputPath)`, not `$(PublishDir)`, so a custom `--output` flag
-strands the folder in the build dir. Add a post-publish copy step:
+strands the folder in the build dir on some SDK versions (others emit it under `--output`
+directly — do not assume either way). Add a post-publish step that **merges** the folder rather
+than copying the directory itself — `cp -r SRC DST` nests into `DST/.azurefunctions/.azurefunctions`
+when `DST` already exists, confirmed in a live CD run's publish.zip listing (2026-07-04):
 ```yaml
 - name: Publish
   run: |
@@ -201,7 +206,8 @@ strands the folder in the build dir. Add a post-publish copy step:
     PROJ_DIR=$(dirname "<csproj>")
     AZFUNC_SRC="$PROJ_DIR/bin/Release/<tfm>/.azurefunctions"
     if [ -d "$AZFUNC_SRC" ]; then
-      cp -r "$AZFUNC_SRC" "$GITHUB_WORKSPACE/publish/.azurefunctions"
+      mkdir -p "$GITHUB_WORKSPACE/publish/.azurefunctions"
+      cp -r "$AZFUNC_SRC/." "$GITHUB_WORKSPACE/publish/.azurefunctions/"
     fi
 ```
 
@@ -265,4 +271,237 @@ uses: third-party/some-action@a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # v2.1.0
 ```
 
 ### A06 — CodeQL Scanning [RECOMMENDED]
-A CodeQL scan workflow catches a broad class of injection, path-traversal, and data-flow vulnerabilities automatically. **It is free for PUBLIC repositories only.** On a **private** repository, CodeQL *analysis* still runs, but uploading results to the Security tab requires **GitHub Advanced Security** — a paid add-on (Team/Enterprise) **not available on Free/personal plans** (`PATCH …/security_and_analysis` → HTTP 422 "Advanced security has not been purchased"). Do **not** state CodeQL is "free at any visibility" — that conflates public-repo-free with all-visibility-free. Running the CodeQL CLI with `upload:false` to dodge GHAS on a private repo is **license-gray** (the CLI is licensed for private use only *in connection with* GitHub code scanning) — not a permitted workaround. On a private repo where GHAS is unavailable, ship CodeQL **dormant** (e.g. `workflow_dispatch`-only behind an enablement gate) and record the choice in the project's decision log. Free first-party SAST on a private repo means a different tool (semgrep OSS, eslint security plugins, Roslyn analyzers).
+A CodeQL scan workflow catches a broad class of injection, path-traversal, and data-flow vulnerabilities automatically. **It is free for PUBLIC repositories only.** On a **private** repository, CodeQL *analysis* still runs, but uploading results to the Security tab requires **GitHub Advanced Security** — a paid add-on (Team/Enterprise) **not available on Free/personal plans** (`PATCH …/security_and_analysis` → HTTP 422 "Advanced security has not been purchased"; verified against a Free personal plan). Do **not** state CodeQL is "free at any visibility" — that conflates public-repo-free with all-visibility-free. Running the CodeQL CLI with `upload:false` to dodge GHAS on a private repo is **license-gray** (the CLI is licensed for private use only *in connection with* GitHub code scanning) — not a permitted workaround. For this repo CodeQL ships **dormant** (`workflow_dispatch`-only + `ENABLE_CODEQL` gate); see `DECISIONS.md` 2026-06-02. Free first-party SAST on a private repo means a different tool (semgrep OSS, eslint security plugins, Roslyn analyzers).
+
+## 7. Cost Governance [STRICT]
+
+On a Free private repo, Actions minutes are a hard, exhaustible cap — and when they run out
+**every** workflow fails in 2–5 seconds with no logs at all, which reads exactly like a broken
+repo. This section exists because that happened on **2026-08-23**, and the diagnosis cost an hour
+because a quota block is indistinguishable from a catastrophic config error until you notice that
+even a pure-bash guard is failing.
+
+### 7.1 The cost model — three multipliers, and they compound
+
+**GitHub bills each JOB, rounded up to a whole minute.** So the bill is not "how long does CI
+take", it is:
+
+```
+billed ≈ Σ_jobs ceil(job_minutes) × runs
+```
+
+Measured on this repo in the 13–17 Aug 2026 window:
+
+| Workflow | Jobs | Billed / run |
+|---|---|---|
+| `ci-angular` | Live smoke walk **3** + validate-build **2** | **5 min** |
+| `ci-backend` | schema-drift **1** + build-and-test **2** | **3 min** |
+
+98 `ci-angular` runs in five days ⇒ **490 min**, against a 2 000 min/month allowance. Three
+multipliers produced that, and **no one of them was reckless on its own**:
+
+1. **Per-run cost.** The live smoke walk (added 2026-08-05) took `ci-angular` from one job at ~2
+   billed min to two jobs at 5 — a **2.5×** on every run, one week before the busiest sprint ever.
+2. **Run count — the one that surprised everyone.** **52 % of all `ci-angular` runs were on
+   `sprint/*` branches, not task branches.** Under `AGENTS.md §8`'s Sprint/Task strategy the
+   cumulative sprint→`main` PR stays open for the whole sprint, so **every task merged into the
+   sprint branch re-ran that PR's full CI**. ~300 billed minutes re-validating PRs that are drafts
+   *precisely because* nobody intends to merge them yet.
+3. **Volume.** A 22-task sprint, overlapping the close of one sprint and the start of another.
+
+**The rule: cost a new job before adding it, in billed minutes per *sprint*, not per run.**
+`ceil(minutes) × jobs × expected runs`, and expected runs for anything `pull_request`-triggered
+must include the sprint-branch re-runs, which roughly **double** the naive per-task estimate.
+Record the estimate in the PR that adds the job.
+
+### 7.2 Draft PRs skip the heavy gates
+
+A draft PR is, by definition, not ready to merge — and in this repo the cumulative sprint→`main` PR
+is a draft *on purpose*, as the standing STOP gate. Re-running a browser walk on it after every
+task merge buys nothing that re-running it once, before merge, does not.
+
+```yaml
+- name: Run the live smoke walk
+  if: github.event.pull_request.draft != true
+  run: npm run smoke:walk
+```
+
+Three things about that one line, each of which has a way to go silently wrong:
+
+- **`!= true`, never `== false`.** Outside a `pull_request` event the field is `null`; `null !=
+  true` is true, so the gate **fails open** and the work still runs. A correctness gate that
+  guesses wrong must over-run, never under-run.
+- **You MUST add `ready_for_review` to the trigger's `types:`.** It is *not* in the default set
+  (`opened`, `synchronize`, `reopened`), so without it, taking the PR out of draft fires **no run
+  at all** and the skipped gate never runs — the gate is not deferred, it is deleted. Listing any
+  type replaces the whole default set, so spell all four out.
+- **Gate the STEP, never the JOB — this is the trap.** Cheap guards routinely share an expensive
+  job (§1's "one job per logical gate, except trivial guards"), so a job-level `if:` silently
+  disables them too. In this repo `check-file-length.sh`, `check-mock-order-items.sh`,
+  `check-validation-anchors.sh` and the e2e type-check all live inside the `smoke-walk` job — and
+  `check-mock-order-items.sh` caught a real defect on exactly the integration PR a job-level gate
+  would have skipped. **Before gating anything, list every step in the job and confirm each one is
+  genuinely deferrable.**
+
+Both halves are enforced by `scripts/ci/check-workflow-cost-guards.sh`, because a rule you verify
+by grepping cannot be re-argued and a rule you verify by memory will be.
+
+### 7.3 Every `pull_request` runner job cancels superseded runs
+
+```yaml
+concurrency:
+  group: <job>-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+Without it, three pushes in a minute bill three whole minutes to answer the same question three
+times. `uses:` jobs inherit the caller's block and need none of their own. Same guard, rule 2.
+
+### 7.4 When the allowance is gone, recognise it fast
+
+Do not debug the diff. The signature is unmistakable once you know it:
+
+| Symptom | Reading |
+|---|---|
+| **Every** workflow fails, including pure-bash guards that pass locally | not your code |
+| Jobs complete in **2–5 s** | the runner never started |
+| Log download returns **HTTP 404** for every job | no step ever executed, so there is nothing to log |
+| A workflow with 150+ prior green runs fails unchanged | not the workflow |
+
+One re-run is sanctioned to confirm (a job that dies before any step is "runner loss" per this
+file's re-run rule); a second is waste. Then check Settings → Billing → Plans and usage, and
+githubstatus.com.
+
+## 8. Self-Hosted Runner — Opt-In Only [STRICT]
+
+Added 2026-08-23, while the GitHub-hosted allowance was exhausted (§7). A self-hosted runner costs
+**no Actions minutes**. This repo can use one, but only when a person asks for it by name.
+
+### 8.1 The contract
+
+The choice resolves through a **three-step chain**, most specific first:
+
+```
+github.event.inputs.runner   per-run override, manual dispatch only
+   ↓ (null on push / pull_request)
+vars.CI_RUNNER               repository variable — the global default
+   ↓ (unset)
+ubuntu-latest                hard fallback, always GitHub-hosted
+```
+
+**The repository variable is the primary control**, and it is the reason this works without adding
+`workflow_dispatch` to every workflow: `vars.*` is readable in `runs-on`, so a `pull_request`- or
+`push`-only workflow follows it too. Set `CI_RUNNER=self-hosted` and *everything* moves; delete the
+variable and everything reverts, with no code change and no redeploy.
+
+**The tradeoff, stated plainly: while `CI_RUNNER=self-hosted` is set, a PR opened when the runner
+is offline queues with no runner to take it, and the check never reports.** That is a global mode
+switch, so treat it as one — set it for the duration of a quota outage, unset it after. The
+dispatch input remains the safer instrument for a one-off: it moves a single run without changing
+the default for everyone.
+
+The hard fallback is never removed, so a repo with no variable and no dispatch behaves exactly as
+it did before this section existed.
+
+Callers compute the chain; reusable workflows accept it as an input:
+
+```yaml
+# caller — resolves the chain, and is the only place it is written
+jobs:
+  own-job:
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+  called-job:
+    uses: ./.github/workflows/shared-build-dotnet.yml
+    with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+```
+```yaml
+# reusable — accepts, never decides; still consults the variable when a caller does not opt in
+on:
+  workflow_call:
+    inputs:
+      runner: { type: string, required: false, default: 'ubuntu-latest' }
+jobs:
+  build:
+    runs-on: ${{ inputs.runner || vars.CI_RUNNER || 'ubuntu-latest' }}
+```
+
+A workflow with no `workflow_dispatch` needs no changes beyond the `runs-on` expression — the
+variable reaches it anyway. The dispatch input is added only where a per-run override is useful.
+
+Four things about that shape, each with a way to go wrong silently:
+
+- **`github.event.inputs.runner` is null on every non-dispatch event**, so `null == 'self-hosted'`
+  is false and the chain falls through to `vars.CI_RUNNER`, then to `ubuntu-latest`. With no
+  variable set, the automatic path is GitHub-hosted **by construction**, not by remembering to set
+  a default.
+- **The `A && B || C` ternary needs a truthy B.** `'self-hosted'` is a non-empty string, so it is
+  safe. Substitute anything falsy and the expression silently collapses to `C`.
+- **Every `runs-on:` expression must name `ubuntu-latest` as its fallback.** `runs-on: ${{
+  inputs.runner }}` alone resolves to an empty string on any event that supplies no input, and an
+  empty `runs-on` is a hard workflow error. Guard rule 3.
+- **Half the jobs are `uses:` calls, and the forward is easy to forget.** Miss it and the dispatch
+  *appears* to work while the build half quietly stays on GitHub-hosted and keeps billing. Guard
+  rule 4. This is the failure mode this whole section is shaped around: it does not fail, it
+  half-works.
+
+### 8.2 What the runner host must provide
+
+The workflows assume **Linux**. Verified assumptions, not guesses: 5 × `sed -i` (GNU semantics —
+BSD/macOS `sed` needs an empty-string argument), 3 × `set -euo pipefail`, 3 × `[[ ]]`, and 2 × `jq`.
+Only 8 of 17 multi-line `run:` blocks pin `shell: bash`, so on a Windows runner the other 9 would
+execute under `pwsh` and fail.
+
+**"Linux" is not "Debian".** An earlier version of this line said `playwright install --with-deps`
+was "`apt` and therefore Linux-only", which quietly equated the two — and the Tech Lead's runner is
+Linux and not apt-based. The step died with `apt-get: command not found` (exit 127) before a single
+test ran, so `Live smoke walk` reported a failure that had nothing to do with the diff under test
+Never write a host assumption as "Linux" when what the command needs is a
+package manager, a specific libc, or systemd.
+
+Needed on the host: the `az` CLI (the backend deploy shells out to `az functionapp deploy`), the
+.NET SDK or `actions/setup-dotnet`, Node, and `jq`.
+
+**Chromium's system libraries are NOT on that list, and the reason is worth recording**, because
+the first version of this section put them there on no evidence. The failure log proved only that
+`apt-get` was absent — it said nothing about a missing library, and the Tech Lead had been running
+Playwright on that machine for months, so they were plainly already present. `--with-deps` was
+installing what was already installed, with a tool the distro does not have. **Dropping the flag
+was the whole fix.** If a host ever genuinely lacks them, `playwright install-deps --dry-run`
+names them for that distro — but do not assert they are missing without a launch failure that says
+so.
+
+**A workflow provisions the WORKSPACE; it never mutates the HOST [STRICT].**
+
+That is the line, and `--with-deps` is the only step in this repo that crossed it. The flag runs
+`apt-get` **as root on the runner machine** — disposable on a GitHub-hosted VM, but on a
+self-hosted runner that machine is someone's laptop, so any PR that edits a workflow could execute
+arbitrary root commands on it. That is a supply-chain hole, and it decides the question on its own;
+the tidiness argument is not needed. `--with-deps` is therefore removed, and the system libraries
+above are a **pre-condition of registering a runner**, not a step.
+
+The rule is not "never install during a workflow" — that would ban `setup-node` and
+`setup-dotnet` too, and the toolchain version belongs in the workflow where it is explicit rather
+than in host state nobody can see. Three categories, three homes:
+
+| Thing | Where | Why |
+|---|---|---|
+| System libraries, root-owned packages | **host pre-condition** | host-wide, persistent, needs root |
+| Chromium binary (`playwright install`, no flag) | project dependency | version-locked to `@playwright/test`; pinning it to the host drifts on every bump — `agent-workarounds.md` records that exact failure |
+| Node / .NET SDK (`setup-*`) | workspace | installs into the tool cache, not system paths (hence `DOTNET_INSTALL_DIR`, §8.1) |
+
+**The cost of the pre-condition model, stated rather than glossed:** host setup becomes state no
+one can read from the repo. Rebuild the machine or add a second runner and CI fails with a cryptic
+error instead of a useful one. The mitigation is the list above being kept accurate — which is why
+it names packages instead of saying "the usual dependencies".
+
+**This buys no CI minutes**, and should not be sold as if it did: the smoke-walk job measures 161 s
+→ 3 billed minutes, and deleting the browser step entirely still bills 3 (§7.1's whole-minute
+boundary). Self-hosted bills nothing at all. The change is about blast radius and determinism.
+
+### 8.3 Security
+
+A self-hosted runner executes repository code on that machine with that machine's credentials. This
+repo is private, so the fork-PR attack that makes self-hosted runners dangerous on public repos does
+not apply — **never enable one on a public repo without an approval gate**. Keep the runner
+non-privileged, and stop it when it is not in use rather than leaving it registered and idle.
