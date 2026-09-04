@@ -806,6 +806,226 @@
           "one-talent": "79cf786913b3f281fc85bf9b0f6ea955222ed445"
         }
       }
+    },
+    {
+      "mode": "SYNC",
+      "date": "2026-09-04T00:00:00Z",
+      "participants": [
+        {
+          "repo": "Coding-Standards",
+          "path": "/home/raffoooo/Projects/Coding-Standards",
+          "branch": "chore/sync-standards-2026-09-02"
+        },
+        {
+          "repo": "le-cementine",
+          "path": "/home/raffoooo/Projects/le-cementine",
+          "branch": "chore/sync-standards-2026-09-02"
+        },
+        {
+          "repo": "one-talent",
+          "path": "/home/raffoooo/Projects/one-talent",
+          "branch": "chore/sync-standards-2026-09-02"
+        }
+      ],
+      "note": "Incremental re-run on top of the 2026-09-02 sync branches (baseline = that entry), collecting the standards drift that landed on le-cementine's main after it. Three concepts changed + one new: rule:stack-angular (token arity != shorthand ban), rule:stack-github-actions (position npm audit after lint/tests/build), doc:AGENTS (new §0 rules 'No Fabrication' and 'Open Points Are Questions'), and workflow:run-sprint-unattended, adopted as a shared standard and fanned out to one-talent. le-cementine is SOURCE for all four and received no fan-out; its own copies stay concrete by design. The 14 github:* digests remain FROZEN at their 2026-07-16 values for every participant, unchanged from the 2026-09-02 entry — one-talent's CI adaptation is still deferred, and recomputing them would record the deferral as convergence.",
+      "deferrals": [
+        {
+          "concepts": [
+            "github:actions/deploy-functions/action.yml",
+            "github:actions/deploy-swa/action.yml",
+            "github:dependabot.yml",
+            "github:workflows/cd-angular-azure-static-web-apps.yml",
+            "github:workflows/cd-angular-azure-storage.yml",
+            "github:workflows/cd-backend-azure-functions.yml",
+            "github:workflows/ci-angular.yml",
+            "github:workflows/ci-backend.yml",
+            "github:workflows/ci-preview-swa.yml",
+            "github:workflows/codeql.yml",
+            "github:workflows/shared-build-angular.yml",
+            "github:workflows/shared-build-dotnet.yml",
+            "github:workflows/smoke-frontend.yml",
+            "github:workflows/validate-archive.yml"
+          ],
+          "target": "one-talent",
+          "reason": "missing guard scripts + live CI"
+        }
+      ],
+      "fileDigests": {
+        "rule:agent-workarounds": {
+          "Coding-Standards": "3fdb96a4c53c39be1e166caf89b7b6870bf64ca2",
+          "le-cementine": "b06c527561b6c65573879a1991fdeb6e77935df6",
+          "one-talent": "3fdb96a4c53c39be1e166caf89b7b6870bf64ca2"
+        },
+        "rule:naming-azure-resources": {
+          "Coding-Standards": "022fa65cbc407fd774efee4e884715ea6776f477",
+          "le-cementine": "f2cc9a462a5d556f8f4828f634e3706c1c8d6484",
+          "one-talent": "70a85749809b6b76e978fb1a4dee3c9d7440807d"
+        },
+        "rule:stack-angular": {
+          "Coding-Standards": "fb7e17ca75617ca6ea9f489fc9ec80128f24e656",
+          "le-cementine": "ed4f3386d1f57455d42d153daea6b31a4328c33d",
+          "one-talent": "fb7e17ca75617ca6ea9f489fc9ec80128f24e656"
+        },
+        "rule:stack-dotnet-core": {
+          "Coding-Standards": "310799c500072090a0f8aaa1b60ce5b06fa03f62",
+          "le-cementine": "ebe1211c3d362d89975487c3449f767586ad8440",
+          "one-talent": "310799c500072090a0f8aaa1b60ce5b06fa03f62"
+        },
+        "rule:stack-github-actions": {
+          "Coding-Standards": "82a0b81df2272143d209e944fe378a71003daabc",
+          "le-cementine": "8bb778312f58199b4573ce35d9d918ae0702456a",
+          "one-talent": "82a0b81df2272143d209e944fe378a71003daabc"
+        },
+        "skill:manage-artifacts": {
+          "Coding-Standards": "4352f403bab2c82fbd02835654a291abe2774fba",
+          "le-cementine": "e048c6ba1f000aeeab795805f9dfb66954401b80",
+          "one-talent": "4352f403bab2c82fbd02835654a291abe2774fba"
+        },
+        "skill:plan-sprint": {
+          "Coding-Standards": "97fe9fd5374e8064bb535bd7783aecab6dadbf5e",
+          "le-cementine": "71f4ae932cc9ed42c40bb67fca62eda0936f5902",
+          "one-talent": "97fe9fd5374e8064bb535bd7783aecab6dadbf5e"
+        },
+        "skill:run-qa": {
+          "Coding-Standards": "14ab508770ccbe9b69e883bcd77ac948320d42fe",
+          "le-cementine": "cde74f2e2bf0f52801354d42a22809885aee912b",
+          "one-talent": "14ab508770ccbe9b69e883bcd77ac948320d42fe"
+        },
+        "skill:todo-manager": {
+          "Coding-Standards": "a1007dcdf467379118eae27162ddd1bc339df4a9",
+          "le-cementine": "8deb566f02d79a41c83824d13a17bb5b43a679ef",
+          "one-talent": "a1007dcdf467379118eae27162ddd1bc339df4a9"
+        },
+        "workflow:deploy-azure": {
+          "Coding-Standards": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "le-cementine": "2072e3f5571568769416250208eb2764fac0e6ba",
+          "one-talent": "2072e3f5571568769416250208eb2764fac0e6ba"
+        },
+        "workflow:pause-session": {
+          "Coding-Standards": "83c54068f0021a831f345bc3962f2dbc8dda87c5",
+          "le-cementine": "f1bb91794e5d1390289041c7ca7480a87642612c",
+          "one-talent": "83c54068f0021a831f345bc3962f2dbc8dda87c5"
+        },
+        "workflow:recursive-review": {
+          "Coding-Standards": "369c3c6546a77eef6cf27b308378918986f2f7b0",
+          "le-cementine": "9fbeee008d313076b1d6238a62df34ffed04fba4",
+          "one-talent": "369c3c6546a77eef6cf27b308378918986f2f7b0"
+        },
+        "workflow:resolve-pr": {
+          "Coding-Standards": "2b9a15501ba36ee7151d98d5be1a8350a902c01c",
+          "le-cementine": "a4a1f8628a99a10191ae901c5a654bd6e344d181",
+          "one-talent": "e4f56e926e7e15c301138c49c2e90ed1fd57c507"
+        },
+        "workflow:resolve-workflow": {
+          "Coding-Standards": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353",
+          "le-cementine": "16c1bc3101928a5ccdcf8a2d00460fb8c05b305d",
+          "one-talent": "ad5192cb0cd6ec77b69ab13fab5c3ae25bdc2353"
+        },
+        "workflow:resume-session": {
+          "Coding-Standards": "cac226e4bcadd7151586160b60416994e63dba86",
+          "le-cementine": "cac226e4bcadd7151586160b60416994e63dba86",
+          "one-talent": "cac226e4bcadd7151586160b60416994e63dba86"
+        },
+        "workflow:run-feature": {
+          "Coding-Standards": "f62cecfdb08744c2bebea4375bb0369a4089757c",
+          "le-cementine": "04e87f4b564d325c6521e7bce25994eb09caf416",
+          "one-talent": "9dfd6460b6cff91c6b05f132178cd08a4296bf77"
+        },
+        "workflow:run-sprint-unattended": {
+          "Coding-Standards": "5305b1853a9ca9cb3bfdcd62634a5ab429c8b36f",
+          "le-cementine": "564975ba145b2dc4dc707e3aca2634d211bb44d5",
+          "one-talent": "5305b1853a9ca9cb3bfdcd62634a5ab429c8b36f"
+        },
+        "workflow:sync-templates": {
+          "Coding-Standards": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "le-cementine": "483bd5e62a81b097d6fad59722d2e29466bbfa3a",
+          "one-talent": "483bd5e62a81b097d6fad59722d2e29466bbfa3a"
+        },
+        "workflow:test-browser": {
+          "Coding-Standards": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "le-cementine": "61f912016d549ba8b165eecc135891c3a87bc60d",
+          "one-talent": "61f912016d549ba8b165eecc135891c3a87bc60d"
+        },
+        "workflow:ux-review": {
+          "Coding-Standards": "79cf786913b3f281fc85bf9b0f6ea955222ed445",
+          "le-cementine": "fd04adb5b552e44188bee4cddc279c20a4a7da2f",
+          "one-talent": "79cf786913b3f281fc85bf9b0f6ea955222ed445"
+        },
+        "doc:AGENTS": {
+          "Coding-Standards": "b5478b12b9ec2bf37a2bcebef14552d39067b35e",
+          "le-cementine": "87de44f316a2878e1fecda2a22ec0862d4983527",
+          "one-talent": "b5478b12b9ec2bf37a2bcebef14552d39067b35e"
+        },
+        "github:actions/deploy-functions/action.yml": {
+          "Coding-Standards": "be27a40addeea3823fb6fe888724626ea22a8f17",
+          "le-cementine": "be27a40addeea3823fb6fe888724626ea22a8f17",
+          "one-talent": "be27a40addeea3823fb6fe888724626ea22a8f17"
+        },
+        "github:actions/deploy-swa/action.yml": {
+          "Coding-Standards": "8cfb1316cbb4c81214f81927f85447ffe5ac646e",
+          "le-cementine": "8cfb1316cbb4c81214f81927f85447ffe5ac646e",
+          "one-talent": "66e0b941b56bf3ece91940f899fb74b7743ce7ff"
+        },
+        "github:dependabot.yml": {
+          "Coding-Standards": "7ba71a724b97ca62b48b337280139b4f3f9e7ac1",
+          "le-cementine": "7ba71a724b97ca62b48b337280139b4f3f9e7ac1"
+        },
+        "github:workflows/cd-angular-azure-static-web-apps.yml": {
+          "Coding-Standards": "132ccafbb9c23a1b180ea79eaa85ba1f27f42ccd",
+          "le-cementine": "132ccafbb9c23a1b180ea79eaa85ba1f27f42ccd",
+          "one-talent": "1e975825ea2b26ca191da1ef19873c27f5ea3cc9"
+        },
+        "github:workflows/cd-angular-azure-storage.yml": {
+          "Coding-Standards": "fe9d658677eb3409851e2eb2f8ff5750d12104e0",
+          "le-cementine": "fe9d658677eb3409851e2eb2f8ff5750d12104e0",
+          "one-talent": "fe9d658677eb3409851e2eb2f8ff5750d12104e0"
+        },
+        "github:workflows/cd-backend-azure-functions.yml": {
+          "Coding-Standards": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0",
+          "le-cementine": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0",
+          "one-talent": "95e74a45f97fd69f01c90dfd1fa11d1c04ba13b0"
+        },
+        "github:workflows/ci-angular.yml": {
+          "Coding-Standards": "6e206302e04381ba091cd92a9ed869ef33cb993f",
+          "le-cementine": "6e206302e04381ba091cd92a9ed869ef33cb993f",
+          "one-talent": "84436571fbf5e9aac8465ea74a5e259137071a30"
+        },
+        "github:workflows/ci-backend.yml": {
+          "Coding-Standards": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a",
+          "le-cementine": "482f0434a3370d0ad76d85bf0ee949bd6b1d4f26",
+          "one-talent": "186ee6c5dfc3ba65d27c6167b96b6bc66649b73a"
+        },
+        "github:workflows/ci-preview-swa.yml": {
+          "Coding-Standards": "084cd54aff40b8da09cacf1571607e597933ac5b",
+          "le-cementine": "084cd54aff40b8da09cacf1571607e597933ac5b",
+          "one-talent": "5f84d82cb627b1ee40b25ef0e48b25ce9e4f68a7"
+        },
+        "github:workflows/codeql.yml": {
+          "Coding-Standards": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e",
+          "le-cementine": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e",
+          "one-talent": "ba2ad228a9c3377e9f3462f7c47768d2dc5c074e"
+        },
+        "github:workflows/shared-build-angular.yml": {
+          "Coding-Standards": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3",
+          "le-cementine": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3",
+          "one-talent": "fd3e9397c7e79ee8ce67713fa109ce6c36aefee3"
+        },
+        "github:workflows/shared-build-dotnet.yml": {
+          "Coding-Standards": "15112e7443c55448151da635ee6aba7580edd255",
+          "le-cementine": "15112e7443c55448151da635ee6aba7580edd255",
+          "one-talent": "15112e7443c55448151da635ee6aba7580edd255"
+        },
+        "github:workflows/smoke-frontend.yml": {
+          "Coding-Standards": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1",
+          "le-cementine": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1",
+          "one-talent": "8bb1f94a30be3f5afa126aa64935caabfbfae2f1"
+        },
+        "github:workflows/validate-archive.yml": {
+          "Coding-Standards": "21ed4e9841113d6410f22276e372fd3622052b69",
+          "le-cementine": "031411982b4612857f438b9233acd337a381684a",
+          "one-talent": "21ed4e9841113d6410f22276e372fd3622052b69"
+        }
+      }
     }
   ]
 }

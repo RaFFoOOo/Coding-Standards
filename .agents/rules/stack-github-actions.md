@@ -239,6 +239,16 @@ function app` and `0 functions found (Custom)`.
 ### A06 — CVE Checks [STRICT]
 Every Node-based workflow MUST run `npm audit` as a non-skippable step. Every .NET workflow (when introduced) MUST run `dotnet list package --vulnerable` and fail on any HIGH or CRITICAL finding. These steps MUST NOT use `continue-on-error: true`.
 
+**Position it AFTER lint, tests and build [STRICT].** The gate is non-skippable; *where* it runs is a
+separate question, and getting it wrong makes a third-party service's uptime the gate on every other
+form of verification. `npm audit` is a network POST to the registry's advisory endpoint. With the step
+placed right after `npm ci`, a registry advisory outage (measured: ~12 h of 503s and 5-minute
+timeouts) failed **six** consecutive PRs with **no signal from the suite or the build at all** — one
+job burned 10m21s to fail on a network call, and a PR carrying a real regression would have looked
+identical. Run it last, before any artifact upload: a moderate-or-higher CVE still fails the workflow,
+and a registry outage now degrades one check instead of all of them. Reordering a step inside an
+existing job crosses no whole-minute boundary, so it costs nothing (§7.1).
+
 **Node.js (copy-paste ready):**
 ```yaml
 - name: Audit npm dependencies

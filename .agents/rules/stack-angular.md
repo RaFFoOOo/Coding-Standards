@@ -164,6 +164,14 @@ description: Frontend stack rules for Angular / TypeScript projects
     padding-block: var(--section-gap);
     padding-inline: var(--section-pad-x);
     ```
+    **What this does NOT ban:** the ban is on the TOKEN'S ARITY, not on shorthand properties. A
+    **single-valued** token in a shorthand slot is correct and expected — `padding: var(--space-2)
+    var(--space-4)` is legal and means exactly what it says. Reading this rule as "never substitute
+    inside a shorthand" inverts it, and a project that inherited that reading was driven toward a
+    **147-entry** exemption baseline in its own token-guard script — the anti-pattern such a guard
+    exists to refuse. The real risk in a shorthand is a **dropped or reordered slot**, which is
+    mechanical: verify it with a computed-style comparison, not by avoiding the substitution.
+
     The bullet above describes the *dropped-declaration* case, which at least renders visibly wrong.
     This one renders **plausibly** wrong — a 1rem left/right asymmetry reads as a design choice.
     **Corollary — a token that is only ever read is a bug.** `.contact-band` read
@@ -667,8 +675,8 @@ untouched.*
 **5 — A label is invariant too.** An item's label must not change **meaning** based on data shape,
 cardinality, or role. Label by **what the item does**, not by what it currently contains.
 > *Check:* no label expression branches on a count, a role, or an `isSingleton`-style flag.
-> *Origin:* a one-catalog group was labelled with the catalog's own title ("Camere") and a
-> multi-catalog group with its action ("Prenota") — so the label silently flipped noun→verb when a
+> *Origin:* a one-catalog group was labelled with the catalog's own **title** (a noun) and a
+> multi-catalog group with its **action** (a verb) — so the label silently flipped noun→verb when a
 > second catalog was added, **and** the nav contradicted its own destination, whose page heading had
 > always used the action key.
 
