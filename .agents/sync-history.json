@@ -848,6 +848,13 @@
           ],
           "target": "one-talent",
           "reason": "missing guard scripts + live CI"
+        },
+        {
+          "concepts": [
+            "github:workflows/validate-archive.yml"
+          ],
+          "target": "le-cementine",
+          "reason": "DIVERGENT BY DESIGN — never fan out verbatim. le-cementine's copy runs 17 project-specific bash guards from scripts/ci/*; the hub and one-talent share an adapted 1-guard version. Copying le-cementine's over either breaks their CI immediately (exit 127, missing guard scripts). This run added the §3 `if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'` gate to le-cementine's copy, which the other two already had — so the concept is now converged on the GATE while staying divergent on the STEPS. A future run seeing le-cementine's digest change must resolve it as gate-level only."
         }
       ],
       "fileDigests": {
