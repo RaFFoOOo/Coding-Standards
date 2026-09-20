@@ -109,3 +109,26 @@ path-scoped rule should load only for the files it governs.
 **Consequences:** Not executed in this PR. It retires three hub files and adds seven,
 which is a larger change than the `AGENTS.md` rewrite and needs its own branch and
 review. Recorded here so the next sync acts on the decision rather than re-deriving it.
+
+## 2026-09-20 — A sync ledger asserts only its own repo's state
+
+**Context:** `Step 6a` appended the *same* `fileDigests` map — every participant's
+column — to every participant's ledger, and `Step 3b.2` then selected the single
+latest-dated entry across all ledgers as the baseline for everyone. The entry is staged
+before its PR merges, so an abandoned PR leaves every *other* ledger asserting a state
+that repo never reached, and the next run consumes that fiction as its baseline.
+
+Found live: two ledgers each carry a `2026-09-04` entry recording digests for a third
+participant whose own ledger stops at `2026-07-16` and whose sync PR is still open. Its
+`AGENTS.md` has not changed since its initialization commit. Every concept read as
+"changed in that repo" when nothing there had moved.
+
+**Decision:** An entry's `fileDigests` carries one column — the repo whose ledger it is.
+`Step 3b` takes each participant's baseline from its own ledger, and cross-checks: if
+repo A's entry names repo B on a date B's ledger does not have, that sync never landed
+for B, the foreign column is discarded and the user is told. A run scoped to a subset of
+concepts records digests only for the ones it actually resolved.
+
+**Consequences:** Ledger and content now share a fate — both live in the same PR, so an
+abandoned PR leaves no stale claim anywhere. Verified against the live ledgers: the new
+cross-check flags exactly the two poisoned entries and nothing else.

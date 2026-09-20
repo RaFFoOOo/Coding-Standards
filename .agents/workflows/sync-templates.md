@@ -85,9 +85,10 @@ For **every** participant (using its `syncRoot` from Step 2a):
 Before diffing, load the **merge baseline**: the content digest of every concept in every repo as of the last SYNC. This is what makes the diff in Step 4 a real three-way merge instead of a blind "current state wins" comparison — without it, a repo that intentionally deleted a sentence looks identical to a repo that never had it.
 
 1. **Locate each participant's ledger** at `<repo>/<syncRoot>/sync-history.json`.
-2. **Find the most recent `mode: "SYNC"` entry** across all participants' ledgers (a participant can join a later sync than another, so check every ledger, not just the hub's — the entry with the latest `date` wins as the baseline source).
-3. **If a SYNC-mode entry exists**, load its `fileDigests` map (`{ conceptId: { repoName: <git blob hash> } }`) as the baseline for Step 4.
-   - **Staleness check:** if any participant's ledger records a `SYNC` entry **newer** than the one just selected as baseline, STOP and warn the user — a more recent sync happened that this run doesn't know about; re-run against that repo's latest branch first.
+2. **Take each participant's baseline from its OWN ledger** — the most recent `mode: "SYNC"` entry in `<that repo>/<syncRoot>/sync-history.json`. A participant can join a later sync than another, so the baselines legitimately differ in date. **Never take one repo's digest column from another repo's ledger:** an entry is written before its PR merges (Step 6a.5), so a participant whose PR is abandoned leaves every *other* ledger asserting a state it never reached.
+3. **If a SYNC-mode entry exists**, load its `fileDigests` map (`{ conceptId: { repoName: <git blob hash> } }`) and keep **only that repo's own column** as its baseline for Step 4.
+   - **Cross-check the ledgers before trusting any of them.** If repo A's latest entry names repo B but repo B's ledger has no entry of that date, that sync never landed for B: A is asserting B's state from an unmerged branch. Discard the foreign column, use B's own ledger, and tell the user which entry was unreliable.
+   - **Staleness check:** if a participant's ledger records a `SYNC` entry dated after the run this one is resuming, STOP and warn the user — a more recent sync happened that this run doesn't know about; re-run against that repo's latest branch first.
 4. **If only legacy (`direction: PUSH`/`PULL`) entries exist, or no ledger exists at all:** there is no usable baseline anywhere (legacy entries carry no `fileDigests`) — every concept enters Step 4 with an empty baseline. Warn the user this first SYNC will surface more concepts for review than steady-state runs will, precisely because there's nothing to diff against yet. Note that baseline absence is evaluated **per concept**, not just globally: even with a valid ledger, a concept added independently by two repos since the last recorded sync has no baseline entry of its own — Step 4's classification handles that the same way as a fully first-sync repo, it is not a separate mode.
 5. **Compute each current digest** via `git hash-object <resolved-path>` (git's own blob hash — no external hashing tool needed) for every concept × participant cell in the registry that has a path. Absence of a key means the repo doesn't have that concept; never store an empty-string digest for "missing."
 
@@ -278,11 +279,13 @@ Proceed to Step 6.
 ### Step 6 — Finalization
 
 #### Step 6a — Update Sync History Ledger [MANDATORY]
-Before staging, append the **same** execution record to **every participant's own ledger** — not just the hub's. Step 3b's baseline lookup checks every participant's ledger for the most recent `mode: "SYNC"` entry (a future run might start from any of them), so if only one repo recorded it, the others would never find a baseline and every run would stay stuck in first-sync mode. This is also the step that finally makes T2's baseline mechanism real: until this entry is written, nothing persists between runs.
+Before staging, append an execution record to **every participant's own ledger** — not just the hub's. Step 3b reads each participant's baseline from its own ledger, so a repo that records nothing never finds a baseline and stays stuck in first-sync mode forever. Until this entry is written, nothing persists between runs.
+
+**A ledger asserts only its own repo's state [STRICT].** The entry names every participant, but its `fileDigests` carry **one column: the repo whose ledger it is.** The entry is staged before its PR merges (step 5 below), so a digest for another repo is a claim about a branch that may never land — and Step 3b would then hand that fiction to the next run as a baseline. Write what you can prove about *this* repo; let every other repo speak for itself.
 
 1. **Recompute `fileDigests`** for every concept in the Concept Registry (Step 2b), using each participant's content **as it now stands after Step 5's fan-out** — this becomes the baseline for the *next* run, so it must reflect the post-sync state, not the pre-merge digests from Step 3b.5.
 2. **Locate** (or create) each participant's ledger at `<repo>/<syncRoot>/sync-history.json` (per its own `shapeProfile`).
-3. **Append the identical entry** to every participant's ledger:
+3. **Append an entry to every participant's ledger**, identical but for `fileDigests`, which holds only that participant's own column:
    ```json
    {
      "mode": "SYNC",
@@ -292,12 +295,13 @@ Before staging, append the **same** execution record to **every participant's ow
        { "repo": "<repo name 2>", "path": "<absolute local path 2>", "branch": "<branch name for this run>" }
      ],
      "fileDigests": {
-       "<conceptId>": { "<repo name>": "<git blob hash>" }
+       "<conceptId>": { "<this repo's name>": "<git blob hash>" }
      }
    }
    ```
 4. If a participant's ledger file did not exist, create it with an `executions` array containing this single entry (matching the array name any pre-existing legacy ledger already used). **Never rewrite or remove** legacy (`direction: PUSH`/`PULL`) entries — this workflow only ever appends.
-5. Include each ledger file in *that participant's own* staged changes — it travels in the same PR as that participant's content changes, not a separate commit.
+5. Include each ledger file in *that participant's own* staged changes — it travels in the same PR as that participant's content changes, not a separate commit. Ledger and content then share a fate: if the PR is abandoned, neither reaches that repo's main, and no other repo is left holding a stale claim about it.
+6. **Write nothing for a concept this run did not resolve.** A run scoped to a subset — prose only, one area, a single rule — records digests for the concepts it actually merged and omits the rest, so a later run still sees them as needing review rather than as agreed.
 
 #### Step 6b — Commit & Push
 For **every** participant (hub included):
