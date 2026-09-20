@@ -194,3 +194,26 @@ reorganised the file. The hub took the reorganisation.
 platform trap is evidence about that spoke, not about every repo the hub serves. Per the
 sync workflow's deletion branch, a concept is removed from the hub only as a confirmed
 global retirement.
+
+## 2026-09-20 — Stack rules split mechanically; content reconciliation is a separate job
+
+**Context:** The hub carried 3 stack rule files against its spoke's 10. `stack-angular.md` was
+68 225 B across 17 sections and loaded in full whenever any `.ts`, `.html` or `.scss` file was
+read. The decision to adopt the split was already recorded; this is how it was executed.
+
+**Decision:** Split **mechanically** — cut each monolith at its own `## ` section boundaries into
+the target files, changing no content. Verified by invariant: all 26 section bodies are
+byte-identical before and after. `stack-github-actions.md` stays one file, as it is in both repos.
+
+**Why not a content merge with the spoke's versions.** The topics map cleanly — 16 of 17 hub
+sections have a spoke counterpart — but the prose diverged almost completely, so reconciling would
+mean reading ~120 KB and judging line by line, with silently dropping a real rule as the failure
+mode. Splitting first delivers the decided benefit at zero risk of loss and leaves reconciliation
+as per-file units small enough to review. An exact-string diff suggested 149 of 160 directives were
+hub-only; sampling showed 9 of 12 of those concepts *do* exist in the spoke, so that number measured
+wording, not coverage, and was not used to justify anything.
+
+**Consequences:** 9 stack files, largest Angular file 21 303 B (from 68 225). Section numbers are
+kept as stable identifiers, so a file now legitimately starts at `## 7`. Twelve sections changed
+file, and every cross-reference was repointed and verified to resolve. `stack-css.md` is **not**
+created — the hub has no CSS content to put in it; it arrives when the spoke's version is reconciled.

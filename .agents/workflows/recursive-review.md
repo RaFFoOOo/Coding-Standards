@@ -77,10 +77,10 @@ multiplier-over-error. **line count is not the right gate for SCSS.**
 ### 5. STRICT-rule grep targets [MANDATORY]
 For each STRICT rule in .agents/rules/*.md, grep the codebase for the explicit forbidden
 pattern. Report any hits with file:line. Minimum patterns to grep:
-- `JwtSecurityTokenHandler\(`           (forbidden by stack-dotnet-core.md §8.2 A07)
+- `JwtSecurityTokenHandler\(`           (forbidden by stack-dotnet-api.md §8.2 A07)
 - `\.Result;` or `\.Wait\(\)`           (forbidden by stack-dotnet-core.md §5)
 - `\bany\b` outside type guards         (forbidden by stack-angular.md §1)
-- `!important;`                         (forbidden by stack-angular.md §4)
+- `!important;`                         (forbidden by stack-i18n.md §4)
 - `providedIn:\s*'root'` on Mock\* class (forbidden by stack-angular.md §2a)
 - `\.subscribe\(` without `takeUntil`   (forbidden by stack-angular.md §6)
 - Hardcoded SAS / connection strings    (forbidden by A02)
