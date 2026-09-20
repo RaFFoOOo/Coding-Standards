@@ -104,15 +104,31 @@
   - If the shared-library mechanism ever does land, its input is a deliberate extraction from live code, not an archaeology dig through a quarantine directory.
 
 ## 3. Reliability & Security
-- **Exception Safety:** All external calls (DB, API, File) must be wrapped in error handling blocks that fail gracefully.
+- **Exception Safety:** Wrap every external call (DB, API, file) in error handling that fails gracefully. Catch only where you can handle the error or add context; everything else reaches one global handler that returns a uniform error.
+- **Asynchronous work never blocks, and stops when nobody needs it.** Await I/O all the way down — never block on a pending result. Pass cancellation through, and start independent I/O in parallel rather than one after another.
+- **What a user's input changes depends on what they did, never on when they stopped [STRICT].** No debounce, throttle or delay between an input and the state it changes: it opens a window in which persisted state disagrees with the input, and no test can assert it without seizing the clock. Rate limits, scheduled jobs and display-only timers are not covered.
 - **Config Separation:** Never hardcode secrets or magic numbers. Use Constants classes or Environment Variables.
-- **Dual-Side Validation [STRICT]:** Every input constraint MUST be enforced on **both** the client and the server — never one side only.
-  - **Client-side validation is UX**, not security: it gives fast feedback and avoids needless round-trips, but it can be bypassed entirely (a direct HTTP call, a disabled-JS client, a crafted request, a stale frontend) and therefore **guarantees nothing**.
-  - **Server-side validation is the security boundary** and is **mandatory for every endpoint**: the backend MUST NOT trust that a request arrived through the app. It independently validates shape, type, range, allowed values (enum/slug patterns), required fields, and authorization, and rejects violations with a typed error (`ProblemDetails` / `4xx`) — *before* any business logic or persistence runs.
-  - This applies to **every** user-influenced value: request bodies, **query parameters**, route values, and headers. Route-level constraints (e.g. a `{id:guid}` segment) count as server-side validation for that value.
-  - Keep the two sides **consistent**: the same rule (e.g. an allowed-value set or a regex) should be expressed on each side so the client never accepts what the server will reject, and vice-versa. When practical, source the rule from one shared definition.
-  - Stack specifics live in the stack rules (`stack-dotnet-core.md §8` server validation; `stack-angular.md` reactive-form validation) but the **both-sides mandate is global and overrides any single-side shortcut**.
-- **Testing:** Unit tests are mandatory for all business logic, covering Happy Path, Edge Cases, and Null Inputs.
+- **Dual-Side Validation [STRICT]:** Enforce every input constraint on **both** the client and the server — never one side only.
+  - Client-side validation is UX, not security: a direct HTTP call, a crafted request or a stale frontend bypasses it, so it guarantees nothing.
+  - Server-side validation is the security boundary, mandatory for every endpoint: validate shape, type, range, allowed values, required fields and authorization, and reject with a typed error before any business logic or persistence runs.
+  - It covers every user-influenced value — request bodies, query parameters, route values and headers. A route-level constraint counts as server-side validation for that value.
+  - Express the same rule on both sides, from one shared definition where practical, so neither side accepts what the other rejects.
+  - Changing a rule that a UI gate mirrors starts at the server: loosen the server first, then remove the client mirror, then check what the newly reachable states render.
+  - Stack specifics live in the stack rules; the both-sides mandate overrides any single-side shortcut.
+- **The wire is UTC; only the view converts [STRICT]:** every timestamp crossing the client/server boundary is a UTC instant. Convert to the user's local time in the view layer, at render.
+  - A date-only value keeps a date-only type (`DateOnly`, a bare `YYYY-MM-DD`). A calendar day sent as local midnight normalises backwards across a positive UTC offset and lands on the previous day in every UTC-keyed filter and aggregate.
+  - A bare `HH:mm` is not a timestamp and cannot be converted alone — the offset for a wall time depends on the date. Return full instants, or pair the time with the date the caller supplied.
+  - Business rules keyed on time-of-day stay correct under UTC keys; only the labels shift. Never add a timezone column to fix a display problem.
+- **When a property is "works regardless of X", make X a PARAMETER, not an environment [STRICT].** A suite that runs in one configuration cannot falsify a claim about all of them, and pinning CI to a second value proves only that value. Sweep the axis in-process instead — both DST hemispheres, a sub-hour offset, the extremes. Applies to time zone, locale, currency, viewport and role.
+- **Testing — write a test only where one earns its upkeep [STRICT]:** a test is mandatory for server-side rules (validation, authorization, capacity, occupancy, pricing), date/time/money logic on either stack, database queries and migrations against a real database, and any regression of a defect that actually shipped, named in the test.
+  - A mandatory test covers the happy path, the boundary (empty, min/max), the error case that must fail with a specific error, and null input.
+  - Everything else gets no new test: component wiring, a mock adapter's mapping, an i18n key lookup, a pass-through service. The smoke walk and the screenshot gate prove the UI.
+  - Keep an existing test outside that scope only where a manual walk would not notice the break — a failure path, an invisible effect (stored data, a request or write count, tenant isolation), a security property, an accessible name or focus, or a branch that runs only in production.
+  - Give an out-of-scope test that a change breaks the smallest fix that makes it pass, and name it in the PR body as a prune candidate. Never rewrite it, and never delete it without the Tech Lead's approval.
+- **A gate that has never been SEEN to fail is not a gate [STRICT]:** every new guard, CI tier or regression test for a shipped defect ships with a recorded mutation run — break what it protects, show it red, restore, show it green. Put the failing output in the PR body.
+  - The mutation must compile, or it tests the harness instead. Prefer changing a value over changing control flow, and read *why* a red run is red.
+  - Commit before mutating: restoring is `git checkout -- <path>`, which discards uncommitted work in the same file.
+  - A test that is in scope under *Testing* but is not a regression is shown to pass, not shown to fail.
 
 ## 4. Operational Protocols
 - **The "Watchdog" Rule:**
