@@ -30,6 +30,37 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Performance:**
   - **Change Detection:** Use `ChangeDetectionStrategy.OnPush` by default for all components to maximize rendering efficiency.
   - **Parallel Loading:** When a page needs multiple data sources, use `forkJoin` (RxJS) to load them in parallel. Never chain independent subscriptions (Waterfall effect).
+- **[STRICT] A component is CREATED only if it is RENDERED — never `display: none` a whole component.**
+  A component shown at only one breakpoint (or in only one state) MUST be gated by `@if`, not hidden
+  with CSS. `display: none` suppresses **paint, not work**: Angular still constructs the component,
+  builds its DOM subtree, and runs every subscription it opens — including HTTP requests whose
+  response nothing can ever render.
+  ```html
+  <!-- ❌ created at every width; the hidden one still fetches and still builds its subtree -->
+  <app-footer></app-footer>          <!-- footer.scss: @media (max-width: 768px) { display: none } -->
+  <app-mobile-nav></app-mobile-nav>  <!-- mobile-nav.scss: :host { display: none } on desktop -->
+
+  <!-- ✅ exactly one of them exists -->
+  @if (isDesktop()) { <app-footer /> } @else { <app-mobile-nav /> }
+  ```
+  **Measured, which is why this is STRICT rather than advice** (2026-09-01, Home at 375px): with the
+  footer hidden by a media query it still built **14 DOM nodes** and still fired its own
+  `contact.json` request — **3 identical fetches** on one page. Gating it with `@if` took that to
+  **1 request and 0 nodes**. The waste is invisible to every gate this project runs: the layout is
+  correct, the tests pass, and nothing renders wrong. It is visible only in a network panel.
+  - **Use `ViewportService`** (`core/services/ui`) for the breakpoint signal — `matchMedia`-backed, so
+    it fires only when the query result actually flips, unlike a `resize` listener. Do not hand-roll
+    a second one, and do not read `window.innerWidth` in a component.
+  - **CSS media queries remain correct for LAYOUT** — spacing, columns, font sizes, and hiding an
+    *inner element* of a component that is rendering anyway. The ban is on hiding a **whole
+    component** that way. The test is simple: if the thing you are hiding has its own selector in a
+    template, it should be an `@if`.
+  - **`jsdom` has no `matchMedia`.** Anything reaching the viewport throws
+    `window.matchMedia is not a function` and takes down its entire spec file, not one test — this
+    broke all 5 of `app.spec.ts` when the shell first injected `ViewportService`. `src/test-setup.ts`
+    stubs it, defaulting to `matches: false` (desktop) because every query in this app is a
+    `max-width` mobile query. A stub answering `true` would silently put every spec in a mobile
+    layout nothing asked for.
 - **Visual Performance:** Avoid Layout thrashing. Use `CSS` transitions instead of JS animations where possible.
 
 ## 2a. Modern Angular Standards [STRICT]
@@ -47,6 +78,16 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Expose proxy signals (`Signal<>` derived from the child via `computed(() => child()?.value())`) and proxy methods (`public foo(): void { this.child()?.foo(); }`) on the parent component. Templates bind only to those.
   - Prefer signal-based `viewChild()` over the legacy decorator `@ViewChild()` — the result is a `Signal<T | undefined>` that integrates naturally with `computed()`.
   - To bridge child reactive-form state into a signal, the child can wire `form.statusChanges.pipe(takeUntilDestroyed()).subscribe(() => versionSignal.update(v => v + 1))` and expose `formInvalid: Signal<boolean> = computed(() => { versionSignal(); return this.form.invalid; })`.
+  - **[STRICT] Imperative-only form flags need their own manual version bump:** `value`/`status` always
+    have a matching `Observable` (`valueChanges`/`statusChanges`) to key a bridge's version counter off
+    of. `dirty`/`pristine` and `touched`/`untouched` do **not** — `markAsPristine()`, `markAsDirty()`,
+    `markAsUntouched()`, and `reset()`'s touched-reset all mutate the flag directly with **no** emission
+    on either observable. A bridge for one of these flags must bump its own version signal at every call
+    site that mutates the flag programmatically, in the same method — there is no event to subscribe to
+    instead. Found in a form-dirty-tracking controller: a
+    `valueChanges`-keyed `isDirty` bridge kept reading stale `true` forever after a legitimate save,
+    because the save handler's own `form.markAsPristine()` never woke the bridge — fixed by bumping the
+    version counter inside `markSaved()` itself, alongside the `markAsPristine()` call.
 - **Control Flow:**
   - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
 - **File Structure:**
@@ -110,6 +151,35 @@ description: Frontend stack rules for Angular / TypeScript projects
     **shorthand** custom property (e.g. `--section-padding: 2rem 3rem 3rem`) into a single-value property
     (`top`, `right`, …) — the declaration is dropped silently; use single-value tokens. Verify positioning
     by the **computed style**, not the authored rule.
+  - **[STRICT] …and never nest a shorthand token inside another shorthand — that failure is *worse*
+    than the dropped one above.** Substituting a multi-value token into a shorthand **slot** yields
+    valid CSS with a silently wrong meaning, so nothing is dropped and nothing warns:
+    ```scss
+    // ❌ --section-padding is `2rem 3rem 3rem`, so this expands to `padding: 0 2rem 3rem 3rem`
+    //    → top 0 · right 2rem · bottom 3rem · LEFT 3rem. Horizontally asymmetric, plus a bottom
+    //    padding nobody wrote. Valid CSS. No error. Survived review for three sprints.
+    padding: 0 var(--section-padding, 1.5rem);
+
+    // ✅ single-value tokens, one axis at a time
+    padding-block: var(--section-gap);
+    padding-inline: var(--section-pad-x);
+    ```
+    **What this does NOT ban:** the ban is on the TOKEN'S ARITY, not on shorthand properties. A
+    **single-valued** token in a shorthand slot is correct and expected — `padding: var(--space-2)
+    var(--space-4)` is legal and means exactly what it says. Reading this rule as "never substitute
+    inside a shorthand" inverts it, and a project that inherited that reading was driven toward a
+    **147-entry** exemption baseline in its own token-guard script — the anti-pattern such a guard
+    exists to refuse. The real risk in a shorthand is a **dropped or reordered slot**, which is
+    mechanical: verify it with a computed-style comparison, not by avoiding the substitution.
+
+    The bullet above describes the *dropped-declaration* case, which at least renders visibly wrong.
+    This one renders **plausibly** wrong — a 1rem left/right asymmetry reads as a design choice.
+    **Corollary — a token that is only ever read is a bug.** `.contact-band` read
+    `var(--section-padding-block, 3rem)`, a custom property defined nowhere in the codebase, so it had
+    always silently used its fallback. `grep` every `var(--x)` for a matching definition; an undefined
+    token with a fallback is indistinguishable from a working one until someone changes the "token"
+    and nothing moves. Both found 2026-08-02 by measuring `getComputedStyle` on the assembled page —
+    neither was visible from reading the source, which is why the computed-style rule above is STRICT.
   - **[STRICT] Component Style Budget:** Angular enforces a per-component CSS budget (`anyComponentStyle`). Before adding styles to any component SCSS file or its partials loaded via `@use`, assess the cumulative size.
     - **Shared visual styles** (colors, transitions, borders, typography) that apply to a base element across multiple partials (e.g., grid, list) MUST be defined once in the root component SCSS file. Partials must contain layout-only overrides (sizing, spacing, flex/grid context).
     - **Never duplicate** a style block across two or more partials loaded by the same component — duplication is the primary cause of budget breaches.
@@ -123,9 +193,6 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Empty-states use a single shared component (e.g. an `EmptyStateComponent` with `[icon]` + `[message]` inputs) — never re-roll a fresh `<div class="empty-state">` block per feature.
   - Recurring status / source badges use global SCSS classes defined once in a shared stylesheet (loaded via the root `styles` entry point) — never redefine the same badge styles in component SCSS.
   - **Why:** duplicated badge SCSS across components and hand-rolled empty-state blocks are a maintenance trap — each copy is a style-drift risk and a CSS-budget consumer.
-  - **Consistency across pages [STRICT]:** once a primitive exists, every surface consumes it — a user must never meet the "same" control (search bar, filter panel, confirm/cancel action bar, pagination, cards, badges, empty/loading states) in a different shape, position, or behavior between pages. A second, page-local re-implementation of an existing primitive is a rule violation, not a shortcut: consume the shared component (config-driven via `input()`, per §2) instead of hand-rolling its markup/logic.
-  - **Extend, don't fork:** when a page needs a variant, add a config option/input to the shared primitive rather than cloning it. Forking is only allowed when the interaction is genuinely different — and that divergence is recorded, not incidental.
-  - **Cross-project candidates:** a primitive generic enough to serve more than one product (e.g. a config-driven `FilterBarComponent`) is a candidate for a shared UX library — evaluate promoting it there before duplicating it into another repo.
 - **[STRICT] Filter / search / view bar — one shared component:**
   - Every "list/collection" surface that offers filtering, sorting, free-text search, and/or a view toggle
     MUST use one shared, config-driven `FilterBarComponent` driven by a declarative config object. Bespoke
@@ -153,6 +220,35 @@ description: Frontend stack rules for Angular / TypeScript projects
     being fixed by removing the `stopPropagation`. Every future shared dropdown/overlay must ship with
     this from day one, not discover it in QA.
 
+- **[STRICT] A toggleable panel's own open/closed CSS class MUST stay separate from an "active-descendant"
+  highlight class — never reuse one class binding for both:**
+  - When a collapsed trigger (dropdown, "More" button, nav-group) needs an active-descendant indicator
+    (highlighting the trigger because the current route is one of its *contents*, without the panel being
+    open — see `catalog-menu-state.service.ts`'s `isGroupActive`, CAT-8) alongside its own real toggle
+    state, these are two independent concerns and MUST bind to two separate classes. A shared CSS rule
+    keyed off one class for both the panel's `display`/visibility AND the trigger's highlight color means
+    "active-descendant" silently pins the panel visually open the moment the route matches — not just
+    highlighted — even though the user never clicked to open it.
+  - ❌ `[class.open]="isActiveDescendant() || isManuallyOpened()"` when the SCSS has
+    `&.open .panel { display: block }` — visiting a page inside the panel renders it permanently expanded.
+  - ✅ `[class.open]="isManuallyOpened()"` (unchanged, drives panel visibility only) +
+    `[class.is-active]="isActiveDescendant() || isManuallyOpened()"` (new, drives only the trigger's
+    highlight color via `&.is-active .trigger { color: var(--primary) }`) — both classes apply together
+    when genuinely open, but only `.is-active` applies when merely active-descendant.
+  - This exact bug was written once in this codebase (desktop header's "More" dropdown) and caught only
+    because live QA happened to be available — a real `ng serve` + Playwright — for that PR; 23/23 unit
+    tests with a mocked `Router`/DOM had already passed and completely missed it, since they never
+    rendered the real CSS cascade. Caught and fixed before merge, not after — but a session without a
+    live browser available would have shipped it. Verify any new active-descendant indicator by reading
+    the actual `getComputedStyle` of the panel/chevron in a live browser, not just the trigger's own
+    signal value in a unit test.
+  - **Recurred once already**, on the *same* "More" dropdown this bullet names as the origin case — a
+    second feature adding active-descendant highlighting made the identical mistake, caught again only
+    by that PR's own live QA pass. **Grep-on-touch:** before writing a new
+    `[class.open]`/visibility binding on any collapsed trigger, grep this file for "active-descendant" —
+    if the task's own description matches this rule's trigger condition, re-read this bullet against the
+    specific change, not just at session start.
+
 - **[STRICT] `<app-bottom-sheet>` (or any `position:fixed` full-viewport overlay component) MUST be a
   root-level template sibling — never nested inside an ancestor that itself is a stacking context
   (`position:sticky`/`fixed` + a `z-index`):**
@@ -173,32 +269,44 @@ description: Frontend stack rules for Angular / TypeScript projects
     sheet's lower content and scroll. A comment in one file didn't stop the mistake recurring in another —
     this is now a named, searchable rule instead.
 
-- **[STRICT] A toggleable panel's own open/closed CSS class MUST stay separate from an "active-descendant"
-  highlight class — never reuse one class binding for both:**
-  - When a collapsed trigger (dropdown, "More" button, nav-group) needs an active-descendant indicator
-    (highlighting the trigger because the current route is one of its *contents*, without the panel being
-    open) alongside its own real toggle state, these are two independent concerns and MUST bind to two
-    separate classes. A shared CSS rule keyed off one class for both the panel's `display`/visibility AND
-    the trigger's highlight color means "active-descendant" silently pins the panel visually open the
-    moment the route matches — not just highlighted — even though the user never clicked to open it.
-  - ❌ `[class.open]="isActiveDescendant() || isManuallyOpened()"` when the SCSS has
-    `&.open .panel { display: block }` — visiting a page inside the panel renders it permanently expanded.
-  - ✅ `[class.open]="isManuallyOpened()"` (unchanged, drives panel visibility only) +
-    `[class.is-active]="isActiveDescendant() || isManuallyOpened()"` (new, drives only the trigger's
-    highlight color via `&.is-active .trigger { color: var(--primary) }`) — both classes apply together
-    when genuinely open, but only `.is-active` applies when merely active-descendant.
-  - This exact bug shipped to production once (a desktop header dropdown highlighted as "active" via
-    route match, which also silently forced the panel visually open) and was caught only because live
-    QA — a real browser + interaction test, not a unit test with a mocked DOM — happened to be available
-    for that PR; a full unit-test pass had already gone green and completely missed it, since it never
-    rendered the real CSS cascade. It then **recurred** in a second, unrelated feature that added
-    active-descendant highlighting to a different trigger, making the identical mistake — caught again
-    only by that PR's own live QA pass. **Grep-on-touch:** before writing a new
-    `[class.open]`/visibility binding on any collapsed trigger, grep this file for "active-descendant" —
-    if the task's own description matches this rule's trigger condition, re-read this bullet against the
-    specific change, not just at session start. Verify any new active-descendant indicator by reading
-    the actual `getComputedStyle` of the panel/chevron in a live browser, not just the trigger's own
-    signal value in a unit test.
+## 4a. Shared-Surface Inventory — grep before you draw, and before you build [STRICT]
+
+Every new user-facing surface reuses this app's existing primitives. The rule is not "prefer the
+shared component" — that is advice, and advice loses to a wireframe. **The rule is that you run the
+inventory below and record its output**, at the Mockup Gate (`plan-sprint/SKILL.md` step 3) and again
+before implementing a surface whose mockup predates this rule.
+
+It is written as commands because **a rule you verify by grepping cannot be re-argued, and a rule you
+verify by judgement will be.** Every row below was a real defect shipped to a preview build and
+caught by the Tech Lead, not by any gate.
+
+| Element on your surface | Run this | Use what it shows |
+|---|---|---|
+| A page-level commit (Save / Continue / Confirm) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`. **Not** a button in the page body. A bare `type="submit"` is only for a *sub-action* — save one card, add a row to a list. |
+| A page title + subtitle | `grep -rn "page-header" src/app --include=*.html` | `<header class="page-header">` > `.section-title` + `.intro-text`. Never a hand-rolled heading: the global `h1` is hero-sized, which §4 *Token Scope* bans on inner pages. |
+| Any button | `grep -n "&--" src/styles/_buttons.scss` | The **BEM** variants: `.btn.btn--primary`, `.btn--danger`, … `.btn-primary` (single dash) matches nothing and renders an unstyled grey box. |
+| A form row's column widths | `grep -rho "form-col-[a-z0-9-]*" src/app --include=*.html \| sort \| uniq -c` | Rows are filled `6+6` pairs or `12 → md-4/6`. **No row in this app leaves an unfilled half on mobile** — a lone `col-6` reads as a layout accident, whatever §14 permits in the abstract. |
+| A helper hint under a control | `grep -rn "form-hint" src/styles/_forms.scss` | `.form-hint` as a **child of the field it describes**, with `aria-describedby` on the `<input>`, not the wrapper. A hint in a cell of its own stacks margins and reads detached. |
+| An empty state, badge, dropdown, overlay | §4 *Shared UI Primitives*, §11 | The existing primitive. |
+
+**Two traps that make this fail silently, both hit by the same task:**
+
+1. **A class name that resolves to nothing looks exactly like one that works.** `ng lint`, `ngc` and
+   the unit suite were all green with the submit button unstyled — nothing in this project checks
+   that a class in a template matches a rule. **The only gate that catches it is a computed-style
+   assertion on a real build.** When you add a surface, add one (`getComputedStyle` /
+   `getBoundingClientRect` in the smoke walk), not a "does it render" check.
+2. **Is the partial global?** `styles.scss` loads `_forms.scss`, `_buttons.scss`, `_badges.scss`,
+   `_theme-variables.scss` and others — those need no `@use`; read `styles.scss` for the live list. `_shared-sections.scss` is **not** loaded there, so
+   `.page-header`/`.section-title`/`.intro-text` need an explicit `@use 'shared-sections'`. Check
+   `styles.scss` rather than assuming either way; the tell-tale of getting it wrong is a class that
+   works on one surface and silently does nothing on yours.
+
+**And when you place a shared component somewhere new, re-check its own assumptions.**
+`<app-action-bar>` positions itself `bottom: var(--mobile-nav-height)` and relies on `margin-top:
+auto` against a flex column — both true on every page that existed when it was written, neither true
+on a route that hides the bottom nav and the footer. A shared component is not automatically correct
+in a context none of its consumers had; measure it where you put it.
 
 ## 5. Debugging & Reliability
 - **Error Interception:**
@@ -210,6 +318,20 @@ description: Frontend stack rules for Angular / TypeScript projects
 - **Automatic Cleanup:** Use `takeUntilDestroyed()` on all manual RxJS subscriptions.
 - **Declarative over Imperative:** Always prefer the `async` pipe or the `toSignal()` function over manually calling `.subscribe()`.
 - **Subscription Ban:** It is strictly forbidden to use `.subscribe()` without an explicit cleanup strategy (e.g. `takeUntilDestroyed`, `DestroyRef`, or async pipe).
+- **`take(1)`-only exception — non-destroyable `providedIn: 'root'` singletons only [STRICT]:** A
+  bare `.pipe(take(1))` with no `takeUntilDestroyed()` is permitted **only** inside a
+  `providedIn: 'root'` singleton service, where the subscriber is never destroyed during the app's
+  lifetime — `takeUntilDestroyed()` there needs an injection-context/`DestroyRef` contrivance for
+  code that never fires it, which is worse than the plain `take(1)` it would "fix." Every other
+  subscriber (a component, a component-scoped controller, or any injectable with a real
+  `DestroyRef`) MUST combine both: `.pipe(take(1), filter(Boolean), takeUntilDestroyed(this.destroyRef))`
+  — `take(1)` self-completes on the expected single emission (e.g. a confirm-dialog result, a
+  one-shot upload), `takeUntilDestroyed()` is the safety net if the component unmounts first. This
+  is already the established pattern for confirm-dialog subscriptions
+  (`services-inline-edit.controller.ts`, `catalog-grid-edit.coordinator.ts`) — codified here after
+  `order-state.service.ts` (a singleton, correctly `take(1)`-only) and `booking.component.ts`/
+  `media-upload.component.ts` (components, now converted to the combined pattern) were found
+  diverging on the same shape without a documented rule (2026-07-18).
 - **Route Param Signals [STRICT]:** Never derive a reactive signal from route params by calling `.subscribe()` and invoking `.set()` inside the callback. Always use `toSignal()` at the class field level:
   ```typescript
   // ✅ Correct
@@ -307,26 +429,58 @@ description: Frontend stack rules for Angular / TypeScript projects
   - Direct string comparisons against config values (e.g., `config.type === 'x'`) are **forbidden** in components and templates. Components consume named signals from the centralized service instead.
   - Config methods on the service (e.g., `getDatePickerConfig()`, `getFormValidators()`) return typed config objects — templates bind to their properties rather than containing inline conditional expressions.
 
-## 11. Select / Dropdown Option Labeling [STRICT]
-- **Never render a raw value as an option label.** Every `<select>` / dropdown option (and any
-  user-facing enum) MUST display an **i18n lookup label** resolved per active language — the
-  underlying value (`'grid'`, `'order'`, `'website'`, a status enum, …) is for the form control and
-  persistence only and must never reach the user verbatim.
-- **Option shape:** model options as `{ value, labelKey }[]` and bind
-  `<option [value]="opt.value">{{ opt.labelKey | translate }}</option>`. Do **not** bind
-  `{{ opt }}` over a bare `string[]`.
-- **Consistency:** all selects in a form reuse the same control class as the sibling inputs (e.g.
-  `.form-input`) so the field styling is uniform; do not introduce a parallel select style.
+## 11. Select / Dropdown / Native-Control Avoidance [STRICT]
+- **Never use a native browser/OS-rendered control whose picker UI cannot be restyled with CSS —
+  unless the User has explicitly requested that exact native control for that exact field.** This
+  covers native `<select>`, `<input type="color">`, and `<input type="date">`/`type="time"`/
+  `type="datetime-local">` — each hands rendering to the OS/browser chrome (Android's system color
+  wheel, iOS's date wheel, …), which varies by platform, cannot be themed, and reads as visually
+  disconnected from the rest of the app. Build a themed custom component instead, reusing the
+  established overlay pattern already shipped twice (an icon picker, and a colour field after its
+  live-walk fix): a trigger button + a `position: fixed; inset: 0` invisible
+  backdrop (click-to-close, no `document:click` listener needed) + a `position: absolute` panel
+  anchored under the trigger. **Exempt:** controls where the OS surface *is* the expected UX and
+  has no themed equivalent — `<input type="file">` (the file picker is a filesystem/security
+  boundary), camera/mic/geolocation permission prompts, `<input type="checkbox">`/`type="radio">`
+  (themed via CSS `accent-color`/pseudo-elements, not a full OS takeover).
+  *(Originated as the native-`<select>` ban below; generalized 2026-07-21 after
+  a colour field shipped with a raw `<input type="color">` — the Android system
+  color-picker dialog a live-device walk flagged as visually non-compliant. Explicit-request escape
+  hatch matters: a future field genuinely needing OS-level pickers, e.g. a native file input, is not
+  a violation.)*
+- **`CustomDropdownComponent` (`shared/components/custom-dropdown/`) is the canonical dropdown
+  widget project-wide** — never a native `<select>`. It renders its own option list so it stays
+  visually consistent across desktop AND mobile (a native `<select>` falls back to the unstyled OS
+  picker on mobile, which cannot be themed). Reactive-form consumers bind via `formControlName`
+  (it implements `ControlValueAccessor`); non-form/per-row consumers (e.g. a table cell) use the
+  legacy `[value]` + `(selectionChange)` API. *(Amends the 2026-07-10 catalog-manager decision,
+  which restored `CustomDropdownComponent` after a locked mockup had briefly reverted to native
+  `<select>` — that rationale is general, not scoped to one component. A follow-up task migrated the
+  one remaining native-`<select>` holdout, a user-management role picker, to match.)*
+- **Never render a raw value as an option label.** Every dropdown option (and any user-facing
+  enum) MUST display an **i18n lookup label** resolved per active language — the underlying value
+  (`'grid'`, `'order'`, `'website'`, a status enum, …) is for the form control and persistence only
+  and must never reach the user verbatim.
+- **Option shape:** model options as `DropdownOption[]` (`{ value, label }[]`, `label` already
+  translated — e.g. via a `toDropdownOptions()` helper mapping `{ value, labelKey }` →
+  `{ value, label: translate.instant(labelKey) }`). `CustomDropdownComponent` renders `option.label`
+  directly with no pipe, so the label MUST already be resolved before it reaches the component.
+- **Consistency:** all dropdowns in a form use `CustomDropdownComponent`'s default styling (which
+  already matches `.form-input`'s height/padding, see `custom-dropdown.component.scss`) so field
+  styling is uniform; do not introduce a parallel dropdown style.
 - *(Rationale: raw lowercase enum values shipped as option labels (`grid`, `order`) read as
-  untranslated and visually inconsistent with the form's labelled fields.)*
+  untranslated and visually inconsistent with the form's labelled fields. A native `<select>` also
+  reads as visually inconsistent with the rest of the app's design system, per the 2026-07-10
+  finding above.)*
 
 ## 12. Testing [STRICT]
 
 - **Targeted runs during development:** Never run the full suite while iterating. Pass only the spec
   files (or directories) touched by the current change — the exact command depends on whether the
   project has its own standalone `vitest.config.ts`:
-  - **Project has a standalone `vitest.config.ts`** (a hand-built config that mirrors Angular's
-    `templateUrl`/`styleUrls` inlining so bare Vitest can JIT-compile components): run it directly —
+  - **Project has a standalone `vitest.config.ts`** (this project does — see `<spa-app>/vitest.config.ts`,
+    a hand-built config that mirrors Angular's `templateUrl`/`styleUrls` inlining so bare Vitest can
+    JIT-compile components): run it directly —
     ```bash
     npx vitest run src/app/path/to/changed/component/ src/app/path/to/other/spec.ts
     ```
@@ -337,14 +491,40 @@ description: Frontend stack rules for Angular / TypeScript projects
     ```bash
     ng test --include 'src/app/path/to/changed/component/**/*.spec.ts' --watch=false
     ```
-  - **Don't confuse this with vitest-cache corruption:** the identical `TestBed.initTestEnvironment()`
-    error can also come from a stale `node_modules/.vite`/`.vitest` cache on a project that DOES have a
-    working `vitest.config.ts` — that class clears with `rm -rf node_modules/.vite node_modules/.vitest`
-    and doesn't recur. If the error persists after that, or the project has no `vitest.config.ts` at
-    all, it's this config gap, not cache corruption.
-  - Full-suite `ng test --watch=false` / `npx vitest run` (no filter) is reserved exclusively for the
-    `/run-qa` gate before opening a PR. Running everything on every iteration wastes cycle time and
-    obscures which tests actually relate to the work in progress.
+  - **Don't confuse this with vitest-cache corruption** (`local-vitest-cache-corruption` memory): the
+    identical `TestBed.initTestEnvironment()` error can also come from a stale
+    `node_modules/.vite`/`.vitest` cache even though this project's `vitest.config.ts` is present and
+    working — that class clears with `rm -rf node_modules/.vite node_modules/.vitest` and doesn't
+    recur. A project with no `vitest.config.ts` at all is the *other* failure class described above,
+    not cache corruption.
+  - **The full-suite gate run MUST be `ng test`, never bare `npx vitest run` [STRICT].** Targeted
+    iteration may use either; the `/run-qa` gate may not. `ng test` is what CI runs, and the two
+    runners **do not agree** — measured 2026-08-12 on `sprint/45` at a commit whose CI was green:
+
+    | Runner | Result | Why |
+    |---|---|---|
+    | `ng test --watch=false` | **1600 passed** | AOT build; `environment.development.ts` |
+    | `npx vitest run` | **20 failed**, 3 files | JIT; `environment.ts` |
+
+    Both divergences were already known — the environment split from an earlier CI-only failure
+    (transcribed into `app.routes.structure.spec.ts`'s own header table) and the JIT `input()`
+    limitation in the very next bullet — but each was written as a *spec-authoring* caveat, so
+    neither stopped the gate itself being pointed at the weaker runner. The two shapes seen:
+    - **4 failures — the environment split.** `onboarding.guard.ts` early-returns on
+      `!environment.enableLoginFeatures`. The base `environment.ts` resolves that flag from an
+      injected token (**false** locally); `environment.development.ts` hardcodes `true`. So under bare
+      vitest the guard returns `true` and every redirect assertion fails.
+    - **16 failures — `NG0303: Can't bind to 'pending'`** on a signal `input()` of a shared component
+      that is correctly listed in the consumer's `imports`. JIT does not register it; AOT does.
+
+    **The failure mode is the dangerous direction: bare vitest reports *phantom* failures here, but the
+    same divergence can hide a real one** — a spec that only passes under JIT/`environment.ts` is
+    exactly the CI-only break that has bitten this project twice. Do not "fix" a spec that fails under
+    bare vitest and passes under `ng test`; re-run it the CI way first, and only then decide whether
+    there is anything to fix.
+
+    Targeted runs still stay targeted: running everything on every iteration wastes a cycle and
+    obscures which tests relate to the work in progress.
 
 - **JIT `input()` limitation:** In Vitest JIT mode, signal inputs declared with `input()` /
   `input.required()` cannot be set via `fixture.componentRef.setInput()` — Angular registers them
@@ -363,6 +543,46 @@ description: Frontend stack rules for Angular / TypeScript projects
   `TestBed.inject(ApplicationRef).tick()` — render-free, so no child providers needed. Keep the *component*
   spec to the synchronous thin aliases/handlers. (`flushEffects` is not in Angular 22's public testing API.)
 
+- **`ng test`'s builder unreliably intercepts `vi.mock()` — design the seam instead of mocking around
+  it:** `ng test`'s `@angular/build:unit-test` Vitest builder (a) hard-bans `vi.mock()` on **relative**
+  imports outright (`"The 'vi.mock' and related methods are not supported for relative imports...
+  Please use Angular TestBed for mocking dependencies"`), and (b) has also been observed to **silently
+  fail to intercept** a `vi.mock()` on a **package** (non-relative) import — a mocked third-party SDK
+  class's methods reported zero calls under `ng test` despite passing locally under a bare
+  `npx vitest run` (observed on a telemetry-SDK wrapper service and its spec). A bare
+  `vitest run` doesn't route through the same builder, so this class of failure is CI-only and
+  invisible to local iteration. **The durable fix is structural, not a better mock:** design the seam
+  so nothing needs mocking —
+  1. Anything read from `environment` inside a service under test: pass it as a **method parameter**
+     instead of importing `environment` directly; the spec passes a literal value.
+  2. Anything that directly `new`s a third-party SDK/library class: move the construction behind a
+     `protected`, **overridable factory method**; the spec subclasses the service under test and
+     overrides the factory to return a lightweight test double.
+  Treat any new service test needing to fake a config value or a third-party class construction as a
+  candidate for this pattern **by default** — don't reach for `vi.mock()` first and only fall back to
+  this after CI fails.
+
+- **Shared test-only fixtures/helpers that are NOT themselves a `.spec.ts` file MUST be named
+  `*.testing.ts` and excluded from `tsconfig.app.json`** (mirrors `@angular/core/testing`,
+  `@angular/common/http/testing`'s own naming convention). `tsconfig.app.json`'s `exclude` is only
+  `src/**/*.spec.ts` — a shared fixture file (e.g. hoisted `vi.fn()` stubs, a `MOCK_TENANT` const, a
+  `setupModule()` helper reused across several split spec files) that doesn't match that pattern is
+  still included in the production app's TypeScript program and gets bundled by `ng build`, which
+  fails with `TS2304: Cannot find name 'vi'` (or `describe`/`expect`) the moment the file uses a
+  test-runner-only global — `tsconfig.app.json` sets `"types": []` deliberately, so nothing makes
+  `vi` a recognized ambient identifier there. **This is invisible to `ngc -p tsconfig.spec.json`**
+  (which type-checks clean — `vitest/globals` is included there) and to plain `npx vitest run`
+  (esbuild transpiles per-file, doesn't do the same whole-program ambient-global resolution `ngc`'s
+  full type-checker does for `tsconfig.app.json`) — only a real `ng build` or `ngc -p
+  tsconfig.app.json --noEmit` **run after the fixture file exists** catches it (`LESSONS_LEARNED.md`
+  when a large spec file was split and its shared fixtures hoisted). Fix: name the file
+  `some-name.testing.ts` and add `"src/**/*.testing.ts"` to `tsconfig.app.json`'s `exclude` (a
+  one-time project-level addition, already done) — `tsconfig.spec.json` needs no corresponding
+  change, since TypeScript still pulls the file into that program transitively via any `.spec.ts`
+  file's `import`. **Re-run `ngc -p tsconfig.app.json --noEmit` after every round of file changes**,
+  not just once early in a session — a later edit (especially adding a new non-`.spec.ts` file) can
+  silently invalidate an earlier "clean" result for a tsconfig that edit didn't touch.
+
 ## 13. Routing & Navigation Discoverability [STRICT]
 - **No orphan feature routes:** a route meant for repeat/general access — as opposed to a redirect
   target (`/not-found`, `/access-denied`, `/wip`) or a step inside an already-guarded flow — MUST be
@@ -377,18 +597,18 @@ description: Frontend stack rules for Angular / TypeScript projects
     (or redirects straight to login) for an unauthenticated visitor, gated by a login-features flag +
     `isAuthenticated()` — an entry placed only there is invisible to exactly the audience a public page
     needs to reach.
-  - A route meant only for an **authenticated role that already has a natural hub** (e.g. an owner's
+  - A route meant only for an **authenticated role that already has a natural hub** (e.g. the owner's
     `/admin`) MAY be reachable one hop from that hub (a dashboard card) without its own persistent
-    header entry. This is the established, intentional pattern for admin-only management routes (e.g.
-    a user-management or availability-settings page one hop from `/admin`) — do not treat it as license
-    to bury a *public-facing* page the same way just because an owner also happens to manage it there.
+    header entry. This is the established, intentional pattern for `/admin/users` and
+    `/admin/booking-availability` — do not treat it as license to bury a *public-facing* page the same
+    way just because an owner also happens to manage it there.
 - **Inline content links are additive, never exclusive:** a "see more" CTA embedded in another page's
   content (e.g. the homepage → a new feature route) is good UX *in addition to* persistent chrome,
   never a substitute for it.
 - *(Rationale: a page reachable only via a buried inline link creates a "how did I get here / how do I
   get back" experience — the user has no durable mental model of where the feature lives. Codified
-  after a new public-facing page shipped with only an inline homepage link and a dashboard card,
-  missing a header entry point anonymous visitors could use.)*
+  after a new public-facing page shipped with only an inline
+  homepage link and a dashboard card, missing a header entry point anonymous visitors could use.)*
 - **Breadcrumb required on every page NOT directly reachable from persistent nav:** a detail/drill-down
   page — reached only by clicking a card/row from a list page, never a direct nav entry (e.g. an entity
   detail route like `/clubs/:id`, `/players/:id`) — is legitimate (it doesn't need its own header/nav
@@ -405,10 +625,121 @@ description: Frontend stack rules for Angular / TypeScript projects
     in-page "back" link or relying on the browser's own back button is not a substitute; the breadcrumb
     is the uniform mechanism for every surface of this shape, not a per-page judgment call.
 
+## 13a. Navigation Placement Doctrine [STRICT]
+
+§13 answers *"is this reachable?"*. This section answers *"reachable from **where**?"* — and exists
+because that second question was re-litigated in four consecutive sprints (31, 37, 42, 43), twice by
+literal reversal (S37 added an admin gear, S42 removed it; S37 made edit-mode a one-shot action, S42
+made it a toggle again). That is oscillation, not refinement. Three root causes, none about taste:
+no item taxonomy, placement argued from frequency intuition, and per-surface specs instead of one
+model.
+
+**Every rule below is structurally checkable.** That is the point: a rule you verify by grepping
+cannot be re-argued, whereas a rule you verify by judgement will be. Where an earlier version of this
+doctrine used a type-table alone, it was contradicted by the codebase on day one (see the note at the
+end) — so the table is now subordinate to the invariants.
+
+### The invariants
+
+**1 — One model, N renderers.** Persistent navigation comes from a *single* ordered, typed list
+(`NavModelService`). Each viewport is a **renderer** over it. Renderers may differ in **capacity and
+chrome only** — never in composition, ordering, or labelling.
+> *Check:* a renderer that builds or filters its own items is a violation. It may only `slice()`.
+> *Origin:* desktop read `navigation.json` (role-blind) while mobile branched by role in its own
+> service, so the two drifted **by construction** — a logged-in customer saw one app on a phone and a
+> different one on a laptop.
+
+**2 — The persistent nav row is role-invariant.** Every visitor sees the same ordered row. Anything
+available to only one role is **not** a nav item — it belongs in the **corner icon cluster**, where
+role- and session-scoped controls already live.
+> *Check:* `grep` the nav model for a role read. There must be none — not a role branch that happens
+> to produce equal lists today, but no role dependency at all. In this codebase `NavModelService` does
+> not inject `IUserProfileService`, and its spec provides no such token, so re-introducing one fails
+> the entire spec file with `NullInjectorError` rather than one assertion.
+> *Why absence, not equality:* a branch producing identical output today keeps passing until the two
+> arms diverge. Absence cannot drift.
+
+**3 — Conditional presence is a dead-link guard, never a preference.** An item may be omitted **only**
+when its destination does not exist for this tenant or user — an unconfigured catalog group, an order
+history a guest cannot have. It may never be omitted, reordered, or promoted because someone judged it
+more or less useful to a given audience.
+> *Check:* every omission traces to a missing destination, not to a role or a frequency claim.
+
+**4 — Anti-churn invariant.** *A new navigable item **never displaces** an existing item. It joins its
+type's home. If that type's home is at capacity, **that type** grows a drawer — every other type is
+untouched.*
+> Applied retroactively this alone would have prevented all three reversals above. Applied forward, a
+> future Notifications bell is *Mine* → it joins its home, and nothing else moves. No debate.
+> *Corollary:* **removing** an item shortens its type's row without redistributing the freed slot.
+
+**5 — A label is invariant too.** An item's label must not change **meaning** based on data shape,
+cardinality, or role. Label by **what the item does**, not by what it currently contains.
+> *Check:* no label expression branches on a count, a role, or an `isSingleton`-style flag.
+> *Origin:* a one-catalog group was labelled with the catalog's own **title** (a noun) and a
+> multi-catalog group with its **action** (a verb) — so the label silently flipped noun→verb when a
+> second catalog was added, **and** the nav contradicted its own destination, whose page heading had
+> always used the action key.
+
+**6 — An in-page anchor is never a nav destination.** A navbar entry resolving to `#fragment` is a
+false affordance: it looks like a route, behaves like a scroll, and breaks the back button's meaning.
+If a section is important enough to need one, the obligation is to make it **prominent on its own
+page**, not to prop it up with a fake nav entry. In-page anchors *within* page content are fine and
+encouraged — the ban is on navbar chrome only.
+
+### Type → home
+
+Types are a *vocabulary for the invariants above*, not an independent authority. When a type
+assignment and an invariant disagree, **the invariant wins**.
+
+| Type | Definition | Home | Notes |
+|---|---|---|---|
+| **Act** | What the business exists to do (catalog → book/order) | Persistent row, after any *promoted* Learn item | Guaranteed a persistent slot; not guaranteed slot 2. |
+| **Mine** | This user's own state (History) | Persistent row, after Act | Present only once the state can exist (invariant 3). |
+| **Manage** | Role-exclusive administration (Admin) | **Corner cluster** | Role-exclusive ⇒ invariant 2 forbids the row. |
+| **Shortcut** | A faster path to a destination the row already reaches (cart → checkout) | **Corner cluster**, and only while it beats the row | An empty cart resolves to the same page as the catalog row item, so it renders only when non-empty. |
+| **Learn** | Brochure & trust content (About, Reviews, Friends) | **Promoted → leads the row; otherwise the drawer** | Promotion is *authored data*, never a code constant — see invariant 7. |
+| **Mode** | Changes how the *current page* behaves (edit mode) | Corner cluster, contextual | **Not a destination.** Must also be scoped to surfaces where it applies. |
+| **Session / Preference** | Login, account, logout, language | Corner cluster, fixed | Found by convention, not exploration. |
+
+**Frequency intuition is banned as a placement argument.** "Owners touch Order daily", "Explore is
+the lowest-frequency of the five" — unfalsifiable claims are re-litigable forever. *Type* determines
+home; only *ordering within a type* may be argued from usage, and only with evidence.
+
+### 7 — Promotion is authored, never argued
+
+*A **Learn** item may outrank the **Act** block only by being in the tenant's `navigation.json`
+`primary` array. Code never promotes a specific item, and never hardcodes which one leads.*
+
+> *Check:* `grep` the nav model for a route/label literal deciding an item's rank. There must be
+> none — the rank comes from which array the item was authored into.
+> *Capacity guard:* `primary` precedes the Act block, so an over-long `primary` can push the catalog
+> past a renderer's capacity. `nav-model.service.spec.ts` pins the catalog inside the mobile 4-tab
+> window; that test is the alarm, and it is meant to fail loudly rather than degrade quietly.
+
+**This invariant replaced a rule that had it backwards** (2026-08-02). §13a originally read
+"Nothing outranks the commercial purpose", which made the *only* sanctioned way to give a tenant's
+identity page a persistent slot a re-argument of the doctrine itself — exactly the re-litigation
+this section exists to end. The real defect was upstream: `navigation.json` already distinguished
+`primary` from `secondary`, and a later task flattened both into one `learn` block, deleting the tenant's
+own means of expressing "this page leads." Restoring the split turns a recurring argument into a
+data edit. See `DECISIONS.md` 2026-08-02 and `NavModelService.items`.
+
+**Corollary — a drawer does not group.** A "More" drawer renders its overflow **flat, in model
+order**. Sectioning it (two category headings, added and removed within one sprint) re-sorts the
+overflow away from the single ordered model that invariant 1 exists to guarantee, and spends two
+headings plus an ungrouped block organising four items. If a drawer ever holds enough items for
+grouping to pay, that is evidence the row is under-capacity — fix the capacity, not the drawer.
+
+> **Why the table is subordinate.** Its first version typed both `Admin` **and** the **cart** as
+> *Manage* → "persistent slots", while the cart had shipped as a corner icon since long before that
+> version was written. A rule the codebase contradicts on day one cannot settle a future argument —
+> which is exactly how it failed. The invariants are checkable; the table is a summary of them.
+> (`DECISIONS.md` 2026-08-02.)
+
 ## 14. Compact Forms — 12-Column Grid [STRICT]
 - **`.form-row` is a Bootstrap-like 12-column CSS Grid**, not an equal-width flex row. Any owner/admin
-  form with 2+ fields on a conceptual "row" MUST wrap them in a shared `.form-row` class (defined once,
-  e.g. `src/styles/_forms.scss`) and give each direct `.form-field` child an explicit width via
+  form with 2+ fields on a conceptual "row" MUST wrap them in the shared `.form-row` class
+  (`src/styles/_forms.scss`) and give each direct `.form-field` child an explicit width via
   `.form-col-{n}` — never rely on equal flex-basis distribution (`flex: 1 1 0`) to size fields, and
   never leave a field's width unset inside a `.form-row`.
 - **Values are restricted to Bootstrap's common divisors of 12 — `2, 3, 4, 6, 12`** — so every field
@@ -418,8 +749,8 @@ description: Frontend stack rules for Angular / TypeScript projects
   columns do **not** need to sum to 12 — unfilled columns are intentional compactness, not a bug;
   `.form-row` never redistributes leftover space to fill the row.
 - **Mobile-first, Bootstrap-named breakpoint override:** the unprefixed `.form-col-{n}` is the
-  **default that applies at every size** (including mobile) unless overridden; `.form-col-md-{n}` (a
-  desktop breakpoint matching `.form-row`'s own mobile breakpoint) overrides it on desktop only. A
+  **default that applies at every size** (including mobile) unless overridden; `.form-col-md-{n}`
+  (`≥769px`, matching `.form-row`'s own `768px` mobile breakpoint) overrides it on desktop only. A
   field MUST NOT always be `form-col-12` (full width) on mobile by default — compact 2-up pairing
   (`form-col-6`) is the mobile baseline for short fields (single-line text inputs, small dropdowns);
   reserve `form-col-12` for content that genuinely needs the full line (a textarea, a 3-way dropdown
@@ -427,11 +758,11 @@ description: Frontend stack rules for Angular / TypeScript projects
   ```html
   <!-- ✅ Mobile pairs 6+6; desktop compacts to 4+8 (title gets more room, id stays narrow) -->
   <div class="form-row">
-    <div class="form-field form-col-6 form-col-md-4"> ... type ... </div>
+    <div class="form-field form-col-6 form-col-md-4"> ... catalogType ... </div>
     <div class="form-field form-col-6 form-col-md-8"> ... title ... </div>
   </div>
-  <!-- ❌ Equal flex distribution — wastes space when one field's content is much narrower than its
-       sibling -->
+  <!-- ❌ Equal flex distribution (the retired `.form-field--inline`) — wastes space when one
+       field's content is much narrower than its sibling -->
   <div class="form-row">
     <div class="form-field form-field--inline"> ... icon-picker (small) ... </div>
     <div class="form-field form-field--inline"> ... currency dropdown ... </div>
@@ -441,9 +772,12 @@ description: Frontend stack rules for Angular / TypeScript projects
   separate nested row below it — e.g. a "Limit bookings" toggle and the two capacity fields it reveals
   sit in one `.form-row` (`toggle: form-col-md-4`, each revealed field `form-col-md-4`) so the revealed
   fields appear *beside* the toggle on desktop, not stacked underneath it. CSS Grid re-flows
-  automatically when a conditionally-rendered grid item is added/removed — no extra layout code needed.
-- *(Rationale: an equal-flex-distribution approach splits every row's fields evenly regardless of
-  content — a small icon-picker trigger next to a currency dropdown each take 50%, leaving a large dead
-  gap between them; mobile falls back to full-width stacking even for short single-line inputs that
-  could easily pair up. A Bootstrap-like 2/3/4/6/12 proportion system fixes both as a general, durable
-  pattern, not a one-off fix to a single form.)*
+  automatically when an `@if`-gated grid item is added/removed — no extra layout code needed.
+- Reference implementation: `catalog-builder-form.component.html`/`.scss`, `_forms.scss`'s
+  `.form-row`/`.form-col-*` classes.
+- *(Rationale: the prior `.form-field--inline` (`flex: 1 1 0`, equal-width) split every row's fields
+  evenly regardless of content — a small icon-picker trigger next to a currency dropdown each took 50%,
+  leaving a large dead gap between them; mobile fell back to `flex-direction: column`, fully stacking
+  every field to one-per-row even for short single-line inputs that could easily pair up. Codified
+  after a live-walk flagged both — the Tech Lead explicitly requested a Bootstrap-like
+  2/3/4/6/12 proportion system as the general, durable pattern, not a one-off fix to this one form.)*

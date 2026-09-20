@@ -45,7 +45,10 @@ jobs:
   guards:
     name: Repo-hygiene guards (archive)
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    concurrency:
+      group: validate-archive-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

@@ -44,10 +44,20 @@ runs:
   using: composite
   steps:
     - name: Set up .NET SDK
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '10.x'
 
+      # Self-hosted runners run as an unprivileged user, and `setup-dotnet` installs into
+      # `/usr/share/dotnet` by default — root-owned, so the install dies with
+      # "mkdir: cannot create directory '/usr/share/dotnet': Permission denied" (observed on
+      # run 32716414855, 2026-08-24). `runner.temp` is writable by the runner on BOTH
+      # GitHub-hosted and self-hosted, so this needs no conditional.
+      # Cost: the SDK is re-fetched per job rather than reused. Measured on GitHub-hosted, this
+      # step already took 9-12 s doing its own install, so the hosted path is not meaningfully
+      # worse. If it proves slow on the laptop, point this at a path that survives between jobs.
+      env:
+        DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
     # Skip in Mock-mode deployments — there's no SQL backend to migrate.
     # Case-sensitive: vars.DATA_ACCESS_MODE must be exactly "Database".
     - name: Apply EF Core migrations

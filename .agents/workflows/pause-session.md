@@ -28,7 +28,7 @@ Identify everything in flight:
 - **Open PRs** (`gh pr list`) — note number, title, base branch, head branch, CI status.
 - **Branches** with unmerged commits ahead of their base (`git branch -vv`).
 - **Active tasks** marked `[/]` or `[ ]` in the current `PLAN_sprint_*.md`.
-- **TODO.md items** picked up but not yet promoted to a PLAN.
+- **`backlog/` entries** picked up but not yet promoted to a PLAN.
 - **Architectural decisions** made this session that are not yet in code.
 - **Operator actions** the User committed to running (Azure CLI, env vars, RBAC grants, manual UI clicks).
 
@@ -37,12 +37,12 @@ Identify everything in flight:
 |---|---|---|
 | Durable preferences / architectural decisions | **Auto-memory** | Applies to future sessions, not just tomorrow |
 | In-sprint tasks and progress | **`PLAN_sprint_*.md`** | Sprint-scoped, lives until sprint closes |
-| New backlog items | **`TODO.md`** | Pre-sprint, awaiting promotion |
+| New backlog items | **`backlog/`** | Pre-sprint, awaiting promotion |
 | Operational state (PR numbers, merge order, verification steps, operator follow-ups) | **`__resume_prompt.txt`** | Session-local, only useful for the immediate next session |
 
 ### Step 3 — Generate `__resume_prompt.txt` [MANDATORY]
 
-Write the file at the **project root** (NOT inside `.agents/`). Required sections in order:
+Write the file at the **project root** (NOT inside `.claude/`). Required sections in order:
 
 1. **Context header** — absolute date, active sprint, role assumed by the User.
 2. **PRIORITY 0 — Verification** — what to check BEFORE any code change (PR status, branch state, anything that may have changed overnight). Lead with verification, not action.
@@ -74,9 +74,32 @@ Output a short summary (max 5 lines):
 
 **Do NOT paste the full resume prompt back in chat** — it is already in the file, and pasting it bloats the session being saved.
 
-## § 2. `.gitignore` Convention
+## § 2. `.gitignore` Convention — and when to override it [STRICT]
 
-`__resume_prompt.txt` is session-local and should not be committed. Verify it appears in `.gitignore`; if not, add it with the comment `# session-local checkpoint from /pause-session skill`. Use the leading double underscore prefix as a project convention for ephemeral session files.
+`__resume_prompt.txt` is session-local, so the default is to keep it out of version control.
+Verify it appears in `.gitignore`; if not, add it with the comment
+`# session-local checkpoint from /pause-session skill`. The leading double underscore is this
+project's convention for ephemeral session files.
+
+**Override it whenever the next session may not run on this machine.** A Claude Code on the web
+session starts from a **fresh clone**, so a git-ignored checkpoint does not exist there at all —
+`/resume-session` finds nothing and the handoff silently fails. The default assumes a local CLI
+resuming from the same working tree; that assumption is wrong for every remote session.
+
+**Ask before assuming.** Do not infer where the next session runs — the answer is not visible from
+inside the sandbox. If the User has not said, ask, in the same turn you write the checkpoint.
+
+When it must travel with the repo:
+1. Comment out the `__resume_prompt.txt` line in `.gitignore`, with a dated note saying why.
+2. Commit the checkpoint on the **sprint branch**, never `main` — it is scoped to that sprint.
+3. **Delete the file and restore the ignore at sprint close-out**, as a named close-out step.
+   Leaving a stale checkpoint tracked is worse than never committing one: it is operational
+   scratch that outlives its own truth, and a later agent will read it as current.
+
+*(Recorded after a checkpoint was written git-ignored for a User who was about to open a web
+session — caught by the User, not the skill. The previous sprint had already hit the same problem
+and left the fix in a `.gitignore` comment, which no one reads while writing a checkpoint. That is
+why it is a rule here instead.)*
 
 ## § 3. Anti-patterns
 

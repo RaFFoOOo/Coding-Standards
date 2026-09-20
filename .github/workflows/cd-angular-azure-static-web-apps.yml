@@ -10,6 +10,14 @@ on:
       - '.github/workflows/shared-build-angular.yml'
   workflow_dispatch:
     inputs:
+      runner:
+        description: 'Where to run. "self-hosted" uses your own runner and bills NO Actions minutes; "github" uses GitHub-hosted. Only a manual dispatch can choose — every automatic trigger stays GitHub-hosted.'
+        type: choice
+        options:
+          - github
+          - self-hosted
+        default: github
+        required: false
       target-env:
         description: 'Target environment(s). "both" = build once → deploy-dev → smoke → deploy-prod (smoke gates the promotion; deploy-prod runs only via manual dispatch).'
         type: choice
@@ -36,6 +44,7 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-angular.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || './lc-webapp' }}
       # Angular CLI configuration name (`--configuration <value>`) — NOT a GitHub
@@ -57,7 +66,7 @@ jobs:
       github.event.inputs.target-env == 'development' ||
       github.event.inputs.target-env == 'both'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     environment: development
     # Surface the deployed URL + the dev API base so the smoke job can hit them.
     # `vars.API_BASE_URL` resolves to the development-scoped value because this
@@ -87,6 +96,7 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
           api-base-url: ${{ vars.API_BASE_URL }}
+          app-insights-connection-string: ${{ vars.APP_INSIGHTS_CONNECTION_STRING }}
           tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -101,6 +111,7 @@ jobs:
     needs: deploy-dev
     uses: ./.github/workflows/smoke-frontend.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       swa-url: ${{ needs.deploy-dev.outputs.url }}
       api-base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
 
@@ -120,7 +131,7 @@ jobs:
         (github.event.inputs.target-env == 'both' && needs.smoke.result == 'success')
       )
     needs: [build, deploy-dev, smoke]
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     environment: production
     concurrency:
       group: cd-swa-production
@@ -142,6 +153,7 @@ jobs:
           msal-authority: ${{ vars.MSAL_AUTHORITY }}
           msal-api-scope: ${{ vars.MSAL_API_SCOPE }}
           api-base-url: ${{ vars.API_BASE_URL }}
+          app-insights-connection-string: ${{ vars.APP_INSIGHTS_CONNECTION_STRING }}
           tenant-key: ${{ vars.TENANT_KEY }}
           swa-deployment-token: ${{ secrets.CD_AZURE_SWA_DEPLOYMENT_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

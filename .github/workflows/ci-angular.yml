@@ -2,11 +2,36 @@ name: CI - Angular Build Validations
 
 on:
   pull_request:
-    branches:
-      - main
+    # `ready_for_review` is NOT in the default set (`opened`, `synchronize`, `reopened`) and is
+    # REQUIRED here, not optional: the smoke walk below is skipped while a PR is a draft, so
+    # without this type, taking a PR out of draft fires no run at all and the walk would never
+    # run on it — a silent hole exactly where the gate matters most. Listing any type replaces
+    # the default set, so the three defaults must be spelled out alongside it.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      # Frontend build inputs ONLY, as of 2026-09-01. The six `scripts/ci/*` entries and
+      # `docs/VALIDATION_MATRIX.md` that were here existed solely to trigger bash guards hosted in
+      # this workflow's smoke-walk job; those guards moved to validate-archive.yml, so their
+      # trigger paths moved with them. What remains is what this workflow actually builds.
       - 'lc-webapp/**'
       - 'package*.json'
+      - '.github/workflows/ci-angular.yml'
+      - '.github/workflows/shared-build-angular.yml'
+
+  # Opt-in manual run, added 2026-08-23 so CI can be executed on a self-hosted runner while the
+  # GitHub-hosted Actions allowance is exhausted. This trigger adds NO automatic runs: a PR still
+  # fires the `pull_request` trigger above, always on GitHub-hosted. Only a person dispatching this
+  # workflow by hand can choose otherwise.
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Where to run. "self-hosted" uses your own runner and bills NO Actions minutes; "github" uses GitHub-hosted.'
+        type: choice
+        options:
+          - github
+          - self-hosted
+        default: github
+        required: false
 
 permissions:
   contents: read
@@ -19,9 +44,127 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/shared-build-angular.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       node-version: ${{ vars.NODE_VERSION || '24' }}
       working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
       environment: development
       upload-artifact: false
+      run-lint: true
       run-tests: true
     secrets: inherit
+
+  # The live smoke walk — the standing gate added 2026-08-05 to close
+  # PLAN_recursive_review_2026-08-04.md §4.1: every other gate in this repo measures *code*, and
+  # none of them opens the app. It boots the fully-Mocked `preview` build and exercises it, so it
+  # needs no backend, no deployed environment and no seed data.
+  #
+  # Its own job rather than a step inside shared-build-angular.yml: that workflow is called by CD
+  # too, where a browser download and a dev-server boot are pure cost. Runs in parallel with the
+  # build (no `needs:`) — it builds its own bundle via `ng serve` and shares nothing with it.
+  smoke-walk:
+    name: Live smoke walk
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    concurrency:
+      group: smoke-walk-${{ github.ref }}
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        # A self-hosted runner keeps ~/.npm between runs (4.1 GB on RaFFoOOo's box), so restoring
+        # the Actions npm cache there downloads ~1013 MB over the network to duplicate a directory
+        # that is already populated — measured at 218 s + 274 s across this PR's two Angular jobs,
+        # i.e. ~8 min per PR for nothing. A GitHub-hosted runner is ephemeral and genuinely needs it.
+        # `runner.environment` resolves ON the runner, so this is correct however the runner was
+        # chosen (dispatch input, vars.CI_RUNNER, or the ubuntu-latest fallback).
+        #
+        # BOTH inputs are required. Clearing `cache` alone does nothing: setup-node falls through to
+        # `else if (packagemanagercache)`, which DEFAULTS TO TRUE and re-derives the manager from
+        # package.json's `packageManager` field ("npm@11.6.2" here) — restoring the identical cache.
+        # Verified against actions/setup-node@v7 src/main.ts, not inferred.
+        # NOTE the direction of this ternary. `A && B || C` collapses to C whenever B is falsy
+        # (stack-github-actions.md §8.1), so the obvious form — `== 'self-hosted' && '' || 'npm'` —
+        # has an EMPTY STRING as B and therefore always yields 'npm', silently leaving the cache on.
+        # That exact version shipped in this PR's first commit and measured 190 s, i.e. unchanged.
+        # Inverted so B is 'npm' (truthy) and the falsy branch is the one that disables.
+        with:
+          node-version: ${{ vars.NODE_VERSION || '24' }}
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
+          cache-dependency-path: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}/package-lock.json
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only chromium: the walk asserts behaviour and accessible names, not cross-engine rendering,
+      # so the other two browsers would triple the download for no additional signal.
+      #
+      # Skipped on draft PRs together with the walk itself — see the walk step below for why.
+      # No `--with-deps`: that flag runs `apt-get` as ROOT on the runner host. Disposable on a
+      # GitHub-hosted VM, but on a self-hosted runner the host is someone's laptop, so a workflow
+      # edit could execute arbitrary root commands on it. The system libraries Chromium links
+      # against are a pre-condition of registering a runner (§8.2), not a step. The browser binary
+      # stays here because it is version-locked to @playwright/test and would drift if pinned to
+      # the host.
+      - name: Install Playwright chromium
+        if: github.event.pull_request.draft != true
+        run: npx playwright install chromium
+
+      - name: Type-check the walk
+        run: npx tsc --noEmit -p tsconfig.e2e.json
+
+      # ── The six pure-bash guards that stood here MOVED OUT on 2026-09-01 ────────────────────
+      # They now run in validate-archive.yml's stack-neutral `guards` job, together with the seven
+      # that were in shared-build-dotnet. Four of them (file-length, validation-anchors,
+      # font-families, nav-fallback-routes) were in BOTH places, so a PR touching both stacks ran
+      # them twice — 6 + 7 invocations, 9 distinct guards. That job went from 5 guards to 14.
+      #
+      # Their own comments here argued the duplication was required — each read both stacks, so
+      # "either workflow alone would leave the other's PRs unchecked". The premise was right; the
+      # conclusion was not. A guard that reads both stacks belongs in NEITHER stack's build. One
+      # job triggered by both trees checks everything once, and it needs neither Node nor the .NET
+      # SDK to do it.
+      #
+      # This job keeps only what genuinely needs a built Angular app: the type-check and the walk.
+
+      # playwright.config.ts boots `ng serve --configuration preview` itself via `webServer`.
+      #
+      # ── Skipped on DRAFT pull requests (2026-08-23) ──────────────────────────────────────────
+      # Measured: this step plus its browser download is ~2m40s of a ~2m45s job, so GitHub bills 3
+      # minutes where the rest of the job bills 1. Across 13–17 Aug it ran 98 times and **52% of
+      # those runs were on `sprint/*` branches, not task branches** — the cumulative sprint→main
+      # PR re-validating itself on every task merge, ~300 billed minutes on PRs that are drafts
+      # precisely because nobody intends to merge them yet (AGENTS.md §8's Sprint/Task strategy
+      # plus the standing STOP gate). That, compounded with this job's own 2.5x on the per-run
+      # cost, is what exhausted this Free private repo's Actions allowance.
+      #
+      # `draft != true` rather than `draft == false`: on any non-`pull_request` event the field is
+      # null, and null != true, so the walk still runs. Failing OPEN is the right default for a
+      # correctness gate — a wrong guess here silently stops testing rather than silently costing.
+      #
+      # WHY THIS IS A STEP-LEVEL `if:` AND MUST STAY ONE. Three repo guards and the e2e type-check
+      # live in this same job. Gating the JOB would disable them on every draft PR — including the
+      # sprint→main PR, which is the integration point where `check-mock-order-items.sh` caught a
+      # real defect during PR #790. Skip the expensive step; never the job.
+      #
+      # The walk is not lost, only deferred: marking the PR ready for review fires
+      # `pull_request: ready_for_review`, and it runs before anyone can merge.
+      - name: Run the live smoke walk
+        if: github.event.pull_request.draft != true
+        run: npm run smoke:walk
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-walk-traces
+          path: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}/test-results
+          retention-days: 3
+          if-no-files-found: ignore

@@ -31,6 +31,31 @@ description: Backend stack rules for ASP.NET Core / C# projects
   - **Global Handling:** Use Middleware for unhandled exceptions to ensure uniform API error responses.
   - **Specific Safety:** In specific methods, use `try/catch` only if you can handle the error or need to wrap it in a custom `DomainException`.
 - **SQL/NoSQL Safety:** User input must never be concatenated into query strings — see §8.2 A03 for the parameterized-query mandate.
+- **Entity Relationships — Real FKs, Not String-Matching [STRICT]:** Two entities that reference
+  each other MUST be linked by a real foreign key (a stable ID + DB constraint) — never by matching
+  two independently-mutable string/business-key columns across tables at query time. A
+  human-readable business key (slug, type, code) may still be denormalized onto the child row for
+  read/API convenience, but it must be **write-time derived from the parent, never independently
+  client-settable**, and it must not itself be the join/query mechanism.
+  ```csharp
+  // ❌ No referential integrity — ChildItem.Type and ParentConfig.ItemType are two
+  // independent string columns; nothing stops them drifting apart, and a lookup by string can
+  // silently return zero rows (orphaned item) or attach to the wrong parent.
+  public record ChildItem { public required string Type { get; init; } }
+  await Context.ChildItems.Where(c => c.Type == itemType).ToListAsync(ct); // string-matched, no FK behind it
+
+  // ✅ A real FK is the relationship; a string mirror kept for an existing URL/API addressing
+  // scheme is always derived from the FK'd parent at write time, never independently settable,
+  // and reads resolve via the FK, not the string.
+  public record ChildItem { public required Guid ParentConfigId { get; init; } public required string Type { get; init; } }
+  builder.HasOne<ParentConfig>().WithMany().HasForeignKey(c => c.ParentConfigId).OnDelete(DeleteBehavior.Cascade);
+  ```
+  **Why:** a matched-string relationship makes drift and orphaning *possible by construction* — a
+  typo, a partial migration, or one direct API call bypassing the single code path that kept two
+  strings in sync is all it takes, and nothing in the schema catches it. Found in a real codebase
+  where a child entity and its parent config were joined purely on a `Type`/`ParentType` string
+  pair — it had already silently orphaned 3 seed rows before anyone noticed. A real FK also makes cascading (or restricting) delete possible for the first time —
+  that requires the DB to know the relationship exists at all.
 
 ## 4. Testing Strategy
 - **Equivalence Classes:** Tests must cover:
@@ -66,7 +91,7 @@ description: Backend stack rules for ASP.NET Core / C# projects
 
 ### §8.1 Existing Baselines
 - **Authentication/Authorization:** Secure all endpoints by default. Expose explicitly using `[AllowAnonymous]`. Combine Role-based and Policy-based authorization.
-- **Authorization owned by application logic [authorization model]:** When the application owns its own permission model, keep authorization **role/permission-based and resolved from the application's own data store** — do not delegate permission decisions to OAuth token claims. Separate the two concerns: the access token **authenticates** the caller (middleware validates the Bearer token and resolves identity), while **roles answer who the user is** and gate access (e.g. per-tenant ownership checks). Token claims such as `scp` should **not** be consulted for permission decisions in this model. Whether to additionally adopt OAuth scope-based authorization (`scp`-claim / `[RequireScope]` checks) is a per-project architectural choice — record the decision and its rationale in the project's decision log.
+- **Role-based authorization [authorization model]:** Authorization is **role-based and owned entirely by internal application logic** — never delegated to OAuth token claims. **Roles** (`owner`/`customer`, resolved from the `TenantUserRole` table) answer *who the user is* and are enforced per-tenant via `ITenantScopeAuthorization` / `RequireOwnerAsync`. The access token is used **only** to authenticate the caller — `[FunctionAuthorize]` + `FunctionAuthorizationMiddleware` validate the Bearer token and resolve identity; the token's claims (including `scp`) are **not** consulted for permission decisions. OAuth scope-based authorization (`[RequireScope]`, `scp`-claim checks) is explicitly **out of scope** for this single-first-party-client project — see `DECISIONS.md` (2026-05-22, scope-based authorization rejected).
 - **Input Validation:** Use `FluentValidation` instead of data annotations for DTOs to separate validation logic from data models.
   - **Server-side validation is mandatory and is the security boundary** (`AGENTS.md §3 Dual-Side Validation`): every endpoint independently validates **all** user-influenced input — request bodies **and query parameters and route values** — and rejects violations with `ProblemDetails`/`4xx` before any business logic runs. Never assume a request came through the frontend; a direct HTTP call bypasses it entirely.
   - Use `FluentValidation` for DTO/body validation. For a single scalar query/route value (e.g. an enum or slug filter) a route constraint (`{id:guid}`) or an inline guard returning `ProblemDetails` is sufficient and idiomatic — do **not** add `FluentValidation` solely for one query-string value if the project does not already use it there (native-over-third-party, §7). Parameterized queries (A03) make filters injection-safe, but shape validation is still required as contract/defense-in-depth.
@@ -139,6 +164,21 @@ reference and a no-op `EndpointDataSource` to the Functions project:
 // Program.cs — after AddAuthentication / AddMicrosoftIdentityWebApi
 services.AddSingleton<EndpointDataSource>(_ => new DefaultEndpointDataSource([]));
 ```
+
+**Isolated worker (Functions) manual token validation — not a violation [documented pattern, found during
+an OWASP audit]:** the ✅ example above (`AddMicrosoftIdentityWebApiAuthentication`
++ ASP.NET Core's `[Authorize]`/`UseAuthentication()` pipeline) has no direct equivalent in the Functions
+isolated worker — there is no ASP.NET Core HTTP pipeline to hook into (`IFunctionsWorkerMiddleware` is a
+different pipeline entirely). This project's `FunctionAuthorizationMiddleware` still registers
+`AddMicrosoftIdentityWebApi` in `Program.cs` (for its OIDC discovery, signing-key rotation, and
+issuer/audience resolution via `IOptionsMonitor<JwtBearerOptions>`), then explicitly calls
+`JsonWebTokenHandler.ValidateTokenAsync(token, tvp)` — `JsonWebTokenHandler`, not the deprecated
+`JwtSecurityTokenHandler` the ❌ example names — supplying `TokenValidationParameters` sourced entirely
+from Microsoft.Identity.Web's own resolved options, never hand-constructed. This is the correct pattern
+for isolated-worker Functions: the STRICT rule's intent (never write custom signature/lifetime
+verification, always delegate to the library's resolved configuration) is satisfied even though the
+literal code shape differs from the ASP.NET Core example. Do not "fix" this by trying to force
+`[Authorize]`-attribute-style validation into a Functions isolated worker.
 
 #### A09 — Logging Failures [STRICT]
 Structured logging via `ILogger<T>` with a correlation ID injected per request. Logging tokens, raw request bodies, passwords, or PII (email, phone, address) is strictly forbidden. Failed authn/authz events MUST be logged at `Warning` with the user's Object ID — never email.

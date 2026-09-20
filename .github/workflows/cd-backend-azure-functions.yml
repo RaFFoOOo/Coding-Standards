@@ -10,6 +10,14 @@ on:
       - '.github/workflows/shared-build-dotnet.yml'
   workflow_dispatch:
     inputs:
+      runner:
+        description: 'Where to run. "self-hosted" uses your own runner and bills NO Actions minutes; "github" uses GitHub-hosted. Only a manual dispatch can choose — every automatic trigger stays GitHub-hosted.'
+        type: choice
+        options:
+          - github
+          - self-hosted
+        default: github
+        required: false
       target-env:
         description: 'Target environment(s). "both" = build once → deploy-dev → smoke → deploy-prod (smoke gates the promotion; deploy-prod runs only via manual dispatch).'
         type: choice
@@ -35,6 +43,7 @@ jobs:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     uses: ./.github/workflows/shared-build-dotnet.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       publish: true
     secrets: inherit
 
@@ -51,7 +60,7 @@ jobs:
         github.event.inputs.target-env == 'both'
       )
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     environment: development
     # Surfaces vars.API_BASE_URL (resolved within this job's `environment: development` scope) for
     # the smoke job below — a job that calls a reusable workflow via `uses:` cannot itself declare
@@ -74,7 +83,7 @@ jobs:
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43  # v3.0.0 — pinned per A08
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c  # v3.0.2 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}
@@ -105,6 +114,7 @@ jobs:
     needs: deploy-dev
     uses: ./.github/workflows/smoke-dev.yml
     with:
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
       base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
     secrets: inherit
 
@@ -125,7 +135,7 @@ jobs:
         (github.event.inputs.target-env == 'both' && needs.smoke.result == 'success')
       )
     needs: [build, deploy-dev, smoke]
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     environment: production
     concurrency:
       group: cd-backend-production
@@ -143,7 +153,7 @@ jobs:
             lc-services/
 
       - name: Login to Azure (OIDC — Workload Identity Federation)
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43  # v3.0.0 — pinned per A08
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c  # v3.0.2 — pinned per A08
         with:
           client-id: ${{ vars.CD_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.CD_AZURE_TENANT_ID }}

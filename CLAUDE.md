@@ -15,6 +15,13 @@ All rules, skills, and workflows live in `.agents/` (the cross-agent standard):
 
 When executing any skill or workflow, read its `SKILL.md` / workflow `.md` directly.
 
+`.agents/` is the **cross-agent source of truth and is never modified for agent-specific
+concerns** — `CLAUDE.md` and the `.claude/skills/` shims carry everything Claude Code needs, so a
+second agent's conventions never leak into the canonical set.
+
+The backlog is [`backlog/`](backlog/), indexed by [`backlog/README.md`](backlog/README.md);
+its lifecycle is the `todo-manager` skill.
+
 ### Available Skills
 Invoke via slash commands (shims in `.claude/skills/`) or by reading the source file:
 
@@ -28,8 +35,10 @@ Invoke via slash commands (shims in `.claude/skills/`) or by reading the source 
 | `/sync-templates` | `.agents/workflows/sync-templates.md` | Sync standards to/from a target project repo |
 | `/test-browser` | `.agents/workflows/test-browser.md` | Plan and execute browser tests |
 | `/deploy-azure` | `.agents/workflows/deploy-azure.md` | Build for production and deploy to Azure |
-| `/todo-manager` | `.agents/skills/todo-manager/SKILL.md` | Manage TODO.md lifecycle (append, mark done, archive, promote to PLAN.md) |
+| `/todo-manager` | `.agents/skills/todo-manager/SKILL.md` | Manage the `backlog/` lifecycle (append, mark done, archive, promote to PLAN.md) |
 | `/recursive-review` | `.agents/workflows/recursive-review.md` | Periodic honest audit of rules, skills, code, pipeline, and direction |
+| `/ux-review` | `.agents/workflows/ux-review.md` | Full-site heuristic UX review, per user role |
+| `/run-sprint-unattended` | `.agents/workflows/run-sprint-unattended.md` | Execute already-planned sprint tasks under a scoped merge authorisation |
 | `/resolve-workflow` | `.agents/workflows/resolve-workflow.md` | Diagnose and fix a failing GitHub Actions run until it passes |
 | `/pause-session` | `.agents/workflows/pause-session.md` | End-of-session checkpoint; writes `__resume_prompt.txt` + persists lessons |
 | `/resume-session` | `.agents/workflows/resume-session.md` | Session-start bootstrap; replays the saved resume protocol |

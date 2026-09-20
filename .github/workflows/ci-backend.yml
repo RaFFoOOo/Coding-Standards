@@ -7,6 +7,21 @@ on:
       - '.github/workflows/ci-backend.yml'
       - '.github/workflows/shared-build-dotnet.yml'
 
+  # Opt-in manual run, so CI can be executed on a self-hosted runner while the GitHub-hosted
+  # Actions allowance is exhausted. This trigger adds NO automatic runs: a PR still fires the
+  # `pull_request` trigger above, always on GitHub-hosted. Only a person dispatching this
+  # workflow by hand can choose otherwise.
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Where to run. "self-hosted" uses your own runner and bills NO Actions minutes; "github" uses GitHub-hosted.'
+        type: choice
+        options:
+          - github
+          - self-hosted
+        default: github
+        required: false
+
 permissions:
   contents: read
 
@@ -19,4 +34,5 @@ jobs:
     uses: ./.github/workflows/shared-build-dotnet.yml
     with:
       run-tests: true
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     secrets: inherit

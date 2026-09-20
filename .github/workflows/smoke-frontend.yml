@@ -9,6 +9,11 @@ name: Smoke — Frontend SWA
 on:
   workflow_call:
     inputs:
+      runner:
+        description: 'Where to execute. "ubuntu-latest" = GitHub-hosted (bills Actions minutes); "self-hosted" = your own runner (free). Callers compute this; see stack-github-actions.md §8.'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
       swa-url:
         description: 'Deployed SWA root URL (no trailing slash)'
         type: string
@@ -25,7 +30,7 @@ permissions:
 jobs:
   smoke:
     name: Run frontend smoke gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || vars.CI_RUNNER || 'ubuntu-latest' }}
 
     steps:
       - name: Check out repository
