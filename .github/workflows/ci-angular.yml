@@ -17,6 +17,12 @@ on:
       - 'package*.json'
       - '.github/workflows/ci-angular.yml'
       - '.github/workflows/shared-build-angular.yml'
+      # `uat-coverage.spec.ts` asserts that every route has a case in docs/uat/, so those documents
+      # are a build input of this workflow's test job in the way the guards' scripts were of the
+      # smoke-walk job. Without this entry a PR that deletes a case while touching nothing under
+      # lc-webapp/ never runs the spec — the check would be silently absent exactly when it matters
+      # (S58 T5).
+      - 'docs/uat/**'
 
   # Opt-in manual run, added 2026-08-23 so CI can be executed on a self-hosted runner while the
   # GitHub-hosted Actions allowance is exhausted. This trigger adds NO automatic runs: a PR still
@@ -37,8 +43,28 @@ permissions:
   contents: read
 
 jobs:
-  validate-build:
+  # Which paths this project's Angular build reads. Overridable per repo, so a sibling with a
+  # different layout reuses `shared-push-scope.yml` untouched. The `paths:` key above must stay
+  # literal — GitHub resolves `on:` before any context exists — so these two lists are maintained
+  # together, deliberately, and the workflow file itself appears in both.
+  push-scope:
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    uses: ./.github/workflows/shared-push-scope.yml
+    with:
+      prefixes: >-
+        ${{ vars.ANGULAR_SCOPE_PREFIXES ||
+            'lc-webapp/ docs/uat/ package.json package-lock.json
+             .github/workflows/ci-angular.yml .github/workflows/shared-build-angular.yml
+             .github/workflows/shared-push-scope.yml' }}
+      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+
+  validate-build:
+    needs: push-scope
+    # Skipped on a draft PR: no step here has to run on one, because the draft is the sprint PR
+    # and its task PRs already ran them. Runs on `ready_for_review` (stack-github-actions.md §7.2).
+    if: >-
+      vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && needs.push-scope.outputs.touched != 'false'
+      && github.event.pull_request.draft != true
     concurrency:
       group: ci-angular-${{ github.ref }}
       cancel-in-progress: true
@@ -62,12 +88,27 @@ jobs:
   # too, where a browser download and a dev-server boot are pure cost. Runs in parallel with the
   # build (no `needs:`) — it builds its own bundle via `ng serve` and shares nothing with it.
   smoke-walk:
+    needs: push-scope
+    # Job-gated on SCOPE, step-gated on `RUN_WALK` (draft, or not targeting the default branch).
+    #   scope=false means no file this job reads changed, e2e/ included — the type-check below
+    #     cannot newly fail, so skipping the whole job loses nothing.
+    #   RUN_WALK=false means the code CAN have changed, so the type-check must still run and only
+    #     the expensive walk is deferred.
+    # Safe to skip a whole job here because this repo has no required status checks (no branch
+    # protection on this plan, verified 2026-09-13); if that ever changes, a skipped job may need a
+    # companion that always reports (stack-github-actions.md §1).
     name: Live smoke walk
-    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
+    if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true' && needs.push-scope.outputs.touched != 'false'
     runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
     concurrency:
       group: smoke-walk-${{ github.ref }}
       cancel-in-progress: true
+    env:
+      # The walk runs at the sprint gate, not per task (DECISIONS.md 2026-09-17): on a non-draft PR into
+      # the default branch — the sprint PR once ready, a hotfix, a Dependabot PR — and on a manual run.
+      # A task PR targets its sprint branch and skips it. Outside `pull_request` both fields are null,
+      # so the walk fails open (stack-github-actions.md §7.2).
+      RUN_WALK: ${{ github.event.pull_request.draft != true && (github.event_name != 'pull_request' || github.base_ref == github.event.repository.default_branch) }}
     defaults:
       run:
         working-directory: ${{ vars.ANGULAR_WORKING_DIRECTORY || '.' }}
@@ -106,7 +147,7 @@ jobs:
       # Only chromium: the walk asserts behaviour and accessible names, not cross-engine rendering,
       # so the other two browsers would triple the download for no additional signal.
       #
-      # Skipped on draft PRs together with the walk itself — see the walk step below for why.
+      # Skipped whenever the walk is (`RUN_WALK`).
       # No `--with-deps`: that flag runs `apt-get` as ROOT on the runner host. Disposable on a
       # GitHub-hosted VM, but on a self-hosted runner the host is someone's laptop, so a workflow
       # edit could execute arbitrary root commands on it. The system libraries Chromium links
@@ -114,7 +155,7 @@ jobs:
       # stays here because it is version-locked to @playwright/test and would drift if pinned to
       # the host.
       - name: Install Playwright chromium
-        if: github.event.pull_request.draft != true
+        if: env.RUN_WALK == 'true'
         run: npx playwright install chromium
 
       - name: Type-check the walk
@@ -135,30 +176,22 @@ jobs:
       # This job keeps only what genuinely needs a built Angular app: the type-check and the walk.
 
       # playwright.config.ts boots `ng serve --configuration preview` itself via `webServer`.
-      #
-      # ── Skipped on DRAFT pull requests (2026-08-23) ──────────────────────────────────────────
-      # Measured: this step plus its browser download is ~2m40s of a ~2m45s job, so GitHub bills 3
-      # minutes where the rest of the job bills 1. Across 13–17 Aug it ran 98 times and **52% of
-      # those runs were on `sprint/*` branches, not task branches** — the cumulative sprint→main
-      # PR re-validating itself on every task merge, ~300 billed minutes on PRs that are drafts
-      # precisely because nobody intends to merge them yet (AGENTS.md §8's Sprint/Task strategy
-      # plus the standing STOP gate). That, compounded with this job's own 2.5x on the per-run
-      # cost, is what exhausted this Free private repo's Actions allowance.
-      #
-      # `draft != true` rather than `draft == false`: on any non-`pull_request` event the field is
-      # null, and null != true, so the walk still runs. Failing OPEN is the right default for a
-      # correctness gate — a wrong guess here silently stops testing rather than silently costing.
-      #
-      # WHY THIS IS A STEP-LEVEL `if:` AND MUST STAY ONE. Three repo guards and the e2e type-check
-      # live in this same job. Gating the JOB would disable them on every draft PR — including the
-      # sprint→main PR, which is the integration point where `check-mock-order-items.sh` caught a
-      # real defect during PR #790. Skip the expensive step; never the job.
-      #
-      # The walk is not lost, only deferred: marking the PR ready for review fires
-      # `pull_request: ready_for_review`, and it runs before anyone can merge.
+      # Gated per STEP, never per job: the type-check above must still run on every PR
+      # (stack-github-actions.md §7.2).
       - name: Run the live smoke walk
-        if: github.event.pull_request.draft != true
+        if: env.RUN_WALK == 'true'
         run: npm run smoke:walk
+
+      # A skipped step cannot announce its own skipping, so the inverse condition gets its own step:
+      # a green check must never be read as "the app was walked".
+      - name: Say that the walk was skipped
+        if: env.RUN_WALK != 'true'
+        run: |
+          if [[ "${{ github.event.pull_request.draft }}" == "true" ]]; then
+            echo "::notice title=Live smoke walk SKIPPED (draft)::This PR is a draft. Mark it ready for review to run the walk (stack-github-actions.md §7.2)."
+          else
+            echo "::notice title=Live smoke walk SKIPPED (task PR)::This PR targets ${{ github.base_ref }}, not ${{ github.event.repository.default_branch }}. The walk runs when the sprint PR is marked ready for review (DECISIONS.md 2026-09-17)."
+          fi
 
       - name: Upload failure traces
         if: failure()

@@ -1,21 +1,61 @@
 name: Validate Artifacts
 
-# Cheap repo-hygiene guard:
-#  - archive-guard: no closed PLAN/TEST_PLAN/EPIC/QA_REPORT artifact left at repo
-#    root — enforces AGENTS.md §1 Living Plan Enforcement.
+# THE HOME OF EVERY PURE-BASH GUARD IN THIS REPO (14 of the 15; consolidated here 2026-09-01).
 #
-# Targets the main boundary: PRs into main (incl. the cumulative sprint PR) and
-# pushes to main. `branches: [main]` filters the TARGET branch per
-# stack-github-actions.md §1.
+# The one exception is `check-schema-drift.sh`, which needs the .NET SDK and dotnet-ef and so
+# stays in shared-build-dotnet.yml. Everything else is bash + python3 and needs neither Node nor
+# a compiler, so hosting them in a stack's build made that stack's TRIGGER the union of "code it
+# compiles" and "files these scripts read" — which is how an i18n edit came to run 7m38s of .NET
+# restore, build and 517 tests to reach a grep (measured on #852).
+#
+# THE INVARIANT THAT KEEPS THIS JOB HONEST: it is stack-neutral, so it must be triggered by
+# everything its guards read (hence `lc-webapp/**` AND `lc-services/**` below) and filtered by
+# nothing else — see the pull_request trigger's note on why it carries no `branches:` filter.
+#
+# Guards:
+#  - archive-guard: no closed PLAN/TEST_PLAN/EPIC/QA_REPORT artifact left at repo
+#    root (the drift the recursive review flagged 3×, §4.6 / N1). (Sprint 19 T4)
+#  - readme-modes: README service-mode docs stay consistent with
+#    environment.production.ts (§4.5 — the stale "all Mock" claim T3 fixed). (Sprint 19 T4)
+#  - tenant-guid-drift: each tenant's blob container GUID stays single-sourced — backend
+#    TenantRegistry.cs == frontend tenants.json (Sprint 20 T6 / DECISIONS.md 2026-06-04).
+#  - workflow-cost: a draft-skip implies `ready_for_review`, and every pull_request runner job
+#    cancels superseded runs (stack-github-actions.md §7 / 2026-08-23 Actions-quota incident).
+#  - dependency-downgrade: no manifest LOWERS a version vs the PR's base. A manifest is a
+#    whole-file snapshot from when the branch was cut, so merging grouped dependency PRs in
+#    sequence can silently revert their siblings (measured: #812 vs #740/#795, 2026-08-29).
+#
+# TRIGGER SHAPE, and the asymmetry is deliberate. The `pull_request` trigger has NO `branches:`
+# filter — it must reach task PRs into `sprint/*`, which are most of them. The `push` trigger
+# keeps `branches: [main]`, because a push to a task branch is already covered by that branch's
+# own PR and re-running there would double every guard.
 
-# Path-scoped per stack-github-actions.md §1 (Trigger Path Scoping): fire only when a
-# file the guard actually reads changes. Unrelated PRs (e.g. a .claude/-only sync) no
-# longer spin a runner or show a false ❌. NOT a required check (path-filtered — see the rule).
+# Path-scoped per stack-github-actions.md §1 (Trigger Path Scoping): fire only when a file one of
+# the guards actually reads changes — the union of all FOURTEEN guards' inputs, plus the scripts
+# and this workflow itself. Unrelated PRs (e.g. a .claude/-only sync) still spin no runner and
+# show no false ❌. NOT a required check (path-filtered — see the rule).
 on:
   pull_request:
-    branches: [main]
-    # Keep identical to the push paths below (GitHub Actions does not support YAML anchors).
+    # `ready_for_review` is NOT in the default set, and its absence is a hole rather than a
+    # default: the cumulative sprint PR is a deliberate draft for the whole sprint, so taking it
+    # out of draft is the ONE moment this job owns fourteen guards, including the ones that gate production code
+    # must run against the merged sprint state. Without this type that transition fires nothing.
+    # Measured 2026-09-13: #969 had zero runs for the gate commit. Listing any type replaces the
+    # whole default set, so all four are spelled out.
+    types: [opened, synchronize, reopened, ready_for_review]
+    # NO `branches:` filter, and that is the whole point of this trigger [STRICT].
+    #
+    # It used to read `branches: [main]`, which filters the TARGET branch — so this workflow ran
+    # only on PRs into `main`. Under the Sprint/Task strategy (AGENTS.md §8) almost every PR
+    # targets a `sprint/*` branch instead: 10 of the 12 most recently merged PRs did. Every one of
+    # them got ZERO repo-hygiene guards, and nothing said so. That was survivable while this job
+    # held five artifact guards; it is not survivable now that it owns fourteen, including the ones
+    # that gate production code. Re-adding a `branches:` filter here silently deletes the guards
+    # for the repo's dominant PR shape.
+    #
+    # Keep the path list identical to the push list below — GitHub Actions has no YAML anchors.
     paths:
+      # archive guard
       - 'PLAN_*.md'
       - 'TEST_PLAN_*.md'
       - 'EPIC_*.md'
@@ -23,8 +63,29 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'scripts/ci/validate-archive.sh'
-      - '.github/workflows/validate-archive.yml'
+      # readme-modes / tenant-guid / dependency-downgrade guards
+      - 'README.md'
+      - '**/environment.production.ts'
+      - '**/TenantRegistry.cs'
+      - '**/tenants.json'
+      - '**/*.csproj'
+      - '**/package.json'
+      - '**/dotnet-tools.json'
+      # workflow-cost guard, and this workflow + its scripts (§1: an edit to a guard re-runs it)
+      - '.github/workflows/**'
+      # check-dev-auth-gate reads deploy-functions/action.yml's App Settings allow-list —
+      # the gate keeping the fake-auth key out of Azure is that file NOT naming it, so an edit
+      # there is exactly when the guard must re-run.
+      - '.github/actions/**'
+      - 'scripts/ci/**'
+      # The guards moved here from ci-angular/shared-build-dotnet read production source on BOTH
+      # stacks — check-file-length scans every production file, so its input genuinely is both
+      # trees and narrowing it would be false precision. This is why the list is broad: a guard
+      # that reads everything must be triggered by everything it reads.
+      - 'lc-webapp/**'
+      - 'lc-services/**'
+      - 'docs/VALIDATION_MATRIX.md'
+      - 'scripts/smoke/dev.sh'
   push:
     branches: [main]
     paths:
@@ -35,22 +96,88 @@ on:
       - 'archive/**'
       - 'CLAUDE.md'
       - 'AGENTS.md'
-      - 'scripts/ci/validate-archive.sh'
-      - '.github/workflows/validate-archive.yml'
+      - 'README.md'
+      - '**/environment.production.ts'
+      - '**/TenantRegistry.cs'
+      - '**/tenants.json'
+      - '**/*.csproj'
+      - '**/package.json'
+      - '**/dotnet-tools.json'
+      - '.github/workflows/**'
+      - 'scripts/ci/**'
+      - 'lc-webapp/**'
+      - 'lc-services/**'
+      - 'docs/VALIDATION_MATRIX.md'
+      - 'scripts/smoke/dev.sh'
 
 permissions:
   contents: read
 
 jobs:
+  # Cost-reduction (stack-github-actions.md §1): all fourteen guards are sub-second bash scripts,
+  # but GitHub bills each JOB rounded up to a whole minute — fourteen jobs would cost ~14 minutes
+  # for ~20 seconds of work. They share one checkout + runner and run sequentially in a single
+  # job; each step still names its guard so a failure is attributable. `set -e` per step means the
+  # first failing guard fails the job.
   guards:
-    name: Repo-hygiene guards (archive)
+    name: Repo-hygiene guards (every pure-bash guard — artifacts, deps, i18n, nav, file-length)
+    # `stack-github-actions.md` §3 names the `Validate Artifacts` hygiene guards as one of the jobs
+    # that MUST carry this gate. Without it the job runs even in a scaffolded repo that has none of
+    # the `scripts/ci/*` guards it invokes, and every step fails with exit 127.
     if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # Every other CI job in this repo cancels its superseded run; this one did not, so a branch
+    # pushed three times in a minute billed three whole minutes to answer the same question three
+    # times. Cheap per run, but it is the one workflow with no ceiling on how often it repeats.
     concurrency:
       group: validate-archive-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-      - name: Closed artifacts are archived
-        run: bash scripts/ci/validate-archive.sh
+
+      # Every pure-bash guard in `scripts/ci/`, DISCOVERED not listed. A hardcoded step per guard
+      # is a second inventory that drifts from the first: a new guard runs nowhere until someone
+      # remembers to add it, and a deleted one fails with exit 127. Discovery also makes this file
+      # portable — a repo reuses it unchanged and runs exactly the guards it ships.
+      #
+      # `check-schema-drift.sh` is excluded on purpose: it is the one guard needing the .NET SDK
+      # and the local dotnet-ef tool, so it runs in the job where that toolchain already exists.
+      #
+      # These are all sub-second, so they share one job rather than paying a whole billed minute
+      # each (`stack-github-actions.md` §1). They were previously split across a Node job and a
+      # .NET job, which made each build's trigger the union of "code this stack builds" and "files
+      # these scripts read" — an i18n edit dragged in a full .NET restore and test run to reach a
+      # grep — and four of them ran in both, so a PR touching both stacks executed them twice.
+      - name: Repo-hygiene guards
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          guards=(scripts/ci/*.sh)
+          skip=check-schema-drift.sh
+
+          if [ ${#guards[@]} -eq 0 ]; then
+            echo "::notice::No scripts/ci/*.sh in this repository — nothing to check."
+            exit 0
+          fi
+
+          failed=()
+          ran=0
+          for g in "${guards[@]}"; do
+            [ "$(basename "$g")" = "$skip" ] && continue
+            echo "::group::$(basename "$g")"
+            if bash "$g"; then
+              echo "PASS"
+            else
+              echo "::error::$(basename "$g") failed"
+              failed+=("$(basename "$g")")
+            fi
+            echo "::endgroup::"
+            ran=$((ran + 1))
+          done
+
+          echo "Ran $ran guard(s); ${#failed[@]} failed."
+          if [ ${#failed[@]} -gt 0 ]; then
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi

@@ -137,7 +137,9 @@ jobs:
                 `**Branch:** \`${branch}\``,
                 `**Commit:** \`${sha}\``,
                 `**Build Tag:** \`${buildTag}\``,
-                `**Build Config:** \`${{ inputs.build-config || 'production' }}\``,
+                // Must match the build job's own fallback above. Reporting a config the build
+                // did not use makes the artefact people read a stale claim.
+                `**Build Config:** \`${{ inputs.build-config || 'preview' }}\``,
                 '',
                 '_This is a shared preview slot — the latest push overwrites the previous preview._'
               ].join('\n')
