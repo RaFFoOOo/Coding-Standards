@@ -132,3 +132,65 @@ concepts records digests only for the ones it actually resolved.
 **Consequences:** Ledger and content now share a fate — both live in the same PR, so an
 abandoned PR leaves no stale claim anywhere. Verified against the live ledgers: the new
 cross-check flags exactly the two poisoned entries and nothing else.
+
+## 2026-09-20 — The backlog is a directory, not a single file
+
+**Context:** `todo-manager` governed one `TODO.md`. In a mature project that file reached
+5 428 lines and 167 sections, a third of it prose with no checkbox — and §§ 3/4/6 are all
+checkbox-keyed, so the mandated sweep ran and was structurally blind to 96 % of it.
+
+**Decision:** The backlog is `backlog/` — one file per area, indexed by `backlog/README.md`,
+which also defines the markers (⚖ needs a decision · ⏳ trigger-gated · 🔍 unverified) and
+the Parked/Rejected list. Every entry carries at least one `- [ ]` and a `Verified` line;
+an entry with no evidence is a guess.
+
+**Consequences:** `TODO.md` is swept out of all nine hub files in the same commit — a rename
+adopted in one file leaves two conventions, which is worse than either. The skill keeps its
+name so `/todo-manager` still resolves.
+
+## 2026-09-20 — The lessons gate asserts a heading, and the lesson must reach a rule
+
+**Context:** `run-qa`'s sprint-close check tested whether `LESSONS_LEARNED.md`'s last commit
+date fell inside the sprint's range. That passes whenever *any* recent commit touched the
+file — including the **previous** sprint's entry, which is how one gate went green with no
+entry for its own sprint present. A shallow clone defeats it a second way: every
+`git log -1 -- <path>` returns the graft commit, so every file reads as modified today.
+
+**Decision:** Assert the sprint's own heading exists — `grep -qE "^#{1,3} .*Sprint <N>\b"`.
+And gate the half that actually gets skipped: before `STATUS: PASS`, name the file and
+section where this sprint's lesson landed as a rule, or say explicitly why no rule change
+was needed.
+
+**Consequences:** Two measurements motivate the second gate — of 10 lessons across a
+20-sprint span, 4 had never become a rule; of 27 entries moved at an archive rotation, 7
+named no rule and 1 named only an agent's local memory, 26 %. A lesson that exists only in
+`LESSONS_LEARNED.md` is enforced by nothing: no bootstrap step reads that file.
+
+## 2026-09-20 — Both logs are measured every sprint, rotated only on threshold
+
+**Context:** `DECISIONS.md` and `LESSONS_LEARNED.md` grow every sprint and neither has a
+natural end. One project's rotation took its lessons file from 158 797 B to 41 155 B, and
+eight days later it was back to 61 289 B with no trigger saying when to do it again. Its
+`DECISIONS.md` meanwhile reached 302 951 B — larger than its own archive, and read in full
+at every bootstrap.
+
+**Decision:** Measure both at the sprint close-out, in the same step that archives the PLAN
+and QA report, and rotate whichever is over its threshold. Rotate, never truncate: the
+recent epoch stays in the live file, everything earlier moves verbatim to the archive, and
+an index at the foot of the live file names what each archived entry became.
+
+**Consequences:** Rejected the simpler rule of rotating both every sprint. `DECISIONS.md` is
+read at every full bootstrap precisely because old decisions still govern; a fixed cadence
+would push governing decisions behind an index and make the bootstrap worse, while the
+index-building judgment — which is what reveals the entries that became nothing — would run
+every sprint for a few KB of content.
+
+## 2026-09-20 — A workaround is retired only with evidence it is obsolete everywhere
+
+**Context:** The spoke's `agent-workarounds.md` dropped the broken-stdout-pipe entry when it
+reorganised the file. The hub took the reorganisation.
+
+**Decision:** The entry stays, re-filed under *Processes and shells*. A spoke not hitting a
+platform trap is evidence about that spoke, not about every repo the hub serves. Per the
+sync workflow's deletion branch, a concept is removed from the hub only as a confirmed
+global retirement.
