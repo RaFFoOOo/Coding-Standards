@@ -126,7 +126,7 @@ Every finding gets:
 - **Page + role + viewport**
 - **Evidence:** the screenshot reference + which heuristic (§5, numbered) it violates
 - **Proposed fix:** specific and actionable, never "improve the styling" — state what would change
-- **Target:** existing TODO.md item to fold into, or "new — needs a Mockup Gate" if it's a visual
+- **Target:** existing `backlog/` entry to fold into, or "new — needs a Mockup Gate" if it's a visual
   design change (per `AGENTS.md §1` Design Exploration → Lock: a UX finding proposing a visual
   change is a design *idea*, not an approved design — it does not get implemented off this doc
   alone)
@@ -149,7 +149,7 @@ Write to `docs/UX_REVIEW_<YYYY_MM_DD>.md`:
 5. **Cross-cutting patterns** — a finding that recurs on 3+ pages is a systemic issue, call it out
    once here instead of repeating it per-page
 6. **Proposed roadmap** — priority-ordered table of every finding, each tagged with its target
-   (existing TODO.md section / new TODO.md item / needs a Mockup Gate)
+   (existing `backlog/` entry / new `backlog/` entry / needs a Mockup Gate)
 7. **Open questions for the Tech Lead**
 
 Keep it readable in one sitting per pass — this is a review, not an archive.
@@ -164,7 +164,7 @@ Keep it readable in one sitting per pass — this is a review, not an archive.
    missing `alt` text) is still logged here, not fixed inline — the review's value is being a
    trustworthy, complete inventory; mixing in opportunistic fixes makes it unclear what's reviewed
    vs. patched.
-4. **[MANDATORY]** Every roadmap item gets a real `TODO.md` entry (or a sprint task, if the Tech
+4. **[MANDATORY]** Every roadmap item gets a real `backlog/` entry (or a sprint task, if the Tech
    Lead resolves it concretely during PR review) in the **same** resolution pass — never leave a
    decision as review-doc prose alone (`/recursive-review §6` step 6's own hard-learned rule, same
    failure mode applies here identically).

@@ -136,7 +136,7 @@ Pre-record the likely decisions **before** the run, each traced to a real one, i
 anything not on that list, the search is a fixed procedure, not a judgement call:
 
 ```bash
-grep -n -i "<concept>" DECISIONS.md TODO.md .agents/rules/*.md
+grep -rn -i "<concept>" DECISIONS.md backlog/ .agents/rules/*.md
 grep -rn -i "<concept>" archive/PLAN_sprint_*.md LESSONS_LEARNED.md
 git log --oneline -S'<symbol>' -- <path>
 ls ~/.claude/projects/*/memory/

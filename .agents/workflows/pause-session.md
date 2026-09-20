@@ -28,7 +28,7 @@ Identify everything in flight:
 - **Open PRs** (`gh pr list`) — note number, title, base branch, head branch, CI status.
 - **Branches** with unmerged commits ahead of their base (`git branch -vv`).
 - **Active tasks** marked `[/]` or `[ ]` in the current `PLAN_sprint_*.md`.
-- **TODO.md items** picked up but not yet promoted to a PLAN.
+- **`backlog/` entries** picked up but not yet promoted to a PLAN.
 - **Architectural decisions** made this session that are not yet in code.
 - **Operator actions** the User committed to running (Azure CLI, env vars, RBAC grants, manual UI clicks).
 
@@ -37,7 +37,7 @@ Identify everything in flight:
 |---|---|---|
 | Durable preferences / architectural decisions | **Auto-memory** | Applies to future sessions, not just tomorrow |
 | In-sprint tasks and progress | **`PLAN_sprint_*.md`** | Sprint-scoped, lives until sprint closes |
-| New backlog items | **`TODO.md`** | Pre-sprint, awaiting promotion |
+| New backlog items | **`backlog/`** | Pre-sprint, awaiting promotion |
 | Operational state (PR numbers, merge order, verification steps, operator follow-ups) | **`__resume_prompt.txt`** | Session-local, only useful for the immediate next session |
 
 ### Step 3 — Generate `__resume_prompt.txt` [MANDATORY]

@@ -29,7 +29,7 @@ followed by a PR.
 
 1. Read these in full — never skim:
    - `CLAUDE.md`, `AGENTS.md`
-   - Every `.md` at the repo root (PLAN_*, TODO.md, EPIC_*, README.md)
+   - Every `.md` at the repo root (PLAN_*, EPIC_*, README.md) and every file in `backlog/`
    - `.agents/rules/*.md`
    - The most recent `archive/PLAN_recursive_review_*.md` (if any) — what was promised, was
      it delivered? **Carry forward unresolved items as evidence in the new review.**
@@ -193,11 +193,11 @@ Keep the file under 500 lines. The Tech Lead should be able to read it in 15 min
    - **Explicit ownership block** copied from §5 of the doc (the agent self-criticism)
 5. Do NOT implement any of the findings in the same PR. The deliverable is the doc only.
    Findings get tracked into existing or new sprint plans as separate PRs.
-6. **[MANDATORY] Translate every Tech-Lead decision into a `TODO.md` entry in the same resolution
+6. **[MANDATORY] Translate every Tech-Lead decision into a `backlog/` entry in the same resolution
    pass — never leave it as review-doc prose alone.** The Tech Lead typically answers §9 as PR
    review comments on the open PR, not by editing the doc directly — resolving that feedback (via
    `/resolve-pr` or equivalent) is the moment every resulting "approved" or "decided" item MUST get
-   a real `TODO.md` entry (or sprint task, if concrete enough), created in the same PR that records
+   a real `backlog/` entry (or sprint task, if concrete enough), created in the same PR that records
    the resolution. A decision that exists only inside a review PR's comment thread or the doc's §9b
    prose is functionally identical to an unapproved idea — it has no owner and decays the same way.
    *(Codified 2026-07-18 after `PLAN_recursive_review_2026-07-16.md` §9b item 3 — approved-per-
