@@ -75,3 +75,37 @@ characters** and **≤ 200 bytes per instruction**.
 verbosity, which is the actual goal. Evidence for a rule — the incident, the
 measurement, the sprint that produced it — lives in this log, in a lessons file, or in
 the PR body, never in `AGENTS.md`.
+
+## 2026-09-20 — UAT cases live in `docs/uat/`, never in a per-sprint test plan
+
+**Context:** The `test-browser` workflow told the agent to write a
+`TEST_PLAN_sprint_[N].md` beside `PLAN.md` for each run. In practice the acceptance
+cases also accumulate in a persisted, per-feature directory, and the two lists drift:
+the sprint file is written from the diff, the durable one from the product, and only
+the durable one has a coverage guard watching it.
+
+**Decision:** `docs/uat/` is the plan. A run enumerates cases from it through a listing
+script that exits non-zero on a heading it cannot parse, so a malformed case surfaces
+instead of being silently dropped. Never write a per-sprint test-plan file. A failure is
+recorded in that case's own file, so the next run sees it.
+
+**Consequences:** Reverses the workflow's previous instruction. The walk also gained a
+mandatory UX review of every surface it touched, with a content-fingerprint checkpoint
+so an unchanged surface is never re-reviewed, and a `⛔ BLOCKED` result that is reported
+as its own value and never folded into a pass rate.
+
+## 2026-09-20 — The hub adopts split stack rules over monoliths (pending)
+
+**Context:** The hub carries 5 stack rule files where its spoke carries 12.
+`stack-angular.md` is 68 225 B across 17 sections here against 14 462 B there, because
+the spoke split testing, CSS, i18n, navigation and shared-UI into their own files; seven
+of the spoke's rule files have no hub counterpart. The hub's monolith loads in full
+whenever any matching file is read.
+
+**Decision:** The hub adopts the split. This is the same argument that drove the
+`AGENTS.md` rewrite — a rule nobody can scan is a rule nobody applies — and a
+path-scoped rule should load only for the files it governs.
+
+**Consequences:** Not executed in this PR. It retires three hub files and adds seven,
+which is a larger change than the `AGENTS.md` rewrite and needs its own branch and
+review. Recorded here so the next sync acts on the decision rather than re-deriving it.

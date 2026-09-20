@@ -7,75 +7,64 @@ description: Azure resource naming convention — load when provisioning or refe
 
 # Azure Resource Naming Convention
 
-All Azure resources in a project follow a structured naming scheme derived from the
-physical/logical context of the resource:
-
 ```
-{region}{region-suffix}{env}{app-prefix}{resource-type}{index}
+{region}{region-suffix}{env}{app-prefix}{resource-type}{index}      e.g. euwdappazf01
 ```
 
-**Segment order note:** region and its suffix come first, together, then environment. A project
-that instead provisions `{region}{env}{region-suffix}...` (environment before the suffix) has the
-order backwards; if resources already exist under that order, don't rename them retroactively (see
-the Rules section below) — but start any **new** project on the order above, never repeat a
-known-inconsistent scheme just because an earlier project shipped one.
+| Segment | Values | Notes |
+|---|---|---|
+| `region` + `region-suffix` | `eu` + `w` | two-letter region code, then a project-defined suffix; pick once and keep it |
+| `env` | `d` dev, `p` prod | |
+| `app-prefix` | project-defined, 2–4 letters | fixed for the life of the project |
+| `resource-type` | the acronym table below | lowercase |
+| `index` | `01`, `02`… | per type, per environment; gaps are fine — never renumber |
 
-## Segments
+**Region and its suffix come first, together, then environment.** A project that provisions
+`{region}{env}{region-suffix}…` has the order backwards. Never rename live resources to fix it —
+document the inconsistency and use the correct order for every **new** resource, accepting that the
+environment mixes both prefixes until it is re-provisioned.
 
-| Segment | Values | Example | Notes |
-|---|---|---|---|
-| `region` | two-letter ISO region code | `eu` | e.g. `eu` for West Europe |
-| `region-suffix` | project-defined | `w` | e.g. `w` for "west" — pick once per project and keep it consistent across environments; if an inconsistency is discovered later, document it rather than renaming live resources |
-| `env` | `d` (dev), `p` (prod) | `d` | environment the resource belongs to |
-| `app-prefix` | project-defined, short (2-4 letters) | `app` | application identifier, fixed for the life of the project |
-| `resource-type` | see table below | `azf` | lowercase acronym identifying the Azure resource type |
-| `index` | `01`, `02`… | `01` | per-type progressive index within the same environment |
+```
+✅ a new dev storage account     euwdappsta03
+❌ same, legacy order            eudwappsta03
+❌ free-form                     app-dev-storage
+```
 
-## Resource Type Acronyms
+## Resource type acronyms
 
-| Acronym | Azure Resource Type |
+| Acronym | Azure resource type |
 |---|---|
 | `rsg` | Resource Group |
-| `azf` | Azure Function App |
+| `azf` | Function App |
 | `sta` | Storage Account |
 | `umi` | User-Assigned Managed Identity |
 | `swa` | Static Web App |
 | `aai` | Application Insights |
 | `sql` | Azure SQL Server |
 | `sqldb` | Azure SQL Database |
-| `spn` | App Registration / Service Principal — **operational/CD identities only** (see note) |
+| `spn` | App Registration / Service Principal — CD identities only |
 | `kv` | Key Vault |
 | `cr` | Container Registry |
-| `aca` | Azure Container App |
+| `aca` | Container App |
 
-> **`spn` scope [STRICT]:** This convention names **Azure infrastructure resources** and
-> **operational** identities (e.g. the GitHub Actions CD service principal for an environment).
-> **Authentication app registrations** — SPA sign-in, API JWT audience — are **not** Azure
-> infrastructure and do **not** follow this scheme: they use descriptive functional names
-> (e.g. `<spa-app>`, `<api-app>`) and live in the customer identity tenant, not the
-> Azure subscription. Never name an auth app registration `…spnNN` — it conflates auth
-> identities with CD identities, which `stack-github-actions.md §2` forbids.
+A type not listed gets its acronym in the PLAN or PR that proposes the resource.
 
-## Example Resource Set (illustrative)
+## Not covered by the scheme
 
-| Name | Type | Purpose |
-|---|---|---|
-| `euwdapprsg01` | Resource Group | Per-environment resource group |
-| `euwdappswa01` | Static Web App | Frontend SPA |
-| `euwdappazf01` | Function App | Backend API |
-| `euwdappsta01` | Storage Account | Application content storage |
-| `euwdappumi01` | User-Assigned Managed Identity | Runtime identity (data-plane only) |
-| `euwdappspn01` | App Registration / SPN | CD identity (control-plane only), one per environment |
+- **Authentication app registrations** (SPA sign-in, API audience) are not Azure infrastructure: they
+  live in the customer identity tenant and use functional names. Never name one `…spnNN` — that
+  conflates an auth identity with a CD identity, which `stack-github-actions.md §2` forbids.
+- **Monitor artifacts** — an action group, a workbook's display name — use
+  `<envprefix><app-prefix>-<descriptor>`. A workbook's *resource* name must be a UUID.
+- **Names Azure generates** — a Consumption plan, a *Failure Anomalies* alert rule — stay as created.
 
 ## Rules
 
-- **[STRICT]** Every new Azure resource MUST follow this naming convention before provisioning.
-  Propose the name in the PLAN or PR description and get approval before running `az` commands.
-- **[STRICT]** One SPN per environment. Never share a CD SPN across environments.
-- **[STRICT]** The `umi` identity (runtime) and the `spn` identity (CD deploy) are always separate.
-  The `umi` has only data-plane permissions (e.g. SQL read/write). The `spn` has only control-plane
-  permissions (e.g. `Website Contributor` on its environment's Function App). Never cross-assign.
-- Index gaps are acceptable — do not renumber existing resources to fill a gap.
-- If a region-suffix or app-prefix inconsistency is discovered after resources are already
-  provisioned, document it in this file and in the project's infra docs rather than renaming
-  live resources retroactively.
+- **[STRICT] Name it before provisioning it.** Propose the name in the PLAN or PR and get approval
+  before running `az`. Then add its row to the project's resource map and its default to the setup
+  script the provisioning scripts read.
+- **[STRICT] A runtime identity and a CD identity are always separate — one CD SPN per environment.**
+  The `umi` holds only data-plane access roles on its own environment's storage and database. The
+  `spn` holds only control-plane roles, such as `Reader` on the subscription and deploy rights on its
+  own environment's Function App. Never grant a deployment role to a `umi`, and never share an SPN
+  across environments. Full taxonomy: `stack-github-actions.md §2`.
