@@ -32,7 +32,7 @@ user experiences them, not the code that produces them.
 
 ## § 1. Pre-flight [MANDATORY]
 
-1. Read `CLAUDE.md`, `AGENTS.md`, `.agents/rules/stack-angular.md` in full — most findings will be
+1. Read `CLAUDE.md`, `AGENTS.md`, `.agents/rules/stack-shared-ui.md` and `.agents/rules/stack-angular.md` in full — most findings will be
    frontend, and a finding that just restates an already-STRICT rule is redundant, not a discovery.
 2. Read the most recent `docs/UX_REVIEW_*.md` (if any) — carry forward undelivered findings (§7).
    For the very first run, also read `docs/UX_AUDIT_sprint_025.md` as historical baseline — it
@@ -95,7 +95,7 @@ misses a category of bug entirely:
    surfaced to a user is this failure mode).
 3. **User control and freedom** — is there always an obvious cancel/back/undo?
 4. **Consistency and standards** — internal consistency (does this page match the visual language
-   of every other page) AND external standards (`stack-angular.md`: no native OS controls per
+   of every other page) AND external standards (`stack-shared-ui.md`: no native OS controls per
    §11, `.form-row` 12-col grid per §14, icon rules per §4, breadcrumbs per §13).
 5. **Error prevention** — can the user submit something invalid without warning first?
 6. **Recognition rather than recall** — does the user have to remember something from a prior

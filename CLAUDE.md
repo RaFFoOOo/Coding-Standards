@@ -57,5 +57,14 @@ It will ask which agent the target project uses and transform paths, entry point
 and tool references accordingly (Claude Code → `.claude/` + `CLAUDE.md`; Gemini → `.agents/` as-is).
 
 ### Stack Rules Reference
-- Angular/TypeScript projects: `.agents/rules/stack-angular.md`
-- ASP.NET Core/C# projects: `.agents/rules/stack-dotnet-core.md`
+Each rule is path-scoped, so only the ones matching the files you touch load.
+
+| Angular / TypeScript | ASP.NET Core / C# | Any stack |
+|---|---|---|
+| `stack-angular.md` — architecture, state, DI, structure | `stack-dotnet-core.md` — syntax, architecture, testing, async, nullability | `stack-github-actions.md` |
+| `stack-shared-ui.md` — shared primitives, controls, form grid | `stack-dotnet-api.md` — endpoints, validation, security | |
+| `stack-navigation.md` — routing and placement | `stack-dotnet-data.md` — persistence, resilience, DB auth | |
+| `stack-i18n.md` — assets and translation | | |
+| `stack-angular-testing.md` — frontend test strategy | | |
+
+All live in `.agents/rules/`.
