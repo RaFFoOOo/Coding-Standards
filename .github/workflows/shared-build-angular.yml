@@ -100,11 +100,6 @@ jobs:
         # ng update uses legacy resolution locally; npm ci in npm v10 ignores .npmrc for ERESOLVE.
         run: npm ci --legacy-peer-deps
 
-      - name: Audit npm dependencies
-        # OWASP A06 — fail the workflow on any moderate-or-higher CVE.
-        # See `.claude/rules/stack-github-actions.md` §6 Security Gates.
-        run: npm audit --audit-level=moderate
-
       # Placed BEFORE the tests and the build, deliberately: lint is 70 s against their combined
       # 203 s, so failing here first is the cheapest possible failure. Folded into this job rather
       # than taking its own, and the arithmetic (stack-github-actions.md §7.1) is why — measured on
@@ -140,6 +135,19 @@ jobs:
 
       - name: Build Application
         run: npm run build -- --configuration ${{ inputs.environment }}
+
+      # Last, so a registry outage cannot hide lint, tests and build; before the upload, so a tree
+      # with a known CVE publishes nothing (`stack-github-actions.md` §6). A transport failure still
+      # fails the step — it only gets a message saying it is not a finding.
+      - name: Audit npm dependencies
+        run: |
+          status=0
+          npm audit --audit-level=moderate > "$RUNNER_TEMP/npm-audit.log" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/npm-audit.log"
+          if [ "$status" -ne 0 ] && grep -q 'audit endpoint returned an error' "$RUNNER_TEMP/npm-audit.log"; then
+            echo "::error::npm registry unreachable — this is not a CVE finding. Re-run the job."
+          fi
+          exit "$status"
 
       - name: Upload Build Artifact
         if: inputs.upload-artifact
