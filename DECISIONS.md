@@ -217,3 +217,24 @@ wording, not coverage, and was not used to justify anything.
 kept as stable identifiers, so a file now legitimately starts at `## 7`. Twelve sections changed
 file, and every cross-reference was repointed and verified to resolve. `stack-css.md` is **not**
 created — the hub has no CSS content to put in it; it arrives when the spoke's version is reconciled.
+
+## 2026-09-20 — The hygiene guards job discovers its guards instead of listing them
+
+**Context:** The spoke's `validate-archive.yml` runs each `scripts/ci/*.sh` guard as its own
+hardcoded step — about 20 of them. Adopting it into the hub unchanged would have fanned out a
+workflow invoking 18 scripts that only one participant ships. Measured: the spoke has 20 guards,
+the hub 0, the third participant 1, and that participant has
+`DISABLE_PIPELINES_FOR_TEMPLATE=false`, so the job would have run there and failed 18 steps with
+exit 127. The spoke's own comment names this failure and relies on the template flag to avoid it —
+a defence the third participant does not have.
+
+**Decision:** The job discovers `scripts/ci/*.sh` and runs what it finds, grouping output per guard
+and failing with the names of those that failed. `check-schema-drift.sh` is excluded by name: it is
+the one guard needing the .NET SDK, so it stays in the job where that toolchain exists.
+
+**Consequences:** The file is portable — a repo reuses it unchanged and runs exactly the guards it
+ships, including none. It also removes a second inventory that drifts from the first: a new guard
+previously ran nowhere until someone added a step, and a deleted one failed with exit 127. This is
+the same principle as deriving the guard count rather than writing it down. Verified by running the
+harness against fixtures: empty repo exits 0, a failing guard exits 1 and names itself, and the
+excluded guard is skipped even when it would fail.

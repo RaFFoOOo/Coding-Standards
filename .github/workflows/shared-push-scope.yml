@@ -1,0 +1,95 @@
+name: Shared — did this push touch these paths?
+
+# Answers "did THIS push change anything the caller cares about", which `paths:` cannot.
+#
+# `on.<event>.paths` is evaluated against a pull_request's CUMULATIVE diff (base…head), never
+# against the individual push — so once a PR holds one matching file, every later push re-runs the
+# workflow, docs-only commits included. See `stack-github-actions.md §7.2b` for the measurement.
+#
+# Paths arrive as an INPUT, never hardcoded, so a sibling repo with a different layout reuses this
+# file unchanged (`AGENTS.md §5`, and the `sync-templates` hub contract). The `paths:` key in the
+# CALLER still has to be literal — GitHub resolves `on:` before any context exists, so no
+# expression is possible there. That is a platform limit, not a choice.
+
+on:
+  workflow_call:
+    inputs:
+      prefixes:
+        description: >-
+          Space-separated path prefixes and exact filenames, e.g.
+          "<app-dir>/ package.json package-lock.json". A value ending in "/" matches a directory
+          subtree; anything else must match the whole path. Anchored at the start, so
+          "docs/<app-dir>-notes.md" never matches the prefix "<app-dir>/".
+        type: string
+        required: true
+      runner:
+        type: string
+        required: false
+        default: 'ubuntu-latest'
+    outputs:
+      touched:
+        description: '"true" when this push changed a matching path, or when the answer cannot be determined.'
+        value: ${{ jobs.scope.outputs.touched }}
+
+permissions:
+  contents: read
+
+jobs:
+  scope:
+    runs-on: ${{ inputs.runner || vars.CI_RUNNER || 'ubuntu-latest' }}
+    outputs:
+      touched: ${{ steps.compare.outputs.touched }}
+    steps:
+      # FAILS OPEN, three independent ways, because a gate that under-runs stops testing silently
+      # while one that over-runs costs a minute:
+      #   1. skipped on any action but `synchronize` — `opened`/`reopened`/`ready_for_review` carry
+      #      no usable range, so the output is unset and every caller's `!= 'false'` still runs;
+      #   2. an unresolvable range (force-push) yields "true";
+      #   3. callers MUST test `!= 'false'`, never `== 'true'`.
+      - name: Compare this push against the previous head
+        id: compare
+        if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFIXES: ${{ inputs.prefixes }}
+        run: |
+          set -uo pipefail
+
+          files=$(gh api \
+            "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.event.after }}" \
+            --paginate --jq '.files[].filename' 2>/dev/null) || files=""
+
+          if [[ -z "$files" ]]; then
+            echo "::notice::Push range unresolvable (force-push?) — running everything."
+            echo "touched=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed in this push:"; echo "$files" | sed 's/^/  /'
+
+          # Built from the input rather than a literal, and anchored with ^ so a prefix can only
+          # match at the start of a path. `printf %s` + grep -F-style escaping is avoided by
+          # requiring plain paths in the input; a prefix ending in / matches its subtree.
+          matched=false
+          for prefix in $PREFIXES; do
+            # Escape regex metacharacters: an unescaped dot in "package-lock.json" would match any
+            # character, so "package-lockXjson" would count as a hit.
+            escaped=$(sed 's/[.[\*^$()+?{}|]/\\&/g' <<< "$prefix")
+            if [[ "$prefix" == */ ]]; then
+              pattern="^${escaped}"
+            else
+              pattern="^${escaped}$"
+            fi
+            if grep -qE "$pattern" <<< "$files"; then
+              echo "  → matched '$prefix'"
+              matched=true
+              break
+            fi
+          done
+
+          if [[ "$matched" == true ]]; then
+            echo "touched=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "touched=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::This push touched none of: $PREFIXES — dependent jobs skipped."
+          fi

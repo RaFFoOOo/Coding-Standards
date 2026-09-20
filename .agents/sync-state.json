@@ -19,6 +19,7 @@
     "workflows/codeql.yml",
     "workflows/shared-build-angular.yml",
     "workflows/shared-build-dotnet.yml",
+    "workflows/shared-push-scope.yml",
     "workflows/smoke-frontend.yml",
     "workflows/validate-archive.yml",
     "actions/deploy-functions/action.yml",
