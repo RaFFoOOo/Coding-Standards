@@ -26,11 +26,18 @@ Execute each step sequentially for every Feature in the sprint.
 6. Read relevant skills: `.agents/skills/plan-sprint/SKILL.md`, `.agents/skills/run-qa/SKILL.md` (if exists).
    **Skill path integrity check:** If any skill referenced in this file was recently renamed, run `grep -rn "<old-name>" .agents/skills/ CLAUDE.md` before proceeding to catch stale references.
 7. Read rules: the relevant `.agents/rules/stack-*.md` file for the current tech stack and `AGENTS.md` (user global rules).
+7a. **Change-Cost Design Pass [STRICT]:** if the PLAN task row has no essential/incidental
+    classification, run the pass in `plan-sprint/SKILL.md` step 2 before writing code. If its gate
+    trips, **stop**: propose the refactor task to the Tech Lead instead of paying the churn.
 
 ## Implementation Loop (per task)
 
 8. **Mockup Gate** (UI tasks only): Use the `/plan-sprint` skill to create a text-based wireframe (markdown layout, component hierarchy, interactions, color tokens). Save as `mockup_[feature].md` artifact. Skip for backend/service tasks.
 9. Implement the code changes following all rules.
+9a. **Test scope [STRICT]:** write a test only for what `AGENTS.md §3` *Testing* makes mandatory
+    (server rules, date/time/money, DB queries and migrations, a shipped-defect regression). Anything
+    else gets no new spec. List any existing out-of-scope test the change broke in the PR body as a
+    prune candidate.
 10. **Quick Pre-QA Scan [MANDATORY]:** Run the `§ 0. Quick Pre-QA Scan` section from `.agents/skills/run-qa/SKILL.md`. If any item fails, fix the issue and re-run the scan until all items pass.
 
 > **Self-Review Gate [MANDATORY — AGENTS.md §1]:** Before committing, run the 7-question self-review (like artifact? · comfortable for user? · can I do better? · rules/skills respected? · refactor/smells? · performance/redundant HTTP? · good base + new TODOs?). Action each finding honestly — cheap fixes and rule violations now; larger refactors/ideas → `backlog/`.
@@ -88,7 +95,7 @@ Execute each step sequentially for every Feature in the sprint.
     - If **all** features are `[x]` or `[-]` (superseded/deferred): add `> **STATUS: CLOSED**` to the plan header, move the file to `archive/`, and remove any associated QA reports and mockup files from the root.
     - If any features remain open: leave the file in the root and continue.
     - **Never** leave a closed sprint plan at the project root — it pollutes the active artifact space.
-23. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail. **Enforced, not just stated:** the sprint-closing QA run (`run-qa/SKILL.md §5`) now checks for a current-sprint `LESSONS_LEARNED.md` commit before it can issue `STATUS: PASS` — do this step before running that QA gate, not after (added 2026-07-18 after 4 sprints closed without it despite this MANDATORY wording alone).
+23. **Recursive Update [MANDATORY]:** The final step of the sprint is forced reflection. You MUST generate a `LESSONS_LEARNED.md` artifact detailing exactly 1 new rule, efficiency gain, or workflow refinement discovered during this specific cycle. If absolutely zero structural improvements can be identified, the file must contain exactly "No structural improvements identified." *After* this file is generated, immediately update the relevant template stack rules, global rules, skills, or workflows to incorporate this new knowledge. This forces our standards to evolve recursively without fail. **Enforced, not just stated:** the sprint-closing QA run (`run-qa/SKILL.md §5`) asserts this sprint's own `## Sprint <N>` **heading** exists in `LESSONS_LEARNED.md`, and separately requires you to name **where the lesson landed as a rule** — a file and a section, or an explicit "no rule change needed, because …". Do this step before running that QA gate, not after. The gate tested a current-sprint **commit date** until it was found to pass on the *previous* sprint's entry.
 24. **Backlog Sweep [MANDATORY — End of Sprint]:** Run the `/todo-manager` skill's **§ 7 full sweep** — all five passes, not the § 6 audit alone. Report the before/after numbers it asks for (`sections`, `lines`, archived, reconciled); a sweep that reports no numbers is indistinguishable from one that did nothing. This is not optional — stale TODO entries erode backlog trust. **Widened from "§ 6 audit", because the narrow version was already MANDATORY here and still left one project's backlog at 5 428 lines / 167 sections with 12 headings reading `✅ RESOLVED`:** § 6 and § 4 are both checkbox-keyed, and a third of the file is prose, so the mandated step ran and was structurally blind to 96% of it. **A close-out step that cannot fail is not a gate** — this one reported success every sprint while the file it governs grew **2.2×**, from 2 439 lines when it was made MANDATORY to 5 428.
 25. **Documentation Update:** Explicitly check if `README.md` needs to be updated (e.g., due to new files, scope changes, or new parameters/secrets).
 26. **Cleanup:** Run a terminal command to delete any temporary files created during the cycle (e.g., `rm -f /tmp/gh_pr_*.txt /tmp/git_*.txt`).
@@ -96,20 +103,20 @@ Execute each step sequentially for every Feature in the sprint.
 ## Dependency Freshness Audit [MANDATORY — End of Sprint]
 Execute this section **once per sprint**, after the final Feature's PR has been merged.
 
-26. **Application Dependencies:** Run `npm outdated` (or equivalent) in every project directory. For each outdated package:
+27. **Application Dependencies:** Run `npm outdated` (or equivalent) in every project directory. For each outdated package:
     - Check the changelog/release notes for **breaking changes**.
     - If the upgrade is a **major version bump**, flag it as `[BREAKING]` and document the migration steps required.
     - If the upgrade is minor/patch, flag it as `[SAFE]`.
-27. **GitHub Actions:** Audit every `.github/workflows/*.yml` file **AND** every `.github/actions/**/*.yml` composite action file. For each action (e.g., `actions/checkout`, `actions/setup-node`, `Azure/static-web-apps-deploy`):
+28. **GitHub Actions:** Audit every `.github/workflows/*.yml` file **AND** every `.github/actions/**/*.yml` composite action file. For each action (e.g., `actions/checkout`, `actions/setup-node`, `Azure/static-web-apps-deploy`):
     - Check the action's GitHub releases page for newer major versions.
     - Verify Node.js runtime compatibility (currently Node.js 24 LTS).
     - **Composite actions in `.github/actions/` are frequently missed — they must be included in the A08 SHA-pinning audit alongside top-level workflow files.
-28. **CI/CD Runner Defaults:** Verify the default Node.js version in all workflow files matches the current **LTS** release.
-29. **Report & Plan:** If ANY outdated dependencies or actions are found:
+29. **CI/CD Runner Defaults:** Verify the default Node.js version in all workflow files matches the current **LTS** release.
+30. **Report & Plan:** If ANY outdated dependencies or actions are found:
     - Generate a `DEPENDENCY_AUDIT.md` artifact listing all findings with their `[SAFE]` / `[BREAKING]` classification.
     - Automatically append upgrade tasks to the **next sprint's** `PLAN.md` (e.g., `Task X.N: Upgrade @angular/core from 21 to 22 [BREAKING]`).
     - If no upgrades are found, log `"All dependencies are current."` in `DEPENDENCY_AUDIT.md`.
-30. **Zero-Tolerance Gate:** The sprint CANNOT be formally closed until this audit has been executed and the `DEPENDENCY_AUDIT.md` artifact exists.
+31. **Zero-Tolerance Gate:** The sprint CANNOT be formally closed until this audit has been executed and the `DEPENDENCY_AUDIT.md` artifact exists.
 
 ## Deploy (Automated)
 31. Inform the user: **"Wait for CI checks to pass on the PR. Upon merging to `main`, the automated CD pipeline will deploy the application."**

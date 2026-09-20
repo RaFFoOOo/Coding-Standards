@@ -57,7 +57,7 @@ Report findings in the EXACT order below. ≤ 200 words per section. No code cha
 ### 1. Frontend service inventory
 For every IFooService interface in <frontend-src>: list the interface path, the Mock*Service
 sibling path, whether an Http*Service exists, and where it's bound in app.providers.ts /
-app.config.ts. Flag every interface still showing TODO [Sprint-N] in its provideByMode call.
+the DI configuration. Flag every interface still wired to a placeholder or a stubbed provider.
 
 ### 2. Backend endpoint inventory
 List every [Function(...)] HTTP endpoint in <backend-src>. For each: name, route, methods,
@@ -117,6 +117,16 @@ own pass, only caught reactively by a later sprint's QA gate.)*
 
 ### 10. Anything else flagged by the rules
 Up to 5 violations of any rule in .agents/rules/. Cite rule + file:line evidence.
+
+### 11. Design change-cost audit [WHOLE REPO — never only the review period]
+For each finding give the SITE COUNT: how many files a one-field or one-dependency change would edit.
+a. Component inputs forwarded unchanged to a child (the component itself never reads them).
+b. Domain types built inline in tests instead of through a shared builder.
+c. Classes under test constructed inline at 10+ sites.
+d. The same value duplicated across mock JSON records or seed rows.
+e. Comments naming another file's identifier.
+Rank by site count. Anything at 5+ files is a refactor task placed ahead of the next feature that
+would touch it (`plan-sprint/SKILL.md` step 2, Change-Cost Design Pass).
 
 Be specific with file paths and line numbers. Flag uncertainty. No code changes.
 ```
