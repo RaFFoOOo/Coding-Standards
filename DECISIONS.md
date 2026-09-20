@@ -55,3 +55,23 @@ the PR body, where `git blame` leads anyone who needs it.
 
 **Consequences:** Reverses the hub's previous rule. Adopting spokes must sweep existing
 `TODO [ID]` comments and rewrite them to state what is missing and when it matters.
+
+## 2026-09-20 — The hub's wording budget is density, not file size
+
+**Context:** `AGENTS.md` loads in every session in every repo that adopts it, so its
+length is a real recurring cost and the instinct is to cap its bytes. This sync tested
+that: the file was rewritten terse and a 30 000 B ceiling was set from the measured
+compression of one section. The rewrite hit 185 bytes per instruction, down from 247,
+and still landed at 34 316 B — because it gained 36 instructions. Closing the remaining
+gap would have meant deleting rules, not prose.
+
+**Decision:** The budget is per rule, not per file. Every rule is one imperative
+sentence plus at most one concrete example; no `Why:` / `Measured:` / evidence
+sub-bullets; no bullet over 400 characters; a rule with several distinct instructions
+keeps them as one-line sub-bullets. The checkable targets are **no bullet over 400
+characters** and **≤ 200 bytes per instruction**.
+
+**Consequences:** A byte ceiling penalises adopting a rule; a density ceiling penalises
+verbosity, which is the actual goal. Evidence for a rule — the incident, the
+measurement, the sprint that produced it — lives in this log, in a lessons file, or in
+the PR body, never in `AGENTS.md`.
