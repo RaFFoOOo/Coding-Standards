@@ -146,7 +146,7 @@ identity page a persistent slot a re-argument of the doctrine itself — exactly
 this section exists to end. The real defect was upstream: `navigation.json` already distinguished
 `primary` from `secondary`, and a later task flattened both into one `learn` block, deleting the tenant's
 own means of expressing "this page leads." Restoring the split turns a recurring argument into a
-data edit. See `DECISIONS.md` 2026-08-02 and `NavModelService.items`.
+data edit.
 
 **Corollary — a drawer does not group.** A "More" drawer renders its overflow **flat, in model
 order**. Sectioning it (two category headings, added and removed within one sprint) re-sorts the
@@ -158,4 +158,3 @@ grouping to pay, that is evidence the row is under-capacity — fix the capacity
 > *Manage* → "persistent slots", while the cart had shipped as a corner icon since long before that
 > version was written. A rule the codebase contradicts on day one cannot settle a future argument —
 > which is exactly how it failed. The invariants are checkable; the table is a summary of them.
-> (`DECISIONS.md` 2026-08-02.)
