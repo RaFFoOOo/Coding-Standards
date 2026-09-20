@@ -134,7 +134,19 @@ For every concept id in the Concept Registry (Step 2b), look up its baseline ent
 | **Single-repo change** | a baseline exists, and exactly one participant's current digest differs from it (including a deletion — concept present in baseline but missing now) | Fast-path: that participant's current version becomes the canonical candidate (today's PUSH behavior) |
 | **New, single-source** | **no baseline exists** for this concept, and it currently exists in exactly one participant | Ask once: adopt as a shared standard everywhere, or confirm it's intentionally repo-local (e.g. a project-only stack rule) — a repo-local answer is recorded as a `skipList` entry on every *other* participant, **never** on the hub. For a `rule:`/`skill:`/`workflow:` concept, repo-local *also* requires a `DECISIONS.md` entry on the hub (Step 4c enforces this). A `github:` concept is the one exception: its opt-in `githubTemplates` allowlist (Step 2b) already *is* the "hasn't adopted this" signal, so repo-local needs no `DECISIONS.md` entry — Step 4c's coverage check doesn't re-scan `.github/` at all |
 | **New, converged** | **no baseline exists**, and 2+ participants already hold the concept with an **identical** current digest | Auto-adopt as canonical — every side already independently agrees, nothing to arbitrate |
-| **Multi-repo conflict** | either a baseline exists and 2+ participants differ from it, **or** no baseline exists and 2+ participants hold the concept with **differing** digests | Route to the N-way merge step (Step 4b) — never resolved automatically here |
+| **Converged change** | a baseline exists, 2+ participants differ from it, and every participant that differs holds an **identical** current digest | Auto-adopt as canonical — the participants made the same change. Ask nothing: there is no disagreement to resolve |
+| **Multi-repo conflict** | 2+ participants hold the concept with **differing** current digests — whether or not a baseline exists. Compare the participants against **each other**, not only against the baseline | Route to the N-way merge step (Step 4b) — never resolved automatically here |
+
+**Divergence from the baseline is not disagreement.** Two participants that changed the same
+concept to the same content agree; only differing *current* digests are a conflict. Classify on
+participant-vs-participant, using the baseline to decide who moved, never to decide whether they
+disagree.
+
+**And compare EVERY participant, not the two you happen to be looking at.** A pair being identical
+says nothing until the third is checked. On one run seven `github:` concepts read as identical
+between hub and one spoke and were called false conflicts; five of them genuinely differed once the
+third participant was included, which was several versions behind. The two-way reading produced a
+confident, wrong number.
 
 Present one classification table (concept id, class, participants involved) spanning **all** participants — this replaces the old single-repo `[ADD]/[MODIFY]/[SKIP]` categorization, which only ever compared one Source against one Target.
 
