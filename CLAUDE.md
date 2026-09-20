@@ -15,6 +15,13 @@ All rules, skills, and workflows live in `.agents/` (the cross-agent standard):
 
 When executing any skill or workflow, read its `SKILL.md` / workflow `.md` directly.
 
+`.agents/` is the **cross-agent source of truth and is never modified for agent-specific
+concerns** — `CLAUDE.md` and the `.claude/skills/` shims carry everything Claude Code needs, so a
+second agent's conventions never leak into the canonical set.
+
+The backlog is [`backlog/`](backlog/), indexed by [`backlog/README.md`](backlog/README.md);
+its lifecycle is the `todo-manager` skill.
+
 ### Available Skills
 Invoke via slash commands (shims in `.claude/skills/`) or by reading the source file:
 
