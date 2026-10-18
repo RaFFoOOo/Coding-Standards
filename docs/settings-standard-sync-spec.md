@@ -1,6 +1,8 @@
 # Spec — `settingsStandard`: sync standard `settings.json` keys across repos
 
-> **Status:** DRAFT (backlog). Future sync-engine enhancement. Sketched 2026-07-03 after
+> **Status:** DRAFT (backlog), written for the layout-converting `sync-templates` that
+> `scripts/standards/sync.sh` replaced on 2026-10-18 (`DECISIONS.md`); its paths and steps are
+> historical. Future sync-engine enhancement. Sketched 2026-07-03 after
 > `CLAUDE_AFK_TIMEOUT_MS` had to be hand-applied to all three repos (Coding-Standards,
 > le-cementine, one-talent) because `.claude/settings.json` is not a synced concept.
 

@@ -1,0 +1,7 @@
+# The standards shared between repositories through the hub. scripts/standards/sync.sh merges
+# exactly these files; anything else is the repository's own. One path or glob per line.
+AGENTS.md
+.agents/standards-manifest.txt
+.agents/rules/*.md
+.agents/skills/*/SKILL.md
+scripts/standards/sync.sh

@@ -1,118 +1,120 @@
 ---
-name: Stack Angular Testing
-trigger: glob
-globs: ["**/*.spec.ts", "**/*.testing.ts", "e2e/**"]
-description: Frontend test strategy and harness rules
+paths:
+  - "**/*.spec.ts"
+  - "**/*.testing.ts"
+  - "**/vitest.config.ts"
+  - "**/tsconfig.spec.json"
 ---
 
-# Stack Angular Testing
+# Frontend unit tests — Vitest through `ng test`
+
+The section number continues from `stack-angular.md`, so a `stack-angular.md §12` citation lands here.
+Paths are relative to `{webapp}/`. Test classes and when to run which battery: `AGENTS.md §3`
+*Testing* and `§4`.
 
 ## 12. Testing [STRICT]
 
-- **Targeted runs during development:** Never run the full suite while iterating. Pass only the spec
-  files (or directories) touched by the current change — the exact command depends on whether the
-  project has its own standalone `vitest.config.ts`:
-  - **Project has a standalone `vitest.config.ts`** (this project does — see `<spa-app>/vitest.config.ts`,
-    a hand-built config that mirrors Angular's `templateUrl`/`styleUrls` inlining so bare Vitest can
-    JIT-compile components): run it directly —
-    ```bash
-    npx vitest run src/app/path/to/changed/component/ src/app/path/to/other/spec.ts
-    ```
-  - **Project has no standalone `vitest.config.ts`** (relies solely on the integrated
-    `@angular/build:unit-test` builder to bootstrap Vitest + `TestBed`): a bare `npx vitest run` skips
-    that bootstrap and fails immediately with `Need to call TestBed.initTestEnvironment() first`, even
-    for specs that are otherwise valid. Use the builder's own filter instead:
-    ```bash
-    ng test --include 'src/app/path/to/changed/component/**/*.spec.ts' --watch=false
-    ```
-  - **Don't confuse this with vitest-cache corruption** (`local-vitest-cache-corruption` memory): the
-    identical `TestBed.initTestEnvironment()` error can also come from a stale
-    `node_modules/.vite`/`.vitest` cache even though this project's `vitest.config.ts` is present and
-    working — that class clears with `rm -rf node_modules/.vite node_modules/.vitest` and doesn't
-    recur. A project with no `vitest.config.ts` at all is the *other* failure class described above,
-    not cache corruption.
-  - **The full-suite gate run MUST be `ng test`, never bare `npx vitest run` [STRICT].** Targeted
-    iteration may use either; the `/run-qa` gate may not. `ng test` is what CI runs, and the two
-    runners **do not agree** — measured 2026-08-12 on `sprint/45` at a commit whose CI was green:
+### What gets a spec
 
-    | Runner | Result | Why |
-    |---|---|---|
-    | `ng test --watch=false` | **1600 passed** | AOT build; `environment.development.ts` |
-    | `npx vitest run` | **20 failed**, 3 files | JIT; `environment.ts` |
+`AGENTS.md §3` *Testing* sets the scope. On this stack a new spec is written only for:
 
-    Both divergences were already known — the environment split from an earlier CI-only failure
-    (transcribed into `app.routes.structure.spec.ts`'s own header table) and the JIT `input()`
-    limitation in the very next bullet — but each was written as a *spec-authoring* caveat, so
-    neither stopped the gate itself being pointed at the weaker runner. The two shapes seen:
-    - **4 failures — the environment split.** `onboarding.guard.ts` early-returns on
-      `!environment.enableLoginFeatures`. The base `environment.ts` resolves that flag from an
-      injected token (**false** locally); `environment.development.ts` hardcodes `true`. So under bare
-      vitest the guard returns `true` and every redirect assertion fails.
-    - **16 failures — `NG0303: Can't bind to 'pending'`** on a signal `input()` of a shared component
-      that is correctly listed in the consumer's `imports`. JIT does not register it; AOT does.
+- date, time or money logic — a util, a pipe, a composer such as `composeScheduledAt`;
+- a regression of a defect that shipped, named in the spec.
 
-    **The failure mode is the dangerous direction: bare vitest reports *phantom* failures here, but the
-    same divergence can hide a real one** — a spec that only passes under JIT/`environment.ts` is
-    exactly the CI-only break that has bitten this project twice. Do not "fix" a spec that fails under
-    bare vitest and passes under `ng test`; re-run it the CI way first, and only then decide whether
-    there is anything to fix.
+Nothing else gets a new spec: not a component's wiring, a controller that forwards a signal, a Mock
+adapter's mapping, an i18n lookup, or a template's `@if`. The smoke walk and the screenshot gate cover
+those. The client-side mirror of a server rule is also not re-tested, because the server test is the
+one that matters (`AGENTS.md §3` *Dual-Side Validation*).
 
-    Targeted runs still stay targeted: running everything on every iteration wastes a cycle and
-    obscures which tests relate to the work in progress.
+### Run what the change touches; gate with `ng test`
 
-- **JIT `input()` limitation:** In Vitest JIT mode, signal inputs declared with `input()` /
-  `input.required()` cannot be set via `fixture.componentRef.setInput()` — Angular registers them
-  only under AOT. Override the signal field directly on the instance:
+- **While iterating, run only the specs the change touches** — a full run on every iteration wastes a
+  cycle and hides which tests relate to the change:
+  ```bash
+  npm test -- --include 'src/app/path/to/changed/component/**/*.spec.ts' --watch=false
+  ```
+  `--include` may repeat. A bare path is read as the project name and fails; `npx vitest run` skips
+  the builder and compiles JIT, so its result is not CI's — `agent-workarounds.md`.
+- **[STRICT] The full-suite gate is `ng test`, never bare `npx vitest run`.** CI runs `npm test` →
+  `ng test` (`.github/workflows/shared-build-angular.yml:121`), and the two runners disagree. Measured
+  2026-08-12 on a commit that was green in CI:
+
+  | Runner | Result | Why |
+  |---|---|---|
+  | `ng test --watch=false` | **1600 passed** | AOT; `environment.development.ts` |
+  | `npx vitest run` | **20 failed**, 3 files | JIT; `environment.ts` |
+
+  - **4 failures, the environment split:** `onboarding.guard.ts:35` returns early on
+    `!environment.enableLoginFeatures`, which `environment.development.ts:25` hardcodes `true` and
+    `environment.ts:27` reads from an injected flag (`false` locally).
+  - **16 failures, `NG0303: Can't bind to 'pending'`:** JIT does not register a signal `input()` —
+    see the next section.
+
+  **Never "fix" a spec that fails only under bare vitest.** Re-run it with `ng test` first. The same
+  divergence can hide a real failure that only CI sees.
+
+### JIT limitations, and how to test around them
+
+- **A signal `input()` cannot be set with `setInput()` under JIT.** Override the field on the
+  instance; AOT builds are unaffected:
   ```typescript
   (component as unknown as { myInput: WritableSignal<T> }).myInput = signal(value);
   ```
-  AOT (production build) resolves `input()` normally; this workaround is test-only.
+- **A `toObservable(signal)` source emits asynchronously.** In a component-scoped controller
+  (`*-data.controller`, `*-facet.controller`), a derived signal read right after `createComponent`
+  still holds the `toSignal` `initialValue`. Do not flush with `fixture.detectChanges()`: it mounts
+  child components whose providers the test lacks (`NG0201`). Test the controller directly — provide
+  it in `TestBed`, `TestBed.inject(TheController)`, mock its dependencies — and flush with
+  `TestBed.inject(ApplicationRef).tick()`. Keep the component spec to its thin synchronous aliases and
+  handlers. (`TestBed.flushEffects()` is deprecated in Angular 22.1.6 in favour of `TestBed.tick()`.)
 
-- **`toObservable(signal)` sources flush via `ApplicationRef.tick()`, not `detectChanges()`:** a component-scoped controller (`*-data.controller` / `*-facet.controller`) that sources data
-  from `toObservable(someSignal).pipe(switchMap(...))` emits **asynchronously** in JIT — reading a derived
-  signal right after `createComponent` returns the `toSignal` `initialValue`, not the data. Do **not**
-  reach for `fixture.detectChanges()` to flush: it renders the full template and mounts heavy child
-  components whose providers a unit test doesn't supply (`NG0201`). Instead **test the controller directly**
-  (provide it in a `TestBed`, `TestBed.inject(TheController)`, mock its deps) and flush its effects with
-  `TestBed.inject(ApplicationRef).tick()` — render-free, so no child providers needed. Keep the *component*
-  spec to the synchronous thin aliases/handlers. (`flushEffects` is not in Angular 22's public testing API.)
+### A fix the user must SEE needs one check on what renders [STRICT]
 
-- **`ng test`'s builder unreliably intercepts `vi.mock()` — design the seam instead of mocking around
-  it:** `ng test`'s `@angular/build:unit-test` Vitest builder (a) hard-bans `vi.mock()` on **relative**
-  imports outright (`"The 'vi.mock' and related methods are not supported for relative imports...
-  Please use Angular TestBed for mocking dependencies"`), and (b) has also been observed to **silently
-  fail to intercept** a `vi.mock()` on a **package** (non-relative) import — a mocked third-party SDK
-  class's methods reported zero calls under `ng test` despite passing locally under a bare
-  `npx vitest run` (observed on a telemetry-SDK wrapper service and its spec). A bare
-  `vitest run` doesn't route through the same builder, so this class of failure is CI-only and
-  invisible to local iteration. **The durable fix is structural, not a better mock:** design the seam
-  so nothing needs mocking —
-  1. Anything read from `environment` inside a service under test: pass it as a **method parameter**
-     instead of importing `environment` directly; the spec passes a literal value.
-  2. Anything that directly `new`s a third-party SDK/library class: move the construction behind a
-     `protected`, **overridable factory method**; the spec subclasses the service under test and
-     overrides the factory to return a lightweight test double.
-  Treat any new service test needing to fake a config value or a third-party class construction as a
-  candidate for this pattern **by default** — don't reach for `vi.mock()` first and only fall back to
-  this after CI fails.
+When a fix exists so that a user sees something — a prefilled value, a restored selection, a label —
+at least one check reads the **rendered** element, not only the model or form control that
+produces it. `expect(control.value).toBe('2026-09-05')` is a true statement about a broken feature:
+S46 T15's prefill passed five specs while three downstream components never displayed the value
+(`archive/LESSONS_LEARNED_ARCHIVE.md`, Sprint 46 T17). For a prefill or seed, that means a smoke-walk
+step or the screenshot gate on the visible control (its value shown, its placeholder gone). Write a DOM
+assertion in a spec only when the fix is a shipped-defect regression (*What gets a spec*).
 
-- **Shared test-only fixtures/helpers that are NOT themselves a `.spec.ts` file MUST be named
-  `*.testing.ts` and excluded from `tsconfig.app.json`** (mirrors `@angular/core/testing`,
-  `@angular/common/http/testing`'s own naming convention). `tsconfig.app.json`'s `exclude` is only
-  `src/**/*.spec.ts` — a shared fixture file (e.g. hoisted `vi.fn()` stubs, a `MOCK_TENANT` const, a
-  `setupModule()` helper reused across several split spec files) that doesn't match that pattern is
-  still included in the production app's TypeScript program and gets bundled by `ng build`, which
-  fails with `TS2304: Cannot find name 'vi'` (or `describe`/`expect`) the moment the file uses a
-  test-runner-only global — `tsconfig.app.json` sets `"types": []` deliberately, so nothing makes
-  `vi` a recognized ambient identifier there. **This is invisible to `ngc -p tsconfig.spec.json`**
-  (which type-checks clean — `vitest/globals` is included there) and to plain `npx vitest run`
-  (esbuild transpiles per-file, doesn't do the same whole-program ambient-global resolution `ngc`'s
-  full type-checker does for `tsconfig.app.json`) — only a real `ng build` or `ngc -p
-  tsconfig.app.json --noEmit` **run after the fixture file exists** catches it (`LESSONS_LEARNED.md`
-  when a large spec file was split and its shared fixtures hoisted). Fix: name the file
-  `some-name.testing.ts` and add `"src/**/*.testing.ts"` to `tsconfig.app.json`'s `exclude` (a
-  one-time project-level addition, already done) — `tsconfig.spec.json` needs no corresponding
-  change, since TypeScript still pulls the file into that program transitively via any `.spec.ts`
-  file's `import`. **Re-run `ngc -p tsconfig.app.json --noEmit` after every round of file changes**,
-  not just once early in a session — a later edit (especially adding a new non-`.spec.ts` file) can
-  silently invalidate an earlier "clean" result for a tsconfig that edit didn't touch.
+### Design the seam instead of reaching for `vi.mock()`
+
+`ng test`'s builder **bans `vi.mock()` on relative imports**, and has been seen to **silently not
+intercept** one on a package import — a mocked SDK class reported zero calls under `ng test` while
+passing under bare vitest, so only CI failed (`archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 33). Make the
+mock unnecessary:
+
+1. **A value read from `environment`** → take it as a method parameter; the spec passes a literal.
+2. **A third-party class the service constructs** → build it in a `protected` factory method that the
+   spec's subclass overrides — `createSdk` in `{webapp}/projects/platform/src/services/telemetry/app-insights.service.ts:58`.
+3. **Module state a spec must reset** (a cache) → export a reset function and call it; **never
+   `vi.resetModules()`**. The runner is not isolated, so a reset re-evaluates every module the rest of
+   the worker loads, while the TestBed environment keeps the providers from `src/test-providers.testing.ts`.
+   A token provided there then no longer matches the token a service injects: S79 T12b failed 5–11
+   specs, a different set each run, until `date-format.util.spec.ts` used `resetDateFormatters()`.
+
+Use this by default for any service test that needs a fake config value or SDK — not only after CI
+has failed.
+
+### A domain object in a test comes from its shared builder [STRICT]
+
+- **A spec never writes a whole domain object inline** — `TenantConfig` and `TenantListEntry` come from
+  `aTenantConfig()` / `aTenantListEntry()` (`{webapp}/projects/platform/src/models/tenant-config.testing.ts`), overriding only
+  what the test is about. Enforced by `scripts/ci/project/check-test-fixture-builders.sh`.
+- **A partial `{ … } as TenantConfig` stub is allowed** (the Tech Lead, 2026-09-17): the cast compiles
+  through a new required field, so it causes no churn. It must still carry every field the code
+  under test reads.
+- **Why:** adding one required field to `TenantConfig` edited **14 FE test files** in S59 T11, each
+  gaining a `currencySymbol: '€'` that asserts nothing.
+
+### Shared test fixtures are named `*.testing.ts`
+
+- **A test helper that is not itself a spec is named `*.testing.ts`** — Angular's own convention
+  (`@angular/core/testing`). `tsconfig.app.json` excludes `src/**/*.testing.ts` (line 14) and sets
+  `"types": []` (line 7). Under any other name the file joins the app program, and `ng build` fails
+  with `TS2304: Cannot find name 'vi'` the moment it uses a test global.
+- **Only `ngc -p tsconfig.app.json --noEmit` or `ng build` catches it** — not
+  `ngc -p tsconfig.spec.json`, and not `npx vitest run`. Re-run it after every round of file changes:
+  adding a non-spec file can break a program an earlier clean run already covered
+  (`archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 35).

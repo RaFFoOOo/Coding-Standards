@@ -2,10 +2,8 @@
 
 Per `AGENTS.md` §1 (Decision Recording): any deviation from an approved plan that adds
 or removes a major dependency, library, or architectural pattern gets a one-paragraph
-entry here, in the same PR. It is also the justification ledger required by
-`sync-templates.md` Step 4c (Hub Completeness Validation) whenever a real rule/skill/
-workflow concept is confirmed repo-local and permanently excluded from this repo's
-canonical `.agents/` set.
+entry here, in the same PR. It is also where a rule or skill that one project keeps out of the
+shared set (`.agents/standards-manifest.txt`) is justified.
 
 Format:
 
@@ -17,6 +15,38 @@ Format:
 ```
 
 ---
+
+## 2026-10-18 — One layout, one script: the shared set is merged three ways, and le-cementine is its master copy
+
+**Context:** The hub had not changed since 2026-09-20 and had fallen behind its main consumer.
+le-cementine had rewritten `AGENTS.md` to one line per rule plus its check (61 → 18 KB) and folded
+15 skills and workflows into 6 checklists. `sync-templates` was 37 KB, and most of it converted
+between three repository layouts: rules and skills in `.agents/` here, in `.claude/` in
+le-cementine, and a mix in one-talent.
+
+**Decision (the Tech Lead, 2026-10-17/18):**
+- **One layout everywhere:** files in `.agents/`, and `.claude/rules` and `.claude/skills` as folder
+  links to them. Measured with Claude Code 2.1.302: two folder links load rules and skills, and
+  `.agents/` alone loads neither. The 15 stub files in `.claude/skills/` are gone.
+- **The shared set** is what `.agents/standards-manifest.txt` lists. `scripts/standards/sync.sh`
+  merges it three ways, in either direction, against the hub commit a project records in
+  `.agents/standards-version`. `sync-history.json` and `sync-state.json` are retired: the marker and
+  the git log hold the same facts, and a public hub must not collect paths of other repositories.
+- **le-cementine is the master copy.** Lessons are folded in where they happen and merged here. A
+  shared file names a project only through placeholders, and a merge into the hub refuses any line
+  that matches the source project's term list.
+- **This first sync took le-cementine's version of every file.** It deleted the hub-only rules
+  *Model Recommendation*, *Session Efficiency* and *Prompt Coaching*, which le-cementine removed on
+  2026-09-27 as rules about the chat rather than the repository. The longer rule texts that
+  le-cementine had trimmed in later sprints were replaced too. Deleted: the 4 skills and 11 workflows
+  in `.agents/`, replaced by `plan`, `build`, `verify`, `close`, `review`, `ops` and `sync-templates`.
+- **Not shared:** the GitHub workflows in `.github/`. They move to a dedicated repository once a
+  second project's CI needs them.
+
+**Consequences:** "Use this template" starts a project with the current standards; `sync-templates`
+keeps it in step afterwards. The skills cite guards under `scripts/ci/generic/` that are not in the
+hub yet; they arrive with the workflows. On Windows, links need Developer Mode and
+`git config core.symlinks true`.
 
 ## 2026-09-20 — §3 Testing narrows from "all business logic" to what earns its upkeep
 
