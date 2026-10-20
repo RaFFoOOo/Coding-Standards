@@ -1,117 +1,127 @@
 ---
-name: Stack .NET API
-trigger: glob
-globs: ["**/*.cs"]
-description: Endpoint design, server-side validation and security
+paths:
+  - "**/*.Functions/**"
 ---
 
-# Stack .NET API
+# Backend HTTP API
+
+Section numbers continue from `stack-dotnet-core.md`, so a `stack-dotnet-core.md §8` citation lands
+here. Rules are written for **ASP.NET Core**, the intended host. Today's host is the Azure Functions
+isolated worker; what differs there is collected in [Current host](#current-host--azure-functions-isolated-worker)
+at the end, so a migration deletes that section and nothing else.
 
 ## 7. API Design
-- **RESTful Routing:** Use noun-based, pluralized routing (`api/v1/users` instead of `api/v1/getUsers`).
-- **Response Envelopes:** Use a standard envelope for API responses or standard ProblemDetails for errors.
-- **Versioning:** Always implement API versioning from Day 1 to prevent breaking changes for mobile/external clients.
+
+- **Routes are plural nouns, versioned from day one:** `v1/reservations/{tenantId:guid}`, never
+  `v1/getReservations`.
+- **Errors are `ProblemDetails`;** successful responses share one envelope shape.
 
 ## 8. Security & Validation
 
-### §8.1 Existing Baselines
-- **Authentication/Authorization:** Secure all endpoints by default. Expose explicitly using `[AllowAnonymous]`. Combine Role-based and Policy-based authorization.
-- **Role-based authorization [authorization model]:** Authorization is **role-based and owned entirely by internal application logic** — never delegated to OAuth token claims. **Roles** (`owner`/`customer`, resolved from the `TenantUserRole` table) answer *who the user is* and are enforced per-tenant via `ITenantScopeAuthorization` / `RequireOwnerAsync`. The access token is used **only** to authenticate the caller — `[FunctionAuthorize]` + `FunctionAuthorizationMiddleware` validate the Bearer token and resolve identity; the token's claims (including `scp`) are **not** consulted for permission decisions. OAuth scope-based authorization (`[RequireScope]`, `scp`-claim checks) is explicitly **out of scope** for this single-first-party-client project — see `DECISIONS.md` (2026-05-22, scope-based authorization rejected).
-- **Input Validation:** Use `FluentValidation` instead of data annotations for DTOs to separate validation logic from data models.
-  - **Server-side validation is mandatory and is the security boundary** (`AGENTS.md §3 Dual-Side Validation`): every endpoint independently validates **all** user-influenced input — request bodies **and query parameters and route values** — and rejects violations with `ProblemDetails`/`4xx` before any business logic runs. Never assume a request came through the frontend; a direct HTTP call bypasses it entirely.
-  - Use `FluentValidation` for DTO/body validation. For a single scalar query/route value (e.g. an enum or slug filter) a route constraint (`{id:guid}`) or an inline guard returning `ProblemDetails` is sufficient and idiomatic — do **not** add `FluentValidation` solely for one query-string value if the project does not already use it there (native-over-third-party, §7). Parameterized queries (A03) make filters injection-safe, but shape validation is still required as contract/defense-in-depth.
-- **CORS & Rate Limiting:** Apply explicit, least-privilege CORS policies and rate limiting middleware for public-facing APIs.
+### §8.1 Baselines
 
-### §8.2 OWASP-Aligned Mandates
+- **Every endpoint is closed unless opening it is a documented choice.** Anonymous access is explicit
+  (`[AllowAnonymous]` in ASP.NET Core), carries its reason on the endpoint, and an anonymous endpoint's
+  writes still check ownership per request (`RequireOwnerAsync`) — `docs/ARCHITECTURE.md:157`.
+- **Authorization is role-based application logic, never token claims.** Roles come from
+  `TenantUserRole` and are enforced per tenant by `ITenantScopeAuthorization` / `RequireOwnerAsync`.
+  Combine role-based and policy-based checks. The token only authenticates the caller; its claims,
+  `scp` included, grant nothing. 🔒 `archive/DECISIONS_ARCHIVE.md` 2026-05-22.
+- **Server-side validation is the security boundary** (`AGENTS.md §3` *Dual-Side Validation*). Validate
+  the body, the query string and route values before any business logic, and reject with
+  `ProblemDetails` / `4xx`. Never assume a request came through the frontend. Parameterized queries
+  (A03) make a filter injection-safe; they do not replace validating its shape.
+  - **Idiom:** an inline static validator returning the first error or `null`
+    (`Http/TenantConfigUpdateValidator.cs:16`); a single scalar gets a route constraint (`{id:guid}`)
+    or an inline guard. **FluentValidation is not used here** — 🔒 `DECISIONS.md` 2026-07-20 and
+    2026-06-24.
+- **CORS and rate limiting are least-privilege** on every public-facing API.
+
+### §8.2 OWASP-aligned mandates
 
 #### A02 — Cryptographic Failures [STRICT]
-All secrets (connection strings, API keys, tokens) MUST be sourced at runtime from the deployment platform — never hardcoded in `appsettings.json` or any source-controlled file. Configuration must be **cloud-agnostic**: no provider-specific secret references in committed files (e.g., `@Microsoft.KeyVault(...)` is forbidden in checked-in config because it couples the codebase to a specific cloud service).
 
-- ❌ `"ConnectionStrings": { "Default": "Server=prod;Password=secret" }` — literal secret in source
-- ❌ `"ConnectionStrings": { "Default": "@Microsoft.KeyVault(SecretUri=...)" }` — provider-specific reference in committed config
-- ✅ `"ConnectionStrings": { "Default": "" }` in `appsettings.json`; the CD pipeline injects the real value as a platform application setting (`ConnectionStrings__Default`, `AzureAd__TenantId`, etc.)
+No secret in a committed file, and no provider-specific secret reference either.
 
-**How secrets reach the runtime:**
-- **Azure Functions / App Service:** CD pipeline sets values via `az functionapp config appsettings set` — Azure stores them encrypted at rest and exposes them as environment variables that override `appsettings.json` at startup (double-underscore = section separator).
-- **Local development:** set values in `appsettings.Development.json` (must be git-ignored) or via `dotnet user-secrets`.
-- **[MANDATORY]** All required secret names MUST be documented in `README.md` under a clearly labelled "Secrets & Configuration" section so operators know exactly what to provision.
+- ❌ `"Default": "Server=prod;Password=secret"` — a literal secret
+- ❌ `"Default": "@Microsoft.KeyVault(SecretUri=...)"` — couples committed config to one cloud
+- ✅ `"Default": ""` committed; the deploy pipeline sets the real value as a platform app setting
+  (`ConnectionStrings__Default` — `__` separates sections)
+
+Locally: a git-ignored `appsettings.Development.json` or `dotnet user-secrets`. **Every required secret
+is listed** in `{services}/README.md` → *Secrets & Configuration*.
 
 #### A03 — Injection [STRICT]
-Parameterized queries or typed ORM repositories only. String concatenation into SQL or NoSQL filter clauses is strictly forbidden. See §3 for general data safety.
-```csharp
-// ❌ String-concat — SQL injection vector
-var sql = $"SELECT * FROM Orders WHERE TenantId = '{tenantId}'";
 
-// ✅ EF Core (parameterized automatically) or Dapper named param
-var orders = await _db.Orders
-    .Where(o => o.TenantId == tenantId)
-    .ToListAsync(ct);
+EF Core or parameterized queries only; never concatenate input into a SQL or NoSQL filter.
+
+```csharp
+// ❌
+var sql = $"SELECT * FROM Orders WHERE TenantId = '{tenantId}'";
+// ✅
+var orders = await _db.Orders.Where(o => o.TenantId == tenantId).ToListAsync(ct);
 ```
 
 #### A05 — Security Misconfiguration [STRICT]
-Security headers middleware MUST be registered in `Program.cs` before `app.UseRouting()`. `ProblemDetails` responses MUST NOT expose stack traces outside development (`IncludeExceptionDetails = env.IsDevelopment()`).
-```csharp
-// ✅ Required in Program.cs
-app.Use(async (ctx, next) =>
-{
-    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    ctx.Response.Headers["X-Frame-Options"] = "DENY";
-    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    ctx.Response.Headers["Content-Security-Policy"] = "default-src 'self'";
-    await next();
-});
-app.UseHsts(); // HSTS via built-in middleware; configure MaxAge in appsettings
-```
+
+- **Every response carries the security headers**, registered before routing: `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, a CSP, and HSTS.
+  ```csharp
+  app.Use(async (ctx, next) => { ctx.Response.Headers["X-Content-Type-Options"] = "nosniff"; /* … */ await next(); });
+  app.UseHsts();
+  ```
+- **No stack trace in an error response outside development** (`IncludeExceptionDetails =
+  env.IsDevelopment()`).
 
 #### A07 — Authentication Failures [STRICT]
-JWT validation MUST use `Microsoft.Identity.Web`. Hand-rolled `JwtSecurityTokenHandler` parsing is strictly forbidden — token lifetime, signature, and refresh are all handled by the library.
-```csharp
-// ❌ Hand-rolled — no lifetime/signature guarantees
-new JwtSecurityTokenHandler().ValidateToken(token, validationParams, out _);
 
-// ✅ Microsoft.Identity.Web — register once in Program.cs
+Token validation is delegated to `Microsoft.Identity.Web`. Never hand-roll signature, lifetime or
+refresh checks.
+
+```csharp
+// ❌ banned
+new JwtSecurityTokenHandler().ValidateToken(token, validationParams, out _);
+// ✅ register once
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration);
 ```
 
-**Isolated worker (Functions) DI stub [STRICT]:** in the Functions
-isolated worker, `AddMicrosoftIdentityWebApi` v3+ chains into `AddAuthorization()`, which
-in .NET 8+ registers `AuthorizationPolicyCache` — a component that resolves
-`Microsoft.AspNetCore.Routing.EndpointDataSource`. That service is absent in the worker DI
-container and the host crashes at startup with no actionable error. Add the framework
-reference and a no-op `EndpointDataSource` to the Functions project:
-```xml
-<!-- <YourApp>.Functions.csproj -->
-<ItemGroup>
-  <FrameworkReference Include="Microsoft.AspNetCore.App" />
-</ItemGroup>
-```
-```csharp
-// Program.cs — after AddAuthentication / AddMicrosoftIdentityWebApi
-services.AddSingleton<EndpointDataSource>(_ => new DefaultEndpointDataSource([]));
-```
-
-**Isolated worker (Functions) manual token validation — not a violation [documented pattern, found during
-an OWASP audit]:** the ✅ example above (`AddMicrosoftIdentityWebApiAuthentication`
-+ ASP.NET Core's `[Authorize]`/`UseAuthentication()` pipeline) has no direct equivalent in the Functions
-isolated worker — there is no ASP.NET Core HTTP pipeline to hook into (`IFunctionsWorkerMiddleware` is a
-different pipeline entirely). This project's `FunctionAuthorizationMiddleware` still registers
-`AddMicrosoftIdentityWebApi` in `Program.cs` (for its OIDC discovery, signing-key rotation, and
-issuer/audience resolution via `IOptionsMonitor<JwtBearerOptions>`), then explicitly calls
-`JsonWebTokenHandler.ValidateTokenAsync(token, tvp)` — `JsonWebTokenHandler`, not the deprecated
-`JwtSecurityTokenHandler` the ❌ example names — supplying `TokenValidationParameters` sourced entirely
-from Microsoft.Identity.Web's own resolved options, never hand-constructed. This is the correct pattern
-for isolated-worker Functions: the STRICT rule's intent (never write custom signature/lifetime
-verification, always delegate to the library's resolved configuration) is satisfied even though the
-literal code shape differs from the ASP.NET Core example. Do not "fix" this by trying to force
-`[Authorize]`-attribute-style validation into a Functions isolated worker.
-
 #### A09 — Logging Failures [STRICT]
-Structured logging via `ILogger<T>` with a correlation ID injected per request. Logging tokens, raw request bodies, passwords, or PII (email, phone, address) is strictly forbidden. Failed authn/authz events MUST be logged at `Warning` with the user's Object ID — never email.
-```csharp
-// ❌ PII in logs
-_logger.LogWarning("Login failed for {Email}", userEmail);
 
-// ✅ Object ID only; structured + correlation-ID enriched
+Structured `ILogger<T>` with a per-request correlation id. Never log tokens, raw request bodies,
+passwords or PII (email, phone, address). A failed authn/authz event logs at `Warning` with the
+Object ID, never the email; before a token validates there is no trusted identity, so log the
+correlation id only.
+
+```csharp
+// ❌
+_logger.LogWarning("Login failed for {Email}", userEmail);
+// ✅
 _logger.LogWarning("Authn rejected. UserId={ObjectId} CorrelationId={CorrelationId}",
-    objectId, HttpContext.TraceIdentifier);
+    objectId, correlationId);
 ```
+
+## Current host — Azure Functions isolated worker
+
+The worker has **no ASP.NET Core request pipeline**: `[Authorize]`, `[AllowAnonymous]`, `app.Use(...)`
+and `UseHsts()` do not apply. Delete this section when the API moves to an ASP.NET Core host.
+
+| Rule | Where the worker does it |
+|---|---|
+| §8.1 closed by default | `[FunctionAuthorize]` opts a function in — **23 of 34** `[Function]` methods, counted 2026-09-14; the rest are anonymous by design. Why a custom attribute: 🔒 `archive/DECISIONS_ARCHIVE.md` 2026-04 |
+| §8.1 CORS, rate limiting | `Middleware/CorsMiddleware.cs`, `Middleware/RateLimitingMiddleware.cs` |
+| A02 app settings | `az functionapp config appsettings set` |
+| A05 headers | `host.json` `extensions.http.customHeaders` — the host adds them to every response, its own 404s included; JSON-API CSP `default-src 'none'`, CORP `same-origin` |
+| A05 no stack trace | `ExceptionHandlingMiddleware.cs:72` gates the detail on `IsDevelopment()` |
+| A09 correlation id | `context.InvocationId`; before validation, `Function` + `InvocationId` only (`FunctionAuthorizationMiddleware.cs:103`) |
+
+- **A07 — the manual validation is compliant; do not "fix" it into `[Authorize]`.** `Program.cs:48`
+  registers `AddMicrosoftIdentityWebApi` for discovery, key rotation and issuer/audience;
+  `FunctionAuthorizationMiddleware.cs:94` calls `JsonWebTokenHandler.ValidateTokenAsync` with
+  parameters taken from those resolved options, never hand-built. Reviewed in the Sprint 33 OWASP
+  audit (`archive/PLAN_sprint_033.md:140`).
+- **A07 — keep the DI stub, or the host crashes at startup with no useful error.**
+  `AddMicrosoftIdentityWebApi` v3+ registers `AuthorizationPolicyCache`, which needs an
+  `EndpointDataSource` the worker does not have:
+  - `<FrameworkReference Include="Microsoft.AspNetCore.App" />` — `{Backend}.Functions.csproj:11`
+  - `services.AddSingleton<EndpointDataSource>(_ => new DefaultEndpointDataSource([]));` —
+    `Program.cs:55`

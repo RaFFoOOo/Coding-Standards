@@ -1,122 +1,118 @@
 ---
-name: Stack GitHub Actions
-trigger: glob
-globs: [".github/workflows/**", ".github/actions/**"]
-description: CI/CD workflow rules for GitHub Actions pipelines
+paths:
+  - ".github/workflows/**"
+  - ".github/actions/**"
+  - "scripts/deploy/**"
 ---
 
-# GITHUB ACTIONS WORKFLOW SPECIFICATIONS
+# GitHub Actions — workflow rules
+
+Section numbers are stable: workflows, scripts and `DECISIONS.md` cite them. Incident history lives
+behind the pointer in each section.
 
 ## 1. Trigger Design
 
-### `pull_request` vs `push` for PR-context workflows
-- **[STRICT]** Any workflow that needs to post a PR comment, reference a PR number, or react to PR lifecycle (open/close) MUST use `pull_request` as its trigger — not `push`.
-  - `push` events carry no PR payload. The PR number would require an extra API call, adding latency and a failure mode.
-  - `pull_request` events expose `github.event.number`, `context.issue.number`, and `github.head_ref` natively.
-  - **Exception — Azure SWA preview deployments:** When a stable `deployment_environment` URL is required (e.g., for pre-configured auth redirect URIs), use `push` instead. Azure SWA generates PR-numbered URLs for `pull_request`-triggered deployments regardless of the `deployment_environment` parameter. Use `pulls.list({ head })` to resolve the PR number for commenting.
-  - **Preview CI: `push` to `main` (path-filtered) + `workflow_dispatch`, Mock-only by default:** `<preview-deploy-workflow>` triggers automatically on `push` to `main`, scoped to `paths: ['<spa-app>/**', ...]` so it only fires when Angular-relevant code actually changed — plus `workflow_dispatch` for previewing any other branch on demand. There is no preview backend slot, so the build-config fallback (`inputs.build-config || 'preview'`) defaults every automatic push-triggered preview to the fully-Mocked `preview` config (`environment.preview.ts`) — a stable, backend-independent UX sandbox that a later automatic trigger can't silently flip back to calling the real dev backend. Validating against the real dev backend uses the `development` environment/config instead (local `ng serve`, or an explicit manual `build-config: production` dispatch) — never this shared preview slot. GitHub Actions minutes are a hard, exhaustible cap on this Free private repo, so the `push` trigger stays narrowly scoped to `main` rather than every branch (which is what made the pre-rev.2 `task/**` trigger too expensive); task-branch previews remain opt-in via manual dispatch. *(An earlier version of this policy defaulted the fallback to `production`, so an automatic preview could silently build against the real backend.)*
-  - **One job per logical gate, except trivial guards [cost]:** GitHub bills each **job** rounded up to a whole minute. Sub-second checks (the repo-hygiene bash guards in `validate-archive.yml`) MUST share a **single** job with one checkout and sequential steps, not one job each — three trivial jobs cost ~3 billed minutes for ~10 seconds of work. Keep heavyweight, independently-parallelisable work (build vs. test vs. schema-drift) in separate jobs where wall-clock matters.
-  - **Branch coverage for preview CI [STRICT]:** A push-triggered preview-deployment workflow MUST include all active branch prefixes: `feature/**`, `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`. Otherwise preview deployments silently skip branches in the sprint/task hierarchy, and a contributor on an uncovered prefix gets no preview URL.
-  - **Preview cost awareness [cost]:** Each preview is a full production build + deploy (typically several billed minutes), and on a Free/private repo Actions minutes are a hard, exhaustible cap. If every branch class already has a validation build elsewhere (e.g. PRs into `main` run the CI build), an auto-preview on push duplicates that coverage and burns minutes — consider making the preview `workflow_dispatch`-only (dispatch on demand) or restricting it to the prefixes that genuinely need a live URL. Record the chosen trade-off in the project's decision log.
-- **Branch-prefix filtering** on `pull_request` triggers MUST use a job-level `if` condition, not the `branches:` key:
+### `pull_request` vs `push`
+- **[STRICT] A workflow that comments on a PR, reads its number or reacts to its lifecycle uses
+  `pull_request`**, which carries `github.event.number` and `github.head_ref`; `push` carries no PR
+  payload.
+  - **Exception — an SWA preview that needs a stable URL** (auth redirect URIs): `pull_request` gets a
+    PR-numbered URL whatever `deployment_environment` says, so trigger it another way and resolve the
+    PR number with `pulls.list({ head })`.
+- **Filter a `pull_request` by source branch with a job-level `if:`** — `branches:` filters the
+  *target*:
   ```yaml
-  # ✅ Correct — filters by source branch (head_ref)
+  # ✅
   if: startsWith(github.head_ref, 'feature/') || startsWith(github.head_ref, 'chore/')
-
-  # ❌ Wrong — branches: filters the TARGET branch, not the source branch
-  on:
-    pull_request:
-      branches: ['feature/**']
+  # ❌ matches PRs INTO feature/**, not from it
+  on: { pull_request: { branches: ['feature/**'] } }
   ```
 
-### Trigger Path Scoping [STRICT — action economy]
-- A workflow MUST scope its triggers with `on.<event>.paths` to the files it actually consumes — never let it fire on **every** PR/push when only an unrelated subtree changed. An unscoped workflow spins up a billed runner (and shows a red ❌ on failure) for changes it cannot possibly be affected by. *(Concrete failure this prevents: a `.claude/`-only standards-sync PR tripping a repo-hygiene guard that validates root `PLAN_*` artifacts it never touched.)*
-- **Scope to inputs — including a global-state guard's inputs.** Even a guard that validates whole-repo state (e.g. "no stray closed `PLAN_*.md` at root") has a finite input set: the artifact patterns it scans + its pointer files (`CLAUDE.md`/`AGENTS.md`) + its script + the workflow file itself. `paths:` is workflow-level, so list the **union** across all jobs. This still catches drift at introduction (the PR that adds the stray file matches the pattern) while no longer blocking unrelated PRs on ambient state.
-- **Always include the workflow's own file and its scripts** (`.github/workflows/<name>.yml`, `scripts/ci/**`) in `paths:`, so edits to the guard itself re-run it.
-- **Required-check gotcha [STRICT]:** a `paths:`-filtered check MUST NOT be marked a **required** status check as-is. When a PR doesn't match the paths the check never reports its context, so the required check hangs **pending forever** and blocks merge. If it must be required, keep the workflow unfiltered and move scoping to a **job-level `if:`** driven by a `dorny/paths-filter` (or equivalent) result — the job then still reports success when skipped — or add a companion always-runs job that reports the required context.
+### Previews
+- **`ci-preview-swa.yml` is `workflow_dispatch`-only**: a preview is always an explicit act for the
+  branch you want to see. The `push` trigger on `main` was removed 2026-09-01 — it duplicated the dev
+  deploy and raced PR dispatches for the one shared slot (`ci-preview-swa.yml:13`).
+- **Its build-config fallback is the all-Mock `preview`** (`inputs.build-config || 'preview'`), so a
+  preview never calls the real dev backend (🔒 `DECISIONS.md` 2026-07-08 rev.2). Validate against dev
+  with a local `ng serve` or a `build-config: production` dispatch.
+- **If a preview is ever push-triggered again**, it covers every branch prefix (`feature/**`,
+  `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`) — and cost it first (§7.1): each run
+  is a full build and deploy.
+
+### Trigger path scoping [STRICT]
+- **Scope every trigger with `on.<event>.paths` to the files the workflow reads**, including a
+  whole-repo guard's inputs (the artifact patterns, its pointer files, its script) and **always the
+  workflow file itself**. `paths:` is workflow-level, so list the union across jobs.
+- **A `paths:` filter cannot scope individual pushes** — §7.2b.
+- **Never make a `paths:`-filtered check a required status check.** When a PR matches no path the
+  context never reports, and the check blocks merge forever. If it must be required, leave the
+  workflow unfiltered and skip with a job-level `if:` (a skipped job reports success), or add an
+  always-running job that reports the context. This repo protects `main` with no required checks
+  (GitHub Pro since 2026-10-16: a PR is required, force-push and deletion are blocked, no approval
+  count — the only reviewer is the PR's own author).
+
+### One job per logical gate, except trivial guards [cost]
+GitHub bills each **job** rounded up to a whole minute. Sub-second guards share **one** job with one
+checkout — `validate-archive.yml`'s *Repo-hygiene guards* runs every pure-bash guard in sequence. Keep
+heavy, parallelisable work (build, test, schema drift, the walk) in separate jobs.
 
 ## 2. Permissions
 
-### Workflow-level `permissions` for reusable workflow calls
-- **[STRICT]** Any `pull_request`-triggered workflow that calls a reusable workflow (`uses:`) containing a `actions/checkout` step MUST declare `permissions: contents: read` at the **workflow level** — not the job level.
-  - GitHub generates the `GITHUB_TOKEN` for reusable workflow jobs using the caller's workflow-level permissions. Per-job `permissions` blocks do not propagate into `uses:` calls.
-  - Without `contents: read`, private repos return "Repository not found" (not "Permission denied") on checkout — a misleading error.
-- When PR comment posting is also required, add `pull-requests: write` to the same block and remove any redundant per-job `permissions`:
-  ```yaml
-  permissions:
-    contents: read
-    pull-requests: write
-  ```
-
-### Principle of Least Privilege
-- Declare only the permissions the workflow actually needs. Never omit permissions entirely and rely on repository defaults — defaults are environment-dependent and can differ between repositories.
+- **[STRICT] A `pull_request` workflow that calls a reusable workflow with a checkout declares
+  `permissions: contents: read` at the WORKFLOW level.** A job-level block does not reach a `uses:`
+  call, and a private repo then fails checkout with *"Repository not found"*. Add
+  `pull-requests: write` to the same block when the workflow comments.
+- **Declare only what the workflow needs** — never rely on repository defaults.
 
 ### CD Identity Separation [STRICT]
-The identity used by the CD pipeline to deploy resources MUST be a dedicated **App Registration
-(Service Principal) per environment**, separate from all application runtime identities.
-
-- **Application runtime identities** (e.g., a UAMI used by the Function App to access Azure SQL)
-  MUST NOT be granted deployment RBAC roles (e.g., `Website Contributor`). Granting deployment
-  rights to a runtime identity allows the running application to redeploy itself — a clear
-  least-privilege violation.
-- **One CD SPN per GitHub environment** — never share a single SPN across dev and prod. Each SPN
-  is granted `Website Contributor` only on its own environment's Function App. An OIDC token
-  scoped to `development` cannot be used to deploy to production because the prod SPN has no
-  federated credential for the `development` environment.
-- **Authentication App Registrations** (SPA login, API JWT audience) are authentication identities
-  — never operational identities. Do not reuse them for CI/CD.
-- Name CD SPNs following `naming-azure-resources.md`: `<dev-cd-spn>` (dev), `<prod-cd-spn>` (prod).
-
-**Identity taxonomy for this project:**
+- **The CD pipeline deploys with a dedicated App Registration (SPN) per GitHub environment.** Never
+  share one across dev and prod; the prod SPN has no federated credential for `development`, so a dev
+  OIDC token cannot deploy to prod.
+- **A runtime identity never gets a deployment role** (`Website Contributor`) — the running app could
+  redeploy itself.
+- **Authentication app registrations are never CD identities.**
+- Names and the scheme: `naming-azure-resources.md`.
 
 | Identity | Type | Purpose | Grants |
 |---|---|---|---|
-| `<runtime-uami>` | User-Assigned Managed Identity | Function App → Azure SQL (runtime) | `db_datareader` + `db_datawriter` on SQL only |
-| `<spa-app>` | App Registration | SPA MSAL authentication | — |
-| `<api-app>` | App Registration | Backend JWT audience/validation | — |
-| `<dev-cd-spn>` | App Registration / SPN | GitHub Actions CD — dev environment | `Reader` on subscription + `Website Contributor` on `<dev-function-app>` |
-| `<prod-cd-spn>` | App Registration / SPN | GitHub Actions CD — prod environment (TBD) | `Reader` on subscription + `Website Contributor` on prod Function App |
+| `eudw{prefix}umi01` | User-Assigned Managed Identity | Function App runtime → storage + SQL | Storage Blob Delegator + Blob/Queue/Table/File data roles, `db_datareader` + `db_datawriter` (`scripts/azure-setup/assign-roles.sh:81`–`:117`) |
+| `{app}-spa` | App Registration | SPA MSAL authentication | — |
+| `{services}-api` | App Registration | Backend JWT audience | — |
+| `eudw{prefix}spn01` | App Registration / SPN | CD — development | `Reader` on the subscription + `Website Contributor` on `eudw{prefix}azf01` (`provision-cd-identity.sh:131`) |
+| `euwp{prefix}spn01` | App Registration / SPN | CD — production (pending) | same, on the prod Function App |
 
 ## 3. Secret & Variable Scope
 
-> The secret naming **schema** and the CI/CD-split principle are defined once in `AGENTS.md §5`. This section covers only the GitHub-specific **placement**.
+The naming schema and the CI/CD split are `AGENTS.md §5`; this is only where they live in GitHub.
 
-### CI vs CD secret separation
-- When the same Azure resource (e.g., an ASWA deployment token) is required in both a CI workflow (PR/preview) and a CD workflow (production):
-  - Register the `CI_AZURE_<RESOURCE>_<NAME>` secret at **repository level** (Settings → Secrets and variables → Actions) — PR workflows cannot access environment-protected secrets.
-  - Register the `CD_AZURE_<RESOURCE>_<NAME>` secret scoped to the **production environment** (Settings → Environments → production → Secrets).
-  - Never share one secret across both scopes; document the split in `README.md`.
+- **A secret both CI and CD need is registered twice:** `CI_AZURE_<RESOURCE>_<NAME>` at repository
+  level (a PR workflow cannot read environment secrets) and `CD_AZURE_<RESOURCE>_<NAME>` on the
+  environment. Document the split in `README.md`.
+- **Variables carry no `CI_`/`CD_` prefix** — the environment scopes them.
 
-### Variables (feature flags, configuration) — no CI/CD prefix
-- Per `AGENTS.md §5`: environment-scoped variables use plain `UPPER_SNAKE_CASE` with no `CI_`/`CD_` prefix (the GitHub environment provides scoping). The `CI_`/`CD_` prefix applies **only** to secrets that need repository-vs-environment isolation.
-
-### `DISABLE_PIPELINES_FOR_TEMPLATE` — gate app pipelines on a scaffolded repo [STRICT]
-- Every app CI/CD workflow (build/test/deploy for the frontend + backend, the SWA preview, and the `Validate Artifacts` hygiene guards) is job-guarded with `if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'`. **CodeQL is intentionally *not* guarded** — security scanning should run even on an empty repo.
-- **When a repo is scaffolded from the standards template but has no app yet** (no webapp/backend directory, no `scripts/ci/*`), set the **repository variable** `DISABLE_PIPELINES_FOR_TEMPLATE=true` (Settings → Secrets and variables → Actions → Variables, or `gh variable set DISABLE_PIPELINES_FOR_TEMPLATE --body true`). Guarded jobs then **skip** (green), instead of failing on missing sources.
-- **Unset it (or set `false`) the moment the app lands** — i.e. in the first sprint PR that adds the buildable app — so build, test, deploy, and the hygiene guards activate. Leaving it `true` once there is real code to verify is a silent-coverage bug.
-- This flag gates *workflow jobs only*; **Dependabot does not honor it** — keep `dependabot.yml`'s `directory:` targets pointing at paths that actually exist, or its updaters fail independently.
+### `DISABLE_PIPELINES_FOR_TEMPLATE` [STRICT]
+- **Every app workflow's jobs are guarded with `if: vars.DISABLE_PIPELINES_FOR_TEMPLATE != 'true'`**
+  (7 workflows today). CodeQL is not — scanning runs even on an empty repo.
+- **Set it to `true` on a repo scaffolded from the template with no app yet**, so jobs skip green
+  instead of failing on missing sources; **unset it in the first PR that adds the app** — left on,
+  nothing is verified.
+- It gates workflow jobs only; Dependabot ignores it, so keep `dependabot.yml`'s `directory:` targets
+  real.
 
 ## 4. Reusable Workflows (`workflow_call`)
 
-- Pass `secrets: inherit` from the caller to avoid re-listing every secret.
-- The `environment:` input on a reusable workflow maps to a GitHub environment, which controls which secrets/vars are available to the job. For CI/preview builds, use `environment: development` — this avoids environment protection rules and grants access to development-scoped vars without exposing production secrets.
-- If the target environment does not exist in the repository, GitHub skips environment protection but still runs the job. This is acceptable for non-production environments.
+- **Pass `secrets: inherit`** rather than re-listing secrets.
+- **A CI or preview job that needs environment-scoped values binds `environment: development`** — no
+  protection rules, no production secrets. A missing environment is skipped, not an error. (Distinct
+  from `shared-build-angular.yml`'s `environment` **input**, which is the Angular build configuration.)
 
 ### A job cannot mix `environment:` with `uses:` [STRICT]
-GitHub Actions job schemas are mutually exclusive: a job either **runs steps** (`runs-on` + `steps`,
-optionally `environment:`) or **calls a reusable workflow** (`uses:` + `with:`/`secrets:`) — never
-both. Adding `environment:` to a `uses:` job doesn't get silently ignored; it breaks the whole
-workflow file with a misleading cascade: `Required property is missing: runs-on` on the job, plus
-`Unexpected value 'uses'/'with'/'secrets'` on that job's own keys (2026-07-05, `cd-backend-azure-
-functions.yml`'s `smoke` job — introduced in a follow-up fix commit, unnoticed until dispatch
-failed).
+A job either runs steps (`runs-on` + `steps`, optionally `environment:`) or calls a reusable workflow
+(`uses:` + `with:` / `secrets:`). Adding `environment:` to a `uses:` job breaks the whole file with a
+misleading cascade — `Required property is missing: runs-on`, then `Unexpected value 'uses'`. Resolve
+the environment-scoped value in a preceding step job and pass it as an output:
 
-When a `uses:` job needs a value that must resolve inside a specific GitHub environment (e.g. an
-environment-scoped `vars.*`), resolve it in a **preceding `runs-on` job that already has
-`environment:`**, expose it via that job's `outputs:`, and have the `uses:` job read
-`needs.<job>.outputs.<name>` instead of reading `vars.*` directly itself:
 ```yaml
-# ✅ Correct — resolve the env-scoped var where environment: is legal, pass it as an output
 deploy-dev:
   runs-on: ubuntu-latest
   environment: development
@@ -124,141 +120,77 @@ deploy-dev:
     api-base-url: ${{ vars.API_BASE_URL }}
   steps: [...]
 
-smoke:                                  # calls a reusable workflow — no environment: here
+smoke:                                # ✅ no environment: here
   needs: deploy-dev
   uses: ./.github/workflows/smoke-dev.yml
   with:
     base-url: ${{ needs.deploy-dev.outputs.api-base-url }}
   secrets: inherit
 ```
-Reference: `cd-backend-azure-functions.yml`'s `deploy-dev`/`smoke` pair, mirroring the identical
-pattern already in `cd-angular-azure-static-web-apps.yml`'s `deploy-dev`/`smoke` pair.
 
-### Shared Build Extraction [STRICT]
-When two or more workflows share the same build steps (restore → audit → build → optional test/publish), extract those steps into a `shared-build-<stack>.yml` reusable workflow. **Never duplicate steps across CI and CD callers.**
+Reference: the `deploy-dev` / `smoke` pairs in `cd-backend-azure-functions.yml:54`/`:110` and
+`cd-angular-azure-static-web-apps.yml`.
 
-**Extraction rule:** If the same ordered sequence of 3+ steps would appear in both a `ci-*.yml` and a `cd-*.yml`, extract immediately.
+### Shared build extraction [STRICT]
+- **The same ordered 3+ steps in a `ci-*.yml` and a `cd-*.yml` become a `shared-build-<stack>.yml`,
+  immediately.** CI and CD differ by boolean inputs, never by a second shared workflow:
+  `shared-build-dotnet.yml` takes `run-tests` (CI) and `publish` (CD).
+- **The deploy job stays in the caller**, bound to its environment, with login and deploy as steps
+  (`cd-backend-azure-functions.yml:86` — `azure/login` over OIDC, then `.github/actions/deploy-functions`).
+  In the shared workflow it would hand production secrets to every caller, CI included.
+- **Artifact handoff:** the shared workflow uploads, the deploy job downloads; `retention-days: 1`.
+  What must outlive the run goes to a release instead: after the dev smoke, the CD `release` job
+  attaches the artifact to `build-<sha7>` (`.github/actions/publish-release-asset`), which does not
+  expire and does not count against Actions storage.
+- **One runtime per shared workflow** — `shared-build-dotnet.yml` installs no Node.
 
-**Boolean input pattern:** Use boolean inputs to toggle CI vs. CD behaviour within one shared workflow — do NOT create separate shared workflows for CI and CD variants of the same stack:
-```yaml
-# shared-build-dotnet.yml inputs
-inputs:
-  run-tests:
-    type: boolean
-    default: false    # CI sets true; CD omits (false)
-  publish:
-    type: boolean
-    default: false    # CD sets true; CI omits (false)
-  publish-project:
-    type: string
-    default: '<YourApp>.Functions/<YourApp>.Functions.csproj'
-```
+### Current host — Azure Functions: the `.azurefunctions/` folder [STRICT]
+*Deleted when the backend moves to an ASP.NET Core host.*
 
-**Deploy job stays in the caller — never in the shared workflow.** The deploy job requires `environment: production` to access environment-scoped secrets. Moving it into the shared workflow would force all callers (including CI) to request production secrets — a security misconfiguration.
+Functions host v4.1000+ loads **0 functions** — every route 404s, with no startup error visible from
+outside — unless the package root holds `.azurefunctions/`. Two steps can lose it:
 
-```yaml
-# ✅ Correct split — cd-backend-azure-functions.yml
-jobs:
-  build:
-    uses: ./.github/workflows/shared-build-dotnet.yml
-    with:
-      publish: true
-    secrets: inherit
+- **`dotnet publish --output <path>` may leave it in `bin/<config>/<tfm>/`.** Merge its contents
+  (`cp -r SRC/. DST/`); `cp -r SRC DST` nests it as `DST/.azurefunctions/.azurefunctions` when `DST`
+  exists (`shared-build-dotnet.yml:135`).
+- **`actions/upload-artifact@v4+` skips hidden paths** — set `include-hidden-files: true`
+  (`shared-build-dotnet.yml:157`).
 
-  deploy:                          # ← stays in the CD caller
-    needs: build
-    environment: production        # ← production secrets scoped here only
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with: { name: dotnet-publish-output, path: publish }
-      - uses: azure/functions-action@<sha>  # pinned per A08
-        with:
-          app-name: ${{ vars.FUNCTION_APP_NAME }}
-          package: publish
-          publish-profile: ${{ secrets.CD_AZURE_FUNC_DEPLOYMENT_TOKEN }}
-```
-
-**Artifact handoff:** The shared workflow uploads a publish artifact (e.g., `dotnet-publish-output`); the deploy job downloads it. Use `retention-days: 1` — artifacts are ephemeral build products, not long-lived assets.
-
-**Node.js note:** The shared .NET workflow does not install Node.js — do not mix runtimes in a single shared workflow. Keep `shared-build-angular.yml` and `shared-build-dotnet.yml` strictly separate.
-
-### Azure Functions isolated worker — `.azurefunctions/` folder [STRICT]
-
-Azure Functions host **v4.1000+** requires a `.azurefunctions/` folder at the root of the
-deployed package. The folder is generated by `Microsoft.Azure.Functions.Worker.Sdk` during
-build (in the project's `bin/<config>/<tfm>/.azurefunctions/`) and contains the worker
-extension binaries. Without it, the host loads **0 functions** and every HTTP route returns
-404 — silently, with no startup error visible from outside the Log Stream.
-
-Two pitfalls were hit on the same pipeline within hours:
-
-**Pitfall 1 — `dotnet publish --output <custom-path>` does not copy `.azurefunctions/`:**
-The SDK target writes to `$(OutputPath)`, not `$(PublishDir)`, so a custom `--output` flag
-strands the folder in the build dir on some SDK versions (others emit it under `--output`
-directly — do not assume either way). Add a post-publish step that **merges** the folder rather
-than copying the directory itself — `cp -r SRC DST` nests into `DST/.azurefunctions/.azurefunctions`
-when `DST` already exists, confirmed in a live CD run's publish.zip listing (2026-07-04):
-```yaml
-- name: Publish
-  run: |
-    dotnet publish "<csproj>" --configuration Release --output "$GITHUB_WORKSPACE/publish"
-    PROJ_DIR=$(dirname "<csproj>")
-    AZFUNC_SRC="$PROJ_DIR/bin/Release/<tfm>/.azurefunctions"
-    if [ -d "$AZFUNC_SRC" ]; then
-      mkdir -p "$GITHUB_WORKSPACE/publish/.azurefunctions"
-      cp -r "$AZFUNC_SRC/." "$GITHUB_WORKSPACE/publish/.azurefunctions/"
-    fi
-```
-
-**Pitfall 2 — `actions/upload-artifact@v4+` excludes hidden paths by default:**
-`include-hidden-files` defaults to `false` in v4+, so `.azurefunctions/` (dot-prefixed) is
-silently filtered out of the artifact even though it exists in the source path. Any artifact
-that legitimately needs a dot-prefixed file or directory MUST set `include-hidden-files: true`:
-```yaml
-- uses: actions/upload-artifact@v7
-  with:
-    name: dotnet-publish-output
-    path: ${{ github.workspace }}/publish
-    include-hidden-files: true   # required for .azurefunctions/
-```
-
-**Verification:** after deploy, a fresh `GET https://<scmsite>/api/vfs/site/wwwroot/` should
-list the `.azurefunctions/` directory. If absent, the Functions Log Stream will show
-`Could not find the .azurefunctions folder in the deployed artifacts of a .NET isolated
-function app` and `0 functions found (Custom)`.
+**Check after deploy:** `GET https://<scmsite>/api/vfs/site/wwwroot/` lists `.azurefunctions/`. If it
+does not, Log Stream shows `Could not find the .azurefunctions folder…` and `0 functions found`.
 
 ## 5. Node.js Runtime
 
-- JavaScript actions (`actions/checkout`, `actions/upload-artifact`, `actions/github-script`, etc.) must target **Node.js 24** natively. Pin to a major version that ships with Node 24 support (check the action's release notes).
-- Do not rely on `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` as a permanent solution — use it only as a temporary bridge while waiting for a new major version of the action to be published.
-- When the `shared-build-angular.yml` reusable workflow upgrades Node.js, audit all workflow files for action version consistency.
+- **JavaScript actions run on Node.js 24 natively** — pin a major that ships it. Use
+  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` only as a bridge until that major exists (0 uses today).
+- **When `shared-build-angular.yml` moves Node, audit every workflow's action versions.**
 
 ## 6. Security Gates
 
-### A06 — CVE Checks [STRICT]
-Every Node-based workflow MUST run `npm audit` as a non-skippable step. Every .NET workflow (when introduced) MUST run `dotnet list package --vulnerable` and fail on any HIGH or CRITICAL finding. These steps MUST NOT use `continue-on-error: true`.
+### A06 — CVE checks [STRICT]
+- **Every Node workflow runs `npm audit --audit-level=moderate`; every .NET workflow runs
+  `dotnet list package --vulnerable --include-transitive` and fails on High or Critical.** Never
+  `continue-on-error: true`.
+- **Run `npm audit` last — after lint, tests and build, before the artifact upload.** It is a network
+  call; placed after `npm ci`, a 12-hour npm registry outage failed **six** PRs with no signal from the
+  suite or the build (`shared-build-angular.yml:142`).
+- **Say when the failure is the registry, not a CVE — and still fail.** A refused connection and an
+  HTTP 503 both exit 1 with `audit endpoint returned an error`, which reads like a finding; one
+  2026-09-04 outage took three re-runs to tell apart.
 
-**Position it AFTER lint, tests and build [STRICT].** The gate is non-skippable; *where* it runs is a
-separate question, and getting it wrong makes a third-party service's uptime the gate on every other
-form of verification. `npm audit` is a network POST to the registry's advisory endpoint. With the step
-placed right after `npm ci`, a registry advisory outage (measured: ~12 h of 503s and 5-minute
-timeouts) failed **six** consecutive PRs with **no signal from the suite or the build at all** — one
-job burned 10m21s to fail on a network call, and a PR carrying a real regression would have looked
-identical. Run it last, before any artifact upload: a moderate-or-higher CVE still fails the workflow,
-and a registry outage now degrades one check instead of all of them. Reordering a step inside an
-existing job crosses no whole-minute boundary, so it costs nothing (§7.1).
-
-**Node.js (copy-paste ready):**
 ```yaml
 - name: Audit npm dependencies
-  run: npm audit --audit-level=moderate
-  # continue-on-error is intentionally absent — any moderate+ finding fails the workflow
+  run: |
+    status=0
+    npm audit --audit-level=moderate > "$RUNNER_TEMP/npm-audit.log" 2>&1 || status=$?
+    cat "$RUNNER_TEMP/npm-audit.log"
+    if [ "$status" -ne 0 ] && grep -q 'audit endpoint returned an error' "$RUNNER_TEMP/npm-audit.log"; then
+      echo "::error::npm registry unreachable — this is not a CVE finding. Re-run the job."
+    fi
+    exit "$status"
 ```
-
-**.NET (copy-paste ready — add after `dotnet restore`):**
 ```yaml
-- name: Audit .NET dependencies
+- name: Audit .NET dependencies        # after dotnet restore — shared-build-dotnet.yml:71
   run: |
     dotnet list package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln.txt
     if grep -qiE "(High|Critical)" /tmp/vuln.txt; then
@@ -267,94 +199,136 @@ existing job crosses no whole-minute boundary, so it costs nothing (§7.1).
     fi
 ```
 
-### A08 — Supply-Chain Action Pinning [STRICT]
-Third-party GitHub Actions (anything **not** under `actions/` or `github/` orgs) MUST be pinned to a full 40-character commit SHA, not a floating major-version tag. First-party actions (`actions/checkout`, `actions/setup-node`, etc.) MAY use major version tags — GitHub's own integrity guarantees cover them.
-
-Rationale: tag mutation on third-party repos is a known supply-chain attack vector (e.g., `tj-actions/changed-files` incident, 2025).
+### A08 — supply-chain action pinning [STRICT]
+A third-party action — outside the `actions/` and `github/` orgs — is pinned to a full 40-character
+SHA with a version comment; first-party actions may use a major tag. Tags on third-party repos can be
+moved (`tj-actions/changed-files`, 2025).
 
 ```yaml
-# ❌ Floating tag — vulnerable to tag mutation
-uses: third-party/some-action@v2
-
-# ✅ SHA-pinned + human-readable comment
-uses: third-party/some-action@a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # v2.1.0 — pinned per A08
+uses: third-party/some-action@v2                                          # ❌
+uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c  # v3.0.2 — pinned per A08   # ✅
 ```
 
-### A06 — CodeQL Scanning [RECOMMENDED]
-A CodeQL scan workflow catches a broad class of injection, path-traversal, and data-flow vulnerabilities automatically. **It is free for PUBLIC repositories only.** On a **private** repository, CodeQL *analysis* still runs, but uploading results to the Security tab requires **GitHub Advanced Security** — a paid add-on (Team/Enterprise) **not available on Free/personal plans** (`PATCH …/security_and_analysis` → HTTP 422 "Advanced security has not been purchased"; verified against a Free personal plan). Do **not** state CodeQL is "free at any visibility" — that conflates public-repo-free with all-visibility-free. Running the CodeQL CLI with `upload:false` to dodge GHAS on a private repo is **license-gray** (the CLI is licensed for private use only *in connection with* GitHub code scanning) — not a permitted workaround. Ship CodeQL **dormant** on a private repo — `workflow_dispatch`-only behind an `ENABLE_CODEQL` gate — so the workflow exists without billing minutes for results nobody can read. Free first-party SAST on a private repo means a different tool (semgrep OSS, eslint security plugins, Roslyn analyzers).
+### CodeQL
+**Free for public repositories only.** On a private repo, uploading results needs GitHub Advanced
+Security, which neither Free nor Pro can buy (`HTTP 422 "Advanced security has not been purchased"`), and
+running the CLI with `upload:false` to avoid it is licence-gray. So `codeql.yml` ships dormant —
+dispatch-only and gated on `ENABLE_CODEQL` (🔒 `DECISIONS.md` 2026-06-02). Free SAST on a private repo
+means another tool: semgrep OSS, eslint security plugins, Roslyn analyzers.
 
 ## 7. Cost Governance [STRICT]
 
-On a Free private repo, Actions minutes are a hard, exhaustible cap — and when they run out
-**every** workflow fails in 2–5 seconds with no logs at all, which reads exactly like a broken
-repo. This section exists because that happened on **2026-08-23**, and the diagnosis cost an hour
-because a quota block is indistinguishable from a catastrophic config error until you notice that
-even a pure-bash guard is failing.
+On a private repo Actions minutes are a monthly allowance — 3 000 on Pro since 2026-10-16 (2 000 on
+Free ran out on 2026-10-16) — and past it, with a $0 spending limit, every workflow fails in seconds
+with no logs, which reads like a broken repo (`DECISIONS.md` 2026-08-23).
 
-### 7.1 The cost model — three multipliers, and they compound
-
-**GitHub bills each JOB, rounded up to a whole minute.** So the bill is not "how long does CI
-take", it is:
+### 7.1 Cost a job in billed minutes per sprint
 
 ```
 billed ≈ Σ_jobs ceil(job_minutes) × runs
 ```
 
-Measured on this repo in the 13–17 Aug 2026 window:
+- **Cost a new job before adding it:** `ceil(minutes) × jobs × expected runs`, and record the
+  estimate in its PR.
+- **Expected runs include the sprint-branch re-runs.** The cumulative sprint→`main` PR re-ran full CI
+  on every task merge — **52 %** of `ci-angular` runs in the measured week, roughly doubling a naive
+  per-task estimate.
+- **A saving that does not cross a whole-minute boundary is worth nothing** (`AGENTS.md §0`).
 
-| Workflow | Jobs | Billed / run |
-|---|---|---|
-| `ci-angular` | Live smoke walk **3** + validate-build **2** | **5 min** |
-| `ci-backend` | schema-drift **1** + build-and-test **2** | **3 min** |
-
-98 `ci-angular` runs in five days ⇒ **490 min**, against a 2 000 min/month allowance. Three
-multipliers produced that, and **no one of them was reckless on its own**:
-
-1. **Per-run cost.** The live smoke walk (added 2026-08-05) took `ci-angular` from one job at ~2
-   billed min to two jobs at 5 — a **2.5×** on every run, one week before the busiest sprint ever.
-2. **Run count — the one that surprised everyone.** **52 % of all `ci-angular` runs were on
-   `sprint/*` branches, not task branches.** Under `AGENTS.md §8`'s Sprint/Task strategy the
-   cumulative sprint→`main` PR stays open for the whole sprint, so **every task merged into the
-   sprint branch re-ran that PR's full CI**. ~300 billed minutes re-validating PRs that are drafts
-   *precisely because* nobody intends to merge them yet.
-3. **Volume.** A 22-task sprint, overlapping the close of one sprint and the start of another.
-
-**The rule: cost a new job before adding it, in billed minutes per *sprint*, not per run.**
-`ceil(minutes) × jobs × expected runs`, and expected runs for anything `pull_request`-triggered
-must include the sprint-branch re-runs, which roughly **double** the naive per-task estimate.
-Record the estimate in the PR that adds the job.
-
-### 7.2 Draft PRs skip the heavy gates
-
-A draft PR is, by definition, not ready to merge — and in this repo the cumulative sprint→`main` PR
-is a draft *on purpose*, as the standing STOP gate. Re-running a browser walk on it after every
-task merge buys nothing that re-running it once, before merge, does not.
+### 7.2 Draft PRs skip the heavy steps
 
 ```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+...
 - name: Run the live smoke walk
   if: github.event.pull_request.draft != true
-  run: npm run smoke:walk
 ```
 
-Three things about that one line, each of which has a way to go silently wrong:
+- **`!= true`, never `== false`.** Outside `pull_request` the field is `null`, so the gate fails
+  open — it must over-run, never under-run.
+- **Add `ready_for_review` to `types:`**, and spell out all four: listing any type replaces the default
+  set, and without it taking a PR out of draft fires no run — the gate is deleted, not deferred.
+- **List every step in the job before choosing where the gate goes.** Gate the job only when no step
+  in it must run on a draft; otherwise move that step to a job that already runs, rather than keep a
+  job alive for it. The e2e type-check lives in `validate-build` (`run-e2e-typecheck`), so the
+  smoke-walk job and its scope run only where the walk does. `build-and-test` and `validate-build` are gated whole
+  (2026-09-16): on a draft they defer build, tests, lint, schema drift and both CVE audits. The
+  draft that matters is the sprint PR, and its task PRs already ran all of them — **a sprint +
+  `main` failure is found at `ready_for_review`, not at merge**.
+- **The walk also skips every PR that does not target the default branch** (2026-09-17, `DECISIONS.md`):
+  a task PR into `sprint/*` runs build, tests, lint and the e2e type-check, never the walk. The
+  condition sits on the `walk-scope` job, and the walk job needs it, so both are skipped — not run to
+  say "skipped" — and bill nothing.
+- **A job is billed a whole minute however short it is** (measured 2026-10-16: two scope jobs of 8 s
+  and 5 s, a 29 s type-check job and a 51 s build billed 4 minutes for one task-PR push). Before adding
+  a job, ask which running job could host the step; on a draft, skip the scope jobs too, since
+  everything they gate skips there.
 
-- **`!= true`, never `== false`.** Outside a `pull_request` event the field is `null`; `null !=
-  true` is true, so the gate **fails open** and the work still runs. A correctness gate that
-  guesses wrong must over-run, never under-run.
-- **You MUST add `ready_for_review` to the trigger's `types:`.** It is *not* in the default set
-  (`opened`, `synchronize`, `reopened`), so without it, taking the PR out of draft fires **no run
-  at all** and the skipped gate never runs — the gate is not deferred, it is deleted. Listing any
-  type replaces the whole default set, so spell all four out.
-- **Gate the STEP, never the JOB — this is the trap.** Cheap guards routinely share an expensive
-  job (§1's "one job per logical gate, except trivial guards"), so a job-level `if:` silently
-  disables them too. In this repo `check-file-length.sh`, `check-mock-order-items.sh`,
-  `check-validation-anchors.sh` and the e2e type-check all live inside the `smoke-walk` job — and
-  `check-mock-order-items.sh` caught a real defect on exactly the integration PR a job-level gate
-  would have skipped. **Before gating anything, list every step in the job and confirm each one is
-  genuinely deferrable.**
+Enforced by `scripts/ci/generic/check-workflow-cost-guards.sh` (rules 1–5).
 
-Both halves are enforced by `scripts/ci/check-workflow-cost-guards.sh`, because a rule you verify
-by grepping cannot be re-argued and a rule you verify by memory will be.
+### 7.2b `paths:` does not filter a pull_request's individual pushes [STRICT]
+
+**`paths:` is evaluated against the cumulative PR diff**, so once a PR holds one matching file every
+later push re-runs the workflow. On #970, **21 of 33 commits were docs-only and each billed 10
+minutes** (`LESSONS_LEARNED.md` Sprint 58).
+
+**The fix is `shared-push-scope.yml`**, which compares this push against the **last tested head** —
+the newest run on the branch whose `tested-job` passed — and gates the expensive jobs on its
+`touched` output: 1 billed minute to save 4–9 on a push that touches nothing they read. **Never
+diff from `github.event.before`:** a run cancelled before its build leaves `before` unbuilt, and a
+docs-only push after it would skip the build and read green on code nobody compiled.
+
+**The prefixes are an input, never hardcoded**, defaulted from a repository variable so a sibling
+repo reuses the file unchanged:
+
+```yaml
+push-scope:
+  uses: ./.github/workflows/shared-push-scope.yml
+  with:
+    prefixes: >-
+      ${{ vars.ANGULAR_SCOPE_PREFIXES || '{webapp}/ package.json package-lock.json' }}
+    tested-job: validate-build
+  permissions:          # the lookup reads earlier runs; a called workflow cannot exceed this
+    contents: read
+    actions: read
+
+validate-build:
+  needs: push-scope
+  if: needs.push-scope.outputs.touched != 'false'
+```
+
+- **Keep the caller's literal `paths:` and its `prefixes` in step** — `on:` resolves before any
+  expression can, so `paths:` cannot read a variable. Both lists include the workflow file and
+  `shared-push-scope.yml`.
+- **A prefix ending in `/` matches its subtree; anything else matches the whole path. Anchor with `^`
+  and escape metacharacters** — otherwise `docs/{webapp}-notes.md` matches `{webapp}/`, and an
+  unescaped dot lets `package-lock.json` match `package-lockXjson`.
+- **[STRICT] One scope per gated job, holding THAT job's inputs** — its `tested-job` names the job
+  it answers for, and `tested-step` the step that proves the expensive part ran when the job can
+  pass without it. A job gated on another job's scope inherits its prefixes: the walk shared the
+  build's, which include `docs/uat/`, and walked the app for a docs-only PR. Guard rule 5.
+- **It fails open, in all four places:**
+
+| | Why |
+|---|---|
+| `opened` / `reopened` / `ready_for_review` ⇒ the whole PR | no earlier push to compare; until 2026-09-27 this answered "run everything", so every new PR ran every job |
+| no tested run ⇒ the whole PR; Actions API unreadable ⇒ `before` | nothing on the branch was built; without the API it is no worse than before the lookup |
+| a tested head that is not an ancestor, or `\|\| files=""` ⇒ `true` | a force-push leaves the base unresolvable |
+| consumers test `!= 'false'`, never `== 'true'` | an unset output must still run the job |
+
+- **Scope can gate any job; draft gates a job only when none of its steps must run on a draft**
+  (§7.2). Unchanged inputs mean nothing the job asserts can newly fail; a draft's code *can* have
+  changed.
+- **Skipping a whole job is safe only with no required checks** — §1.
+- **Say which skip happened** with a `::notice::`, so a green check never reads as "the app was
+  walked" (`ci-angular.yml:222`).
+- **Never cancel a superseded run whose push touched code when the newer push did not.** Scope is
+  per push, so the code push's run is the only one that tests the code. On 2026-09-17 PR #1010's code
+  push (`4264ffff`) was cancelled to free the self-hosted runner, its docs-only follow-up went green
+  with `build-and-test` and `validate-build` both **skipped**, and nothing had been tested. Re-run the
+  cancelled run (`gh run rerun <id>`) — it keeps its own `before…after`.
 
 ### 7.3 Every `pull_request` runner job cancels superseded runs
 
@@ -364,69 +338,62 @@ concurrency:
   cancel-in-progress: true
 ```
 
-Without it, three pushes in a minute bill three whole minutes to answer the same question three
-times. `uses:` jobs inherit the caller's block and need none of their own. Same guard, rule 2.
+Three pushes in a minute otherwise bill three minutes for one answer. A `uses:` job inherits the
+caller's block. Guard rule 2.
 
 ### 7.4 When the allowance is gone, recognise it fast
 
-Do not debug the diff. The signature is unmistakable once you know it:
-
 | Symptom | Reading |
 |---|---|
-| **Every** workflow fails, including pure-bash guards that pass locally | not your code |
-| Jobs complete in **2–5 s** | the runner never started |
-| Log download returns **HTTP 404** for every job | no step ever executed, so there is nothing to log |
-| A workflow with 150+ prior green runs fails unchanged | not the workflow |
+| **every** workflow fails, pure-bash guards included | not your code |
+| jobs finish in **2–5 s**, or show no runner and 0 steps | the runner never started |
+| every job's log download returns **HTTP 404** | no step ran |
+| a workflow with a long green history fails unchanged | not the workflow |
 
-One re-run is sanctioned to confirm (a job that dies before any step is "runner loss" per this
-file's re-run rule); a second is waste. Then check Settings → Billing → Plans and usage, and
-githubstatus.com.
+Do not debug the diff. Re-run once to confirm; a second re-run is waste. Then check Settings → Billing
+and githubstatus.com — or switch runners (§8).
 
 ## 8. Self-Hosted Runner — Opt-In Only [STRICT]
 
-Added 2026-08-23, while the GitHub-hosted allowance was exhausted (§7). A self-hosted runner costs
-**no Actions minutes**. This repo can use one, but only when a person asks for it by name.
+A self-hosted runner uses none of the GitHub-hosted minutes allowance and, measured on October
+2026's usage export, bills nothing: 1 012 self-hosted minutes at $0 (GitHub has announced a
+$0.002/min platform charge; re-check the export if it appears). This repo uses one only when a person
+asks for it.
 
 ### 8.1 The contract
 
-The choice resolves through a **three-step chain**, most specific first:
-
 ```
-github.event.inputs.runner   per-run override, manual dispatch only
-   ↓ (null on push / pull_request)
+github.event.inputs.runner   per-run override — manual dispatch only
+   ↓ null on push / pull_request
 vars.CI_RUNNER               repository variable — the global default
-   ↓ (unset)
-ubuntu-latest                hard fallback, always GitHub-hosted
+   ↓ unset
+ubuntu-latest                hard fallback, never removed
 ```
 
-**The repository variable is the primary control**, and it is the reason this works without adding
-`workflow_dispatch` to every workflow: `vars.*` is readable in `runs-on`, so a `pull_request`- or
-`push`-only workflow follows it too. Set `CI_RUNNER=self-hosted` and *everything* moves; delete the
-variable and everything reverts, with no code change and no redeploy.
+- **The variable is the primary control.** `vars.*` is readable in `runs-on`, so `pull_request` and
+  `push` workflows follow it with no `workflow_dispatch` of their own. Switch it with
+  `./scripts/deploy/ci-runner.sh status | self-hosted | github`; for one deploy,
+  `./scripts/deploy/with-self-hosted-runner.sh <workflow> <ref> key=value` starts the runner,
+  dispatches and stops it.
+- **While `CI_RUNNER=self-hosted` is set, a PR opened with the runner offline queues and its check
+  never reports.** It is a global mode switch: set it for an outage, unset it after. For one run, the
+  dispatch input is the safer instrument.
+- **Not every job follows it:** `cd-angular-azure-storage.yml:59`, `:114` and `codeql.yml:32` hardcode
+  `ubuntu-latest`.
 
-**The tradeoff, stated plainly: while `CI_RUNNER=self-hosted` is set, a PR opened when the runner
-is offline queues with no runner to take it, and the check never reports.** That is a global mode
-switch, so treat it as one — set it for the duration of a quota outage, unset it after. The
-dispatch input remains the safer instrument for a one-off: it moves a single run without changing
-the default for everyone.
-
-The hard fallback is never removed, so a repo with no variable and no dispatch behaves exactly as
-it did before this section existed.
-
-Callers compute the chain; reusable workflows accept it as an input:
+Callers compute the chain; reusable workflows accept it:
 
 ```yaml
-# caller — resolves the chain, and is the only place it is written
-jobs:
-  own-job:
-    runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
-  called-job:
-    uses: ./.github/workflows/shared-build-dotnet.yml
-    with:
-      runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+# caller — the only place the chain is written
+own-job:
+  runs-on: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
+called-job:
+  uses: ./.github/workflows/shared-build-dotnet.yml
+  with:
+    runner: ${{ github.event.inputs.runner == 'self-hosted' && 'self-hosted' || vars.CI_RUNNER || 'ubuntu-latest' }}
 ```
 ```yaml
-# reusable — accepts, never decides; still consults the variable when a caller does not opt in
+# reusable — accepts, never decides
 on:
   workflow_call:
     inputs:
@@ -436,82 +403,48 @@ jobs:
     runs-on: ${{ inputs.runner || vars.CI_RUNNER || 'ubuntu-latest' }}
 ```
 
-A workflow with no `workflow_dispatch` needs no changes beyond the `runs-on` expression — the
-variable reaches it anyway. The dispatch input is added only where a per-run override is useful.
+- **`github.event.inputs.runner` is null on every non-dispatch event**, so the chain falls through
+  to the variable, then to GitHub-hosted — by construction.
+- **`A && B || C` needs a truthy `B`.** `'self-hosted'` is; anything falsy collapses to `C`.
+- **Every `runs-on:` expression names `ubuntu-latest` last.** `${{ inputs.runner }}` alone is empty on
+  an event with no input, and an empty `runs-on` is a hard error. Guard rule 3.
+- **Forward the runner to every `uses:` call.** Miss one and a dispatch half-works: the build keeps
+  running, and billing, on GitHub-hosted. Guard rule 4.
 
-Four things about that shape, each with a way to go wrong silently:
+### 8.2 What the runner host provides
 
-- **`github.event.inputs.runner` is null on every non-dispatch event**, so `null == 'self-hosted'`
-  is false and the chain falls through to `vars.CI_RUNNER`, then to `ubuntu-latest`. With no
-  variable set, the automatic path is GitHub-hosted **by construction**, not by remembering to set
-  a default.
-- **The `A && B || C` ternary needs a truthy B.** `'self-hosted'` is a non-empty string, so it is
-  safe. Substitute anything falsy and the expression silently collapses to `C`.
-- **Every `runs-on:` expression must name `ubuntu-latest` as its fallback.** `runs-on: ${{
-  inputs.runner }}` alone resolves to an empty string on any event that supplies no input, and an
-  empty `runs-on` is a hard workflow error. Guard rule 3.
-- **Half the jobs are `uses:` calls, and the forward is easy to forget.** Miss it and the dispatch
-  *appears* to work while the build half quietly stays on GitHub-hosted and keeps billing. Guard
-  rule 4. This is the failure mode this whole section is shaped around: it does not fail, it
-  half-works.
+**The workflows assume Linux with bash**, measured 2026-09-14 across `.github/`: 5 × `sed -i` (GNU
+semantics), 3 × `set -euo pipefail`, 7 × `[[ ]]`, `jq` in `deploy-swa` and `shared-push-scope`. Only
+the 8 composite-action `run:` blocks pin `shell: bash`; the 11 in workflows rely on the Linux default,
+and would run under `pwsh` on Windows.
 
-### 8.2 What the runner host must provide
+**Linux is not Debian.** Name the actual need — a package manager, a libc, systemd. `playwright install
+--with-deps` died on this non-apt runner with `apt-get: command not found` (exit 127) before any test
+ran (PR #802).
 
-The workflows assume **Linux**. Verified assumptions, not guesses: 5 × `sed -i` (GNU semantics —
-BSD/macOS `sed` needs an empty-string argument), 3 × `set -euo pipefail`, 3 × `[[ ]]`, and 2 × `jq`.
-Only 8 of 17 multi-line `run:` blocks pin `shell: bash`, so on a Windows runner the other 9 would
-execute under `pwsh` and fail.
+**Needed on the host:** the `az` CLI (`deploy-functions` runs `az functionapp deploy`), `jq`, `gh`
+and `zip` (`publish-release-asset` creates the release and zips the artifact), and Chromium's system
+libraries. Node and the .NET SDK come from `setup-node` / `setup-dotnet`. If a host lacks the libraries,
+`playwright install-deps --dry-run` names them — never assert they are missing without a launch
+failure that says so.
 
-**"Linux" is not "Debian".** An earlier version of this line said `playwright install --with-deps`
-was "`apt` and therefore Linux-only", which quietly equated the two — and the Tech Lead's runner is
-Linux and not apt-based. The step died with `apt-get: command not found` (exit 127) before a single
-test ran, so `Live smoke walk` reported a failure that had nothing to do with the diff under test
-Never write a host assumption as "Linux" when what the command needs is a
-package manager, a specific libc, or systemd.
+**[STRICT] A workflow provisions the WORKSPACE; it never mutates the HOST.** `--with-deps` runs
+`apt-get` as root on the runner, and on a self-hosted runner that is someone's machine: any PR editing
+a workflow could run root commands on it. So it is removed, and system libraries are a precondition of
+registering a runner.
 
-Needed on the host: the `az` CLI (the backend deploy shells out to `az functionapp deploy`), the
-.NET SDK or `actions/setup-dotnet`, Node, and `jq`.
-
-**Chromium's system libraries are NOT on that list, and the reason is worth recording**, because
-the first version of this section put them there on no evidence. The failure log proved only that
-`apt-get` was absent — it said nothing about a missing library, and the Tech Lead had been running
-Playwright on that machine for months, so they were plainly already present. `--with-deps` was
-installing what was already installed, with a tool the distro does not have. **Dropping the flag
-was the whole fix.** If a host ever genuinely lacks them, `playwright install-deps --dry-run`
-names them for that distro — but do not assert they are missing without a launch failure that says
-so.
-
-**A workflow provisions the WORKSPACE; it never mutates the HOST [STRICT].**
-
-That is the line, and `--with-deps` is the only step in this repo that crossed it. The flag runs
-`apt-get` **as root on the runner machine** — disposable on a GitHub-hosted VM, but on a
-self-hosted runner that machine is someone's laptop, so any PR that edits a workflow could execute
-arbitrary root commands on it. That is a supply-chain hole, and it decides the question on its own;
-the tidiness argument is not needed. `--with-deps` is therefore removed, and the system libraries
-above are a **pre-condition of registering a runner**, not a step.
-
-The rule is not "never install during a workflow" — that would ban `setup-node` and
-`setup-dotnet` too, and the toolchain version belongs in the workflow where it is explicit rather
-than in host state nobody can see. Three categories, three homes:
-
-| Thing | Where | Why |
+| Thing | Home | Why |
 |---|---|---|
-| System libraries, root-owned packages | **host pre-condition** | host-wide, persistent, needs root |
-| Chromium binary (`playwright install`, no flag) | project dependency | version-locked to `@playwright/test`; pinning it to the host drifts on every bump — `agent-workarounds.md` records that exact failure |
-| Node / .NET SDK (`setup-*`) | workspace | installs into the tool cache, not system paths (hence `DOTNET_INSTALL_DIR`, §8.1) |
+| System libraries, root-owned packages | host precondition | host-wide, persistent, needs root |
+| Chromium binary (`playwright install`, no flag) | project dependency | locked to `@playwright/test`'s version |
+| Node / .NET SDK (`setup-*`) | workspace | the tool cache, not system paths — hence `DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet` (`shared-build-dotnet.yml:67`) |
 
-**The cost of the pre-condition model, stated rather than glossed:** host setup becomes state no
-one can read from the repo. Rebuild the machine or add a second runner and CI fails with a cryptic
-error instead of a useful one. The mitigation is the list above being kept accurate — which is why
-it names packages instead of saying "the usual dependencies".
-
-**This buys no CI minutes**, and should not be sold as if it did: the smoke-walk job measures 161 s
-→ 3 billed minutes, and deleting the browser step entirely still bills 3 (§7.1's whole-minute
-boundary). Self-hosted bills nothing at all. The change is about blast radius and determinism.
+The cost: host setup is state the repo cannot show, so a rebuilt machine fails cryptically. Keep the
+list above accurate. And this buys no minutes — the walk job measures 161 s, 3 billed minutes, with or
+without the browser step (§7.1).
 
 ### 8.3 Security
 
-A self-hosted runner executes repository code on that machine with that machine's credentials. This
-repo is private, so the fork-PR attack that makes self-hosted runners dangerous on public repos does
-not apply — **never enable one on a public repo without an approval gate**. Keep the runner
-non-privileged, and stop it when it is not in use rather than leaving it registered and idle.
+A self-hosted runner executes repository code with that machine's credentials. The fork-PR attack
+does not apply to this private repo — **never enable one on a public repo without an approval gate**.
+Keep it non-privileged, and stop it when it is not in use.

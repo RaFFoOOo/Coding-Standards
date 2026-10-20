@@ -1,72 +1,79 @@
 ---
-name: Stack .NET Data
-trigger: glob
-globs: ["**/*.cs"]
-description: Persistence, resilience and database authentication
+paths:
+  - "**/*.DataAccess/**"
+  - "**/*.Domain/Models/**"
 ---
 
-# Stack .NET Data
+# Backend data — entities, persistence, Azure SQL
+
+Section numbers continue from `stack-dotnet-core.md`, so a `stack-dotnet-core.md §3` or `§9` citation
+for these rules lands here. Paths below are relative to `{services}/`.
 
 ## 3. Resilience & Data
-- **Constants & Enums:**
-  - Strict Ban on Magic Strings/Numbers.
-  - Use `const` strings in a central `AppConstants` class or specific `Enums` for logic branching.
-- **Exception Handling:**
-  - **Global Handling:** Use Middleware for unhandled exceptions to ensure uniform API error responses.
-  - **Specific Safety:** In specific methods, use `try/catch` only if you can handle the error or need to wrap it in a custom `DomainException`.
-- **SQL/NoSQL Safety:** User input must never be concatenated into query strings — see §8.2 A03 for the parameterized-query mandate.
-- **Entity Relationships — Real FKs, Not String-Matching [STRICT]:** Two entities that reference
-  each other MUST be linked by a real foreign key (a stable ID + DB constraint) — never by matching
-  two independently-mutable string/business-key columns across tables at query time. A
-  human-readable business key (slug, type, code) may still be denormalized onto the child row for
-  read/API convenience, but it must be **write-time derived from the parent, never independently
-  client-settable**, and it must not itself be the join/query mechanism.
-  ```csharp
-  // ❌ No referential integrity — ChildItem.Type and ParentConfig.ItemType are two
-  // independent string columns; nothing stops them drifting apart, and a lookup by string can
-  // silently return zero rows (orphaned item) or attach to the wrong parent.
-  public record ChildItem { public required string Type { get; init; } }
-  await Context.ChildItems.Where(c => c.Type == itemType).ToListAsync(ct); // string-matched, no FK behind it
 
-  // ✅ A real FK is the relationship; a string mirror kept for an existing URL/API addressing
-  // scheme is always derived from the FK'd parent at write time, never independently settable,
-  // and reads resolve via the FK, not the string.
-  public record ChildItem { public required Guid ParentConfigId { get; init; } public required string Type { get; init; } }
-  builder.HasOne<ParentConfig>().WithMany().HasForeignKey(c => c.ParentConfigId).OnDelete(DeleteBehavior.Cascade);
-  ```
-  **Why:** a matched-string relationship makes drift and orphaning *possible by construction* — a
-  typo, a partial migration, or one direct API call bypassing the single code path that kept two
-  strings in sync is all it takes, and nothing in the schema catches it. Found in a real codebase
-  where a child entity and its parent config were joined purely on a `Type`/`ParentType` string
-  pair — it had already silently orphaned 3 seed rows before anyone noticed. A real FK also makes cascading (or restricting) delete possible for the first time —
-  that requires the DB to know the relationship exists at all.
+### Entity relationships — real foreign keys, never string-matching [STRICT]
 
-## 9. Azure SQL Authentication with Microsoft.Data.SqlClient 7+ [STRICT]
+Two entities that reference each other are linked by a stable id **and** a database constraint. A
+readable business key (slug, type, code) may be copied onto the child for the API, but it is derived
+from the parent at write time, never set independently by a client, and never used as the join.
 
-`Microsoft.Data.SqlClient` 7.0 removed the built-in `Authentication=Active Directory*` connection-string keyword handlers. They must be replaced with the `AccessTokenCallback` pattern via an EF Core `DbConnectionInterceptor`.
+```csharp
+// ❌ two independent string columns: nothing stops them drifting, and a lookup can silently match 0 rows
+public record CatalogItem { public required string Type { get; init; } }
+await Context.CatalogItems.Where(c => c.Type == catalogType).ToListAsync(ct);
 
-**Never downgrade SqlClient to avoid this migration.** SqlClient 6.0 was the first version to support the native `json` column type; 7.0 is the current target. Pinning to an older version to sidestep the breaking change violates `AGENTS.md §7 No Downgrade Shortcut`.
+// ✅ the FK is the relationship; Type is a write-time copy of the parent's key, and reads go through the FK
+public record CatalogItem { public required Guid CatalogConfigId { get; init; } public required string Type { get; init; } }
+builder.HasOne<CatalogConfig>().WithMany().HasForeignKey(c => c.CatalogConfigId).OnDelete(DeleteBehavior.Cascade);
+```
 
-**Reference implementation — `AzureSqlAuthInterceptor` (`<YourApp>.DataAccess/Database/`):**
-a `sealed DbConnectionInterceptor` (override both `ConnectionOpeningAsync` and the sync
-`ConnectionOpening`) that, when the connection is a `SqlConnection`, sets
-`sqlConnection.AccessTokenCallback` to a static callback fetching a token from a shared
-`DefaultAzureCredential` for scope `https://database.windows.net/.default`. Requires the
-`Azure.Identity` package in the DataAccess project. Register it via
-`.AddInterceptors(new AzureSqlAuthInterceptor())` in **both** the runtime DbContext
-(`ServiceCollectionExtensions`) **and** the design-time factory
-(`AppDbContextFactory`, used by `dotnet ef`). Both registrations are mandatory —
-the EF CLI tooling fails to connect without the design-time one.
+Only a real FK makes a cascading or restricted delete possible. Here:
+`{Backend}.DataAccess/Database/Configurations/CatalogItemConfiguration.cs:27`. The string-matched
+version had already orphaned **3** seed items — 🔒 `archive/DECISIONS_ARCHIVE.md` 2026-07-23.
 
-**Connection string requirements:**
-- Must NOT contain `Authentication=` keyword — token injection is handled entirely by the interceptor.
-- Minimal form: `Server=<host>.database.windows.net;Database=<db>;Encrypt=True;TrustServerCertificate=False;`
-- `DefaultAzureCredential` resolves credentials in order: Managed Identity (Azure) → Azure CLI → Visual Studio → environment variables. No connection string changes are needed between environments.
+### A persisted field with a visual half ships the visual half first [STRICT]
 
-**Dependency matrix:**
+Before adding a property to a persisted record (`ThemeSettings`, `TenantConfig`, …), seeding it or
+writing its migration, the rendered result is approved on the **deployed preview SWA**, built
+frontend-only — and first ask whether it needs persisting at all. Both are `AGENTS.md §1`. What a new
+persisted field costs here:
 
-| SqlClient version | `SqlDbType.Json` | Built-in AAD auth | `AccessTokenCallback` |
+- **`required` breaks every construction site** (good — the compiler finds them) **and every existing
+  row needs a backfill before any read.** `ThemeSettings` is one native `json` column
+  (`{Backend}.DataAccess/Database/Configurations/TenantConfigConfiguration.cs:50`), so EF scaffolds an
+  **empty** migration and the data half is hand-written. Precedent:
+  `{Backend}.DataAccess/Migrations/20260726150958_BackfillThemeSettingsPrimaryText.cs` (`JSON_MODIFY`,
+  keyed by `TenantId`). Every value in a backfill is the computed output of the derivation function,
+  never a mockup's illustrative table.
+- **A full-replace update wipes a field its request does not carry.** `ConfigurationFunction.MergeTheme`
+  (`{Backend}.Functions/Http/ConfigurationFunction.cs:174`) rebuilds `ThemeSettings` on every owner
+  save, so a `required` field missing from `ThemeSettingsUpdateRequest` is lost. Derive it there, as
+  `PrimaryText` is, or it cannot be a persisted field.
+
+## 9. Azure SQL authentication — Microsoft.Data.SqlClient 7+ [STRICT]
+
+SqlClient 7 removed the `Authentication=Active Directory*` connection-string handlers. The token comes
+from an EF Core `DbConnectionInterceptor` instead.
+
+- **Never downgrade SqlClient to avoid this** (`AGENTS.md §7` *No Downgrade Shortcut*). 6.0 was the
+  first version with the native `json` column type; 7 is the target
+  (`{Backend}.DataAccess/{Backend}.DataAccess.csproj:12`).
+- **The interceptor** — `{Backend}.DataAccess/Database/AzureSqlAuthInterceptor.cs`: a sealed
+  `DbConnectionInterceptor` overriding **both** `ConnectionOpeningAsync` (`:24`) and the sync
+  `ConnectionOpening` (`:36`). Each sets `SqlConnection.AccessTokenCallback` from one static
+  `DefaultAzureCredential` for scope `https://database.windows.net/.default`. Needs `Azure.Identity`
+  (`{Backend}.DataAccess.csproj:10`).
+- **Register it twice; both are required:** the runtime context
+  (`{Backend}.DataAccess/ServiceCollectionExtensions.cs:142`) and the design-time factory
+  (`{Backend}.DataAccess/Database/{Backend}DbContextFactory.cs:24`). Without the second, `dotnet ef`
+  cannot connect.
+- **The connection string has no `Authentication=` keyword:**
+  `Server=<host>.database.windows.net;Database=<db>;Encrypt=True;TrustServerCertificate=False;`
+  `DefaultAzureCredential` finds a credential (Managed Identity, Azure CLI, Visual Studio, …), so the
+  string does not change between environments.
+
+| SqlClient | `SqlDbType.Json` | Built-in AAD auth | `AccessTokenCallback` |
 |---|---|---|---|
-| 5.x (EF Core 9 default) | ❌ | ✅ | ✅ |
+| 5.x | ❌ | ✅ | ✅ |
 | 6.x | ✅ | ✅ | ✅ |
-| 7.x (current target) | ✅ | ❌ (use interceptor) | ✅ |
+| 7.x (target) | ✅ | ❌ — use the interceptor | ✅ |

@@ -1,0 +1,2 @@
+# This repository is the standards hub: scripts/standards/sync.sh merges the shared standards
+# (.agents/standards-manifest.txt) between it and each project.

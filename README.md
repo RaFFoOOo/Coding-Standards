@@ -14,30 +14,43 @@ The most important configurations live in directories intended for the AI Agent:
 
 | Path | Purpose |
 | ---- | ------- |
-| `AGENTS.md` | **Global Rules.** The absolute baseline rules for architecture, security, and agent behavior. Cross-agent standard (Claude Code, Gemini, etc.). |
-| `CLAUDE.md` | **Claude Code Entry Point.** Imports `AGENTS.md` and provides Claude Code-specific configuration: skills index, plan mode guidance, and remote execution notes. |
-| `.agents/rules/` | **Stack & Agent Rules.** Stack-specific constraints (e.g., `stack-angular.md`) and agent-level workarounds. The canonical cross-agent source. |
-| `.agents/skills/` | **Specialized Capabilities.** Detailed instructions for the agent to perform complex reviews (e.g., `QUALITY_ASSURANCE`, `SPRINT_MANAGER`). |
-| `.agents/workflows/` | **Standard Operating Procedures.** Explicit step-by-step procedures the agent must follow (e.g., `feature-cycle.md` or `pr-resolution.md`). The `sync-template.md` workflow is designed to be **copied to new projects** to pull standards updates dynamically. |
-| `.claude/skills/` | **Claude Code Shims.** Thin wrapper `SKILL.md` files enabling `/slash-command` invocation of all skills and workflows within Claude Code. Delegates to `.agents/` source files. **Not synced to target projects.** |
+| `AGENTS.md` | **Global Rules.** One line per rule and the check that enforces it. Cross-agent. |
+| `CLAUDE.md` | **Claude Code entry point.** Imports `AGENTS.md`; holds the skills index and the placeholder table a project fills in. |
+| `.agents/rules/` | **Stack and agent rules.** Path-scoped with a `paths:` list; a rule without one always loads. |
+| `.agents/skills/` | **Skills.** `plan`, `build`, `verify`, `close`, `review`, `ops`, `sync-templates`: numbered checklists of at most 8 KB. |
+| `.agents/standards-manifest.txt` | **The shared set.** Exactly the files `sync.sh` merges between the hub and a project. |
+| `.claude/rules`, `.claude/skills` | **Links** to the two `.agents/` folders: Claude Code reads only under `.claude/`. |
+| `scripts/standards/sync.sh` | **The sync.** A three-way merge of the shared set, in either direction. |
 | `.github/workflows/` | **CI/CD Pipelines.** Automated build, test, and deployment definitions using GitHub Actions. |
 
 ## 🤖 Agent Compatibility & Deployment Model
 
-This repository is **agent-agnostic** by design. The `.agents/` directory and `AGENTS.md` use the open cross-agent standard, readable by any AI coding assistant.
+The standards are **agent-agnostic**: the files live once, in `AGENTS.md` and `.agents/`, which any
+agent can read. Claude Code reads rules and skills only under `.claude/`, so `.claude/rules` and
+`.claude/skills` are folder links into `.agents/`. On Windows, links need Developer Mode and
+`git config core.symlinks true`. Shared files name a project only through placeholders (`{webapp}`,
+`{services}`, `{Backend}`, …); each project maps them to its own values in its `CLAUDE.md`.
 
-### Working in this Repository (Claude Code)
-Claude Code loads `CLAUDE.md` at session start, which imports `AGENTS.md` and indexes all available skills. Skills and workflows are invocable via `/slash-commands` (handled by `.claude/skills/` shims that delegate to `.agents/`).
+### Starting a new project
+Use **"Use this template"** on GitHub. Then fill in the placeholder table in `CLAUDE.md`, add
+`scripts/standards/project-terms.txt` (the words that identify the project), and run the first sync
+from the hub to record the hub commit you started from:
 
-### Deploying Standards to a New Project
-Use the `/sync-template` workflow. It supports both Push (template → project) and Pull (project ← template) directions, and performs **agent-aware transformation**:
+```bash
+scripts/standards/sync.sh <hub-checkout> <project-checkout>
+```
 
-| Target Agent | Entry Point | Rules Path | Skills Path | Tools |
-|---|---|---|---|---|
-| **Claude Code** | `CLAUDE.md` generated | `.claude/rules/` | `.claude/skills/` | Antigravity tools replaced with CC equivalents |
-| **Gemini / Generic** | `AGENTS.md` (existing) | `.agents/rules/` | `.agents/skills/` | No transformation |
+### Keeping projects and the hub in step
+The `sync-templates` skill drives `scripts/standards/sync.sh`, in either direction.
 
-The `.claude/` directory in this template repo is intentionally excluded from syncing (see `.agents/sync-state.json`).
+- **What it merges:** each shared file, three ways, against the hub commit the project last took.
+  Each project records that commit in `.agents/standards-version`.
+- **One-sided changes** are taken from the side that made them. **Overlapping edits** are left as
+  conflict markers to resolve by hand.
+- **Safety:** nothing that names a project reaches the hub. A merge into the hub refuses any line
+  matching the project's term list.
+- **Out of scope:** the GitHub workflows below are not part of the shared set. They will be shared
+  from a dedicated repository once a second project needs them.
 
 ## 🚀 CI/CD Pipelines Overview
 This repository uses a **"build once, deploy multiple"** methodology using GitHub Shared Workflows. All pipelines are YAML-based and deeply parameterized so they remain portable across different projects.

@@ -1,223 +1,228 @@
 ---
-name: Stack Angular
-trigger: glob
-globs: ["**/*.ts", "**/*.html"]
-description: Angular/TypeScript architecture, state, DI and structure
+paths:
+  - "**/*.ts"
+  - "**/*.html"
 ---
 
-# Stack Angular
+# Angular / TypeScript
+
+The language-agnostic rules — decoupling, strict typing, exceptions, async — are `AGENTS.md` §2–§3,
+which loads every session. This file holds their Angular form and what only Angular needs. Paths are
+relative to `{webapp}/src/app/`.
+
+> **Moved — numbers kept, so existing citations still resolve:**
+> - §4 *Styling* → `stack-css.md` · §4 *Text Content* and §9 → `stack-i18n.md` · §4 icons and shared
+>   components, §4a, §11, §14 → `stack-shared-ui.md`
+> - §12 → `stack-angular-testing.md` · §13, §13a → `stack-navigation.md`
 
 ## 1. TypeScript Strictness
-- **Type Safety:**
-  - `strict: true` is mandatory.
-  - **[ARCHITECT REQUIRED]** The `any` keyword is forbidden. If a type is unknown, use `unknown` and type-guard it, or create a `Generic<T>` interface.
-- **Interfaces:** Define explicit interfaces for all input properties (`input()`), API responses, and Domain models.
-- **[STRICT] Explicit Property Types:** Every class property (component or service) **MUST** carry an explicit type annotation — no reliance on TypeScript inference alone.
-  - This applies to all `readonly` fields, injected service aliases, `computed()` signals, `toSignal()` results, and any other class-level declaration.
-  - For Angular signals, always declare the full generic form: `Signal<T>`, `InputSignal<T>`, `WritableSignal<T>`, `ModelSignal<T>`.
+
+The Angular form of `AGENTS.md §2` *Strict typing*.
+
+- **`"strict": true`** (`{webapp}/tsconfig.json:6`). **[ARCHITECT REQUIRED] No `any`** — narrow an
+  `unknown`, or write a generic.
+- **Explicit interfaces** for every `input()`, API response and domain model.
+- **[STRICT] Every class property carries an explicit type**, signals in their full generic form
+  (`Signal<T>`, `InputSignal<T>`, `WritableSignal<T>`, `ModelSignal<T>`):
   - ❌ `readonly isReady = computed(() => true)`
   - ✅ `readonly isReady: Signal<boolean> = computed(() => true)`
 
-## 2. Component Architecture (The "Building Block" Strategy)
-- **Smart vs. Dumb Components:**
-  - **Dumb (Presentation):** Receive data via `input()` / `model()`, emit actions via `output()`. No dependency on API Services.
-  - **Smart (Container):** Orchestrate data fetching and pass it down to Dumb components.
-- **Config-Driven UI:**
-  - Complex components (Tables, Forms) must accept a `Config` object (e.g., `TableColumnDefinition[]`) rather than hardcoded HTML structures.
-- **Reactive Forms — `FormArray` Hierarchy:**
-  - A `formArrayName` directive MUST be present on the parent container element before any `[formGroupName]="index"` children can resolve their controls. Angular reactive forms fail silently without it — the error `Cannot find control with path: 'N -> fieldName'` indicates a missing `formArrayName` ancestor.
-- **Client-side validation is UX, not security [STRICT]:** Form/`Validators` checks exist for fast feedback only — the server re-validates everything and is the real boundary (`AGENTS.md §3 Dual-Side Validation`). Mirror each server constraint (allowed values, patterns, required, range) in the form so the client never submits what the backend will reject, but **never** treat a client check as sufficient, and never ship a constraint that exists only on the client.
-- **Performance:**
-  - **Change Detection:** Use `ChangeDetectionStrategy.OnPush` by default for all components to maximize rendering efficiency.
-  - **Parallel Loading:** When a page needs multiple data sources, use `forkJoin` (RxJS) to load them in parallel. Never chain independent subscriptions (Waterfall effect).
-- **[STRICT] A component is CREATED only if it is RENDERED — never `display: none` a whole component.**
-  A component shown at only one breakpoint (or in only one state) MUST be gated by `@if`, not hidden
-  with CSS. `display: none` suppresses **paint, not work**: Angular still constructs the component,
-  builds its DOM subtree, and runs every subscription it opens — including HTTP requests whose
-  response nothing can ever render.
-  ```html
-  <!-- ❌ created at every width; the hidden one still fetches and still builds its subtree -->
-  <app-footer></app-footer>          <!-- footer.scss: @media (max-width: 768px) { display: none } -->
-  <app-mobile-nav></app-mobile-nav>  <!-- mobile-nav.scss: :host { display: none } on desktop -->
+  ESLint enforces the constructor case:
+  `@typescript-eslint/consistent-generic-constructors: type-annotation` (`{webapp}/eslint.config.js:47`).
 
-  <!-- ✅ exactly one of them exists -->
-  @if (isDesktop()) { <app-footer /> } @else { <app-mobile-nav /> }
-  ```
-  **Measured, which is why this is STRICT rather than advice** (2026-09-01, Home at 375px): with the
-  footer hidden by a media query it still built **14 DOM nodes** and still fired its own
-  `contact.json` request — **3 identical fetches** on one page. Gating it with `@if` took that to
-  **1 request and 0 nodes**. The waste is invisible to every gate this project runs: the layout is
-  correct, the tests pass, and nothing renders wrong. It is visible only in a network panel.
-  - **Use `ViewportService`** (`core/services/ui`) for the breakpoint signal — `matchMedia`-backed, so
-    it fires only when the query result actually flips, unlike a `resize` listener. Do not hand-roll
-    a second one, and do not read `window.innerWidth` in a component.
-  - **CSS media queries remain correct for LAYOUT** — spacing, columns, font sizes, and hiding an
-    *inner element* of a component that is rendering anyway. The ban is on hiding a **whole
-    component** that way. The test is simple: if the thing you are hiding has its own selector in a
-    template, it should be an `@if`.
-  - **`jsdom` has no `matchMedia`.** Anything reaching the viewport throws
-    `window.matchMedia is not a function` and takes down its entire spec file, not one test — this
-    broke all 5 of `app.spec.ts` when the shell first injected `ViewportService`. `src/test-setup.ts`
-    stubs it, defaulting to `matches: false` (desktop) because every query in this app is a
-    `max-width` mobile query. A stub answering `true` would silently put every spec in a mobile
-    layout nothing asked for.
-- **Visual Performance:** Avoid Layout thrashing. Use `CSS` transitions instead of JS animations where possible.
+## 2. Component Architecture
+
+- **Presentational components take `input()` / `model()` and emit `output()`**, with no API service;
+  containers fetch and pass data down (`AGENTS.md §2` *Keep the boundary thin*).
+- **A complex component — a table, a form — takes a config object** (`TableColumnDefinition[]`), not
+  hardcoded markup.
+- **`ChangeDetectionStrategy.OnPush` on every component.**
+- **Independent data sources load in parallel with `forkJoin`** — never a chain of subscriptions.
+- **`formArrayName` sits on the parent of `[formGroupName]="index"` children.** Without it the controls
+  do not resolve: `Cannot find control with path: 'N -> fieldName'`.
+- **Client validators are UX, not security** (`AGENTS.md §3` *Dual-Side Validation*): mirror every server
+  constraint in the form, and never ship a constraint that exists only on the client.
+- **Animate with CSS transitions, not JavaScript**, and avoid layout thrashing.
+- **A value that is constant for the tenant is read where it is used — by a pipe or a service — never
+  passed down as an input.** `MoneyPipe` reads `TenantConfig.currencySymbol` itself. As an input, the
+  symbol ran through 27 files, and removing it touched every one (S59 T11). The multi-language
+  editors read the tenant's languages through `injectTenantLanguages()` for the same reason (S60 T4).
+
+### A component is created only if it is rendered [STRICT]
+
+A component shown at one breakpoint, or in one state, is gated by `@if` — never hidden with
+`display: none`. CSS hides paint, not work: the component is still built and still runs its
+subscriptions and HTTP requests.
+
+```html
+<!-- ❌ both exist at every width; the hidden one still fetches -->
+<app-footer></app-footer>          <!-- footer.scss: @media (max-width: 768px) { display: none } -->
+<app-mobile-nav></app-mobile-nav>  <!-- mobile-nav.scss: :host { display: none } on desktop -->
+
+<!-- ✅ exactly one exists — app.html:25 -->
+@if (isDesktop()) { <app-footer /> } @else { <app-mobile-nav /> }
+```
+
+Measured on Home at 375 px (2026-09-01): the CSS-hidden footer still built **14 DOM nodes** and fired
+its own `contact.json` request — **3 identical fetches** on one page. `@if` made it 1 request and 0 nodes.
+
+- **The breakpoint comes from `ViewportService`** (`{webapp}/projects/platform/src/services/ui/viewport.service.ts`), which is
+  `matchMedia`-backed — never a `resize` listener, never `window.innerWidth` in a component.
+- **Media queries stay correct for layout**, and for hiding an inner element of a component that
+  renders anyway. The test: if what you are hiding has its own selector in a template, it is an `@if`.
+- **jsdom has no `matchMedia`**, and a missing stub fails a whole spec file.
+  `{webapp}/src/test-setup.testing.ts` stubs it with `matches: false` (desktop), because every media
+  query here is a `max-width` query.
 
 ## 2a. Modern Angular Standards [STRICT]
-- **Dependency Injection:**
-  - **MUST** use the `inject()` function instead of constructor injection for all services and tokens.
-  - **Strict Interface Tokens:** When providing a concrete Mock class mapping to an abstract interface token in `app.config.ts`, components **MUST** strictly invoke `inject(ITokenInterface)`, never the concrete class directly.
-  - **Ambient Provider Ban:** Concrete Mock classes intentionally bound within `app.config.ts` providers MUST NOT declare `@Injectable({ providedIn: 'root' })`. This forces explicit dependency resolution failures over silent uninitialized dual-instantiations if developers accidentally breach token mappings.
-- **[STRICT] Service Decoupling from Templates:**
-  - Injected services **MUST** always be declared `private`. Templates must never call service methods or access service signals directly (e.g., `myService.someSignal()` in HTML is forbidden).
-  - Expose named `readonly` component properties (computed signals or direct signal aliases) that delegate to the service internally. Templates bind only to component properties.
-  - ❌ `[value]="myService.someSignal()"` in template
-  - ✅ `readonly someValue = this.myService.someSignal;` in component, then `[value]="someValue()"` in template
-- **[STRICT] ViewChild Clean Surface**
-  - `viewChild()` / `@ViewChild()` references MUST be `private`. Templates must not access child-component internals directly (e.g., `childForm.form.invalid` or `childForm.submit()` in the template is forbidden).
-  - Expose proxy signals (`Signal<>` derived from the child via `computed(() => child()?.value())`) and proxy methods (`public foo(): void { this.child()?.foo(); }`) on the parent component. Templates bind only to those.
-  - Prefer signal-based `viewChild()` over the legacy decorator `@ViewChild()` — the result is a `Signal<T | undefined>` that integrates naturally with `computed()`.
-  - To bridge child reactive-form state into a signal, the child can wire `form.statusChanges.pipe(takeUntilDestroyed()).subscribe(() => versionSignal.update(v => v + 1))` and expose `formInvalid: Signal<boolean> = computed(() => { versionSignal(); return this.form.invalid; })`.
-  - **[STRICT] Imperative-only form flags need their own manual version bump:** `value`/`status` always
-    have a matching `Observable` (`valueChanges`/`statusChanges`) to key a bridge's version counter off
-    of. `dirty`/`pristine` and `touched`/`untouched` do **not** — `markAsPristine()`, `markAsDirty()`,
-    `markAsUntouched()`, and `reset()`'s touched-reset all mutate the flag directly with **no** emission
-    on either observable. A bridge for one of these flags must bump its own version signal at every call
-    site that mutates the flag programmatically, in the same method — there is no event to subscribe to
-    instead. Found in a form-dirty-tracking controller: a
-    `valueChanges`-keyed `isDirty` bridge kept reading stale `true` forever after a legitimate save,
-    because the save handler's own `form.markAsPristine()` never woke the bridge — fixed by bumping the
-    version counter inside `markSaved()` itself, alongside the `markAsPristine()` call.
-- **Control Flow:**
-  - **MUST** use the new Control Flow syntax (`@if`, `@for`, `@switch`) instead of legacy directives (`*ngIf`, `*ngFor`).
-- **File Structure:**
-  - **Inline Templates/Styles forbidden:** Components must have separate `.html` and `.scss` files unless they display static text < 3 lines.
-- **Standalone Components:** All components must be `standalone: true`.
-- **Template Purity:**
-  - **No Inline Logic:** Direct property assignment or Signal mutation in templates is forbidden.
-    - ❌ `(click)="isOpen = false"` 
-    - ❌ `(click)="isOpen.set(false)"`
-  - **Explicit Handlers:** Always invoke a dedicated method that encapsulates the logic.
-    - ✅ `(click)="closeDropdown()"` where method contains `this.isOpen.set(false)`
+
+- **`inject()`, never constructor injection**, for services and tokens. A plain class built with
+  `new` is not DI (`{webapp}/projects/ui/src/lib/custom-dropdown/custom-dropdown-keyboard.controller.ts`).
+- **Inject the interface token, never the Mock or Http class** — `inject(IOrderService)`. Each token is
+  bound per service by `provideByMode` (`app.providers.ts:43`): the Angular form of `AGENTS.md §2`
+  *Depend on abstractions*.
+- **A Mock class bound through a token does not declare `@Injectable({ providedIn: 'root' })`**, so
+  injecting the class directly fails at resolution instead of silently creating a second instance.
+  All 18 comply (`git grep -nE "^@Injectable" -- '{webapp}/src/app/**/mock-*.ts'`, 2026-10-16);
+  grep the decorator, not the text — each file's "Does NOT declare" comment matches a bare search.
+- **Injected services are `private`, and templates never reach them.** Expose a named `readonly`
+  property instead:
+  - ❌ `[value]="myService.someSignal()"`
+  - ✅ `readonly someValue = this.myService.someSignal;` → `[value]="someValue()"`
+- **`viewChild()` references are `private`;** a template never reaches a child's internals
+  (`childForm.form.invalid`). Expose proxy signals (`computed(() => child()?.value())`) and proxy
+  methods instead. Prefer signal `viewChild()` to `@ViewChild()`.
+- **To bridge a child form's state into a signal,** bump a version signal from
+  `form.statusChanges.pipe(takeUntilDestroyed())` and read it inside
+  `computed(() => { version(); return this.form.invalid; })`.
+  - **[STRICT] `dirty`/`pristine` and `touched`/`untouched` emit nothing.** `markAsPristine()`,
+    `markAsDirty()`, `markAsUntouched()` and `reset()` change the flag silently, so bump the version in
+    the same method that calls them — as `CatalogDirtyTrackingController.markSaved()` does
+    (`archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 37).
+  - **[STRICT] So does every `{ emitEvent: false }` write** — `patchValue`, `setValue`, `enable`,
+    `disable`, `updateValueAndValidity`. Each one that can move validity bumps the version where it
+    happens, including inside an `effect()` fed by data that arrives after construction. The all-Mock
+    build resolves most such data synchronously, before the `computed` first reads, so **no Mock test
+    or walk sees the stale value**: S62 T14 locked *Conferma Prenotazione* on a valid form for every
+    customer on the real backend (`LESSONS_LEARNED.md` Sprint 62).
+- **Control flow is `@if` / `@for` / `@switch`**, never `*ngIf` / `*ngFor`.
+- **Separate `.html` and `.scss` files**, unless the template is static text under 3 lines.
+  **`standalone: true`** on every component.
+- **No logic in a template:** ❌ `(click)="isOpen = false"`, ❌ `(click)="isOpen.set(false)"`;
+  ✅ `(click)="closeDropdown()"`.
 
 ## 3. Data Service & Mocking Strategy
-- **Offline Capability:**
-  - **[ARCHITECT REQUIRED]** Every API Service (e.g., `BookingService`) must have a corresponding `MockBookingService`.
-  - Switch providers per-service via a `ServiceMode` flag (`'Mock' | 'Http'`), not a single global `useMocks` boolean. Each service flips independently in `environment.*.ts` (e.g. under a `services.*` map) and is wired via a per-service provider factory (e.g. `provideByMode(token, MockCtor, HttpCtor, mode)`) in the app's providers config.
-  - Mock services must return synthetic data with realistic delays (using `delay()` operator) to simulate network latency.
-- **Local Environment Secure Mocking:**
-  - Mock configuration payloads tracked in version control (e.g., `app-config.json`) **MUST NEVER** contain hardcoded secrets or SAS tokens.
-  - To mock backend-level secure payload injections natively during local development, the consuming Mock Service MUST intercept the parsed JSON structure and dynamically merge active secrets isolated securely within `environment.development.ts` into the configuration state prior to distribution.
-- **[STRICT] Data Layer vs. Shared Behavior Separation:**
-  - `IFoo` / `MockFooService` implementations are **data-source adapters only**. They fetch, transform, and register data. They MUST NOT own reactive state (signals), persist user preferences, or contain business logic.
-  - Shared state, derived signals, user preference persistence, and cross-component behavior MUST live in a dedicated `FooService` annotated `@Injectable({ providedIn: 'root' })` — following the `CartService` / `TranslationService` / `AuthService` pattern.
-  - The shared service is the single source of truth consumed by components. The data-layer interface is an internal collaborator injected by the shared service.
-  - ❌ Signals, `switchLanguage()`, persistence calls inside `MockLanguageService`
-  - ✅ `MockLanguageService` → loads files; `TranslationService` → owns signals, activation, persistence
-  - **[PRE-QA CHECK]:** Before committing any new `IFoo`/`MockFooService`, verify it contains NO `signal()`, `WritableSignal`, `computed()`, or `localStorage` calls. If any are present, extract them to a dedicated `FooService` first. Catching this at authoring time avoids a full PR-cycle rework.
-- **[STRICT] Interface Parameters Must Use Stable IDs**
-  - Service interface method parameters that identify a resource (tenant, user, entity) MUST use the immutable primary key (`tenantId: string`, `userId: string`) — never a display name, slug, or file-path artifact.
-  - If the mock implementation needs a display name for internal file paths, it resolves it from the config service internally. The interface contract is stable and ID-based from day one.
-  - ❌ `abstract getAll(tenantName: string): Observable<...>` — name is a display artifact; changes break the interface
-  - ✅ `abstract getAll(tenantId: string): Observable<...>` — GUID is immutable; mock resolves name internally
 
-- **[STRICT] Server-state interfaces expose Observable, not Signal**
-  - When a `IFooService` interface represents **server-owned data** (orders, catalog items, reviews, …), every method MUST return `Observable<>`. The interface MUST NOT declare `Signal<>` properties.
-  - The mock implementation simulates the backend with a plain in-memory array (NOT signals) and returns observables via `of(…).pipe(delay())`. This makes the interface 1:1 swap-compatible with an HTTP adapter later.
-  - The reactive cache (`Signal<>` state) belongs to a separate `FooStateService` (`providedIn: 'root'`) that subscribes to `IFooService` on init and exposes signals to components.
-  - ❌ `abstract readonly all: Signal<readonly Foo[]>` in `IFooService`
-  - ✅ `abstract getAll(): Observable<Foo[]>` in `IFooService`; `FooStateService.all: Signal<readonly Foo[]>` for consumers.
-  - **Exception — client-side state:** `IAuthService.isAuthenticated: Signal<boolean>`, a config service's `Signal<Config>`, and similar interfaces representing **session-scoped client state** MAY expose signals. Distinguish by ownership: server-owned (Observable) vs. client-projected (Signal).
-  - **Why this matters:** an interface exposing `Signal<>` for server-owned data makes a later HTTP-adapter swap impossible without breaking every consumer — caught early it is a small extraction; caught after backend integration it is a fire-drill across dozens of files.
+- **[ARCHITECT REQUIRED] Every API service has a Mock** (`BookingService` → `MockBookingService`).
+- **Each service switches on its own `ServiceMode`** (`'Mock' | 'Http'`, `environments/service-mode.ts:2`)
+  under `services.*` in `environment.*.ts`, wired by `provideByMode` — never one global `useMocks` flag.
+- **Mocks return synthetic data with a realistic `delay()`.**
+- **No secret in a committed mock payload.** A mock that needs one merges it in from
+  `environment.development.ts` after loading — `{webapp}/projects/platform/src/services/tenant/tenant-config/mock-tenant-config.service.ts:99`
+  (`mockStorageSasTokens`, read through `PLATFORM_ENVIRONMENT`).
+- **[STRICT] Before proposing a persisted value, check whether CSS can derive it** from tokens that
+  already ship (`color-mix()`, `calc()`) — no seed, no migration, no backend deploy (`AGENTS.md §1`).
+- **[STRICT] A data adapter fetches; a service owns state** (`AGENTS.md §2` *Separate fetching data
+  from owning state*). An `IFoo` / `MockFoo` fetches, maps and registers data — no `signal()`,
+  `computed()`, `localStorage` or business logic. State, preferences and shared behaviour live in a
+  `providedIn: 'root'` `FooService` that consumes the adapter.
+  - ✅ `MockLanguageService` loads files; `TranslationService` owns the signals, activation and persistence.
+  - **Check before committing a new adapter:** grep it for `signal(`, `WritableSignal`, `computed(` and
+    `localStorage`.
+- **[STRICT] Two halves of one user action share a lifetime.** When state accompanies something already
+  persisted, ask what happens if only the other half survives a reload. `CartService` persisted the
+  items while `EditOrderModeService` kept *"this is an edit"* in memory, so after a reload confirming
+  created a second order (Sprint 46 T18). Test it with a **second `TestBed` seeded from what the first
+  stored** — a mocked `setItem`/`getItem` pair with no store between them cannot fail this way.
+- **[STRICT] Interface parameters identify a resource by its stable id** (`AGENTS.md §2`):
+  `getAll(tenantId: string)`, never `getAll(tenantName: string)`. A mock that needs a name for a file
+  path resolves it internally.
+- **[STRICT] A server-state interface returns `Observable`, never `Signal`.** A mock simulates the
+  backend with a plain array and `of(…).pipe(delay())`, so the Http adapter is a drop-in swap. The
+  `Signal` cache lives in a `FooStateService` (`providedIn: 'root'`).
+  - ✅ `IOrderService.getAll(): Observable<OrderRequest[]>` (`core/services/order/order-service.interface.ts:17`),
+    cached by `OrderStateService`.
+  - **Exception — client-side session state may be a `Signal`:** `IAuthService.isAuthenticated`
+    (`{webapp}/projects/platform/src/services/auth/auth-service.interface.ts:16`). The test is ownership: server-owned →
+    `Observable`, client-projected → `Signal`.
 
 ## 5. Debugging & Reliability
-- **Error Interception:**
-  - Implement a global `HttpInterceptor` to catch errors.
-  - Log errors to the console with specific "Reproduction Steps":
-    `console.error("Context: [ComponentName]", "Input:", inputData, "Error:", error);`
+
+- **One global `HttpInterceptor` catches HTTP errors** (`AGENTS.md §3` *Exception Safety*) and logs the
+  context, input and error together — `{webapp}/projects/platform/src/interceptors/error.interceptor.ts:130`.
 
 ## 6. Memory Safety & Subscriptions
-- **Automatic Cleanup:** Use `takeUntilDestroyed()` on all manual RxJS subscriptions.
-- **Declarative over Imperative:** Always prefer the `async` pipe or the `toSignal()` function over manually calling `.subscribe()`.
-- **Subscription Ban:** It is strictly forbidden to use `.subscribe()` without an explicit cleanup strategy (e.g. `takeUntilDestroyed`, `DestroyRef`, or async pipe).
-- **`take(1)`-only exception — non-destroyable `providedIn: 'root'` singletons only [STRICT]:** A
-  bare `.pipe(take(1))` with no `takeUntilDestroyed()` is permitted **only** inside a
-  `providedIn: 'root'` singleton service, where the subscriber is never destroyed during the app's
-  lifetime — `takeUntilDestroyed()` there needs an injection-context/`DestroyRef` contrivance for
-  code that never fires it, which is worse than the plain `take(1)` it would "fix." Every other
-  subscriber (a component, a component-scoped controller, or any injectable with a real
-  `DestroyRef`) MUST combine both: `.pipe(take(1), filter(Boolean), takeUntilDestroyed(this.destroyRef))`
-  — `take(1)` self-completes on the expected single emission (e.g. a confirm-dialog result, a
-  one-shot upload), `takeUntilDestroyed()` is the safety net if the component unmounts first. This
-  is already the established pattern for confirm-dialog subscriptions
-  (`services-inline-edit.controller.ts`, `catalog-grid-edit.coordinator.ts`) — codified here after
-  `order-state.service.ts` (a singleton, correctly `take(1)`-only) and `booking.component.ts`/
-  `media-upload.component.ts` (components, now converted to the combined pattern) were found
-  diverging on the same shape without a documented rule (2026-07-18).
-- **Route Param Signals [STRICT]:** Never derive a reactive signal from route params by calling `.subscribe()` and invoking `.set()` inside the callback. Always use `toSignal()` at the class field level:
-  ```typescript
-  // ✅ Correct
-  readonly catalogType = toSignal(
-    this.route.paramMap.pipe(map(params => params.get('catalogType') ?? '')),
-    { initialValue: '' }
-  );
 
-  // ❌ Wrong — sets a signal inside a subscription
-  readonly catalogType = signal('');
-  ngOnInit() {
-    this.route.paramMap.subscribe(params => this.catalogType.set(params.get('catalogType') ?? ''));
-  }
+- **Prefer `toSignal()` or the `async` pipe to `.subscribe()`.**
+- **[STRICT] Every `.subscribe()` has a cleanup** — `takeUntilDestroyed()`, `DestroyRef` or the `async` pipe.
+- **[STRICT] `take(1)` alone is allowed only in a `providedIn: 'root'` singleton**, which is never
+  destroyed (`core/services/order/order-state.service.ts:169`). Anything with a real `DestroyRef` — a
+  component, a component-scoped controller — combines both:
+  `.pipe(take(1), filter(Boolean), takeUntilDestroyed(this.destroyRef))`. Reference: the confirm-dialog
+  subscriptions in `features/services/services-inline-edit.controller.ts` and
+  `features/catalog/catalog-grid-edit.coordinator.ts`.
+- **[STRICT] A route param becomes a signal through `toSignal()` at the field**, never `.subscribe()` +
+  `.set()`:
+  ```typescript
+  // ✅
+  readonly catalogType: Signal<string> = toSignal(
+    this.route.paramMap.pipe(map(params => params.get('catalogType') ?? '')), { initialValue: '' });
+
+  // ❌
+  ngOnInit() { this.route.paramMap.subscribe(params => this.catalogType.set(params.get('catalogType') ?? '')); }
   ```
 
 ## 7. Reactive State Management
-- **Local State:** Use `signal()` for all mutable component local state.
-- **Derived State:** Use `computed()` for values derived from other signals.
-- **Side Effects:** Use `effect()` strictly for side-effects (e.g., syncing to local storage, logging, external DOM manipulation) and never for state derivation.
-- **Component API:** Use `input()`, `output()`, and `model()` for component communication.
-- **Derived overrides:** Use `linkedSignal()` when you need state that is derived from props/inputs but can also be explicitly overridden by the user.
-- **[STRICT] Optimistic Server-State Updates** When a component must render an
-  async server-owned list AND accept optimistic local mutations (role change, status toggle, etc.),
-  layer signals as `toSignal(httpStream$, { initialValue }) → linkedSignal(() => serverSignal())`.
-  - `toSignal` owns the reactive subscription to the http source.
-  - `linkedSignal` exposes a `WritableSignal` consumers can `.update(...)` for optimistic edits.
-  - On source re-emit (route param / tenant switch / refetch), `linkedSignal` automatically
-    resets to the new server value — discarding stale optimistic overrides without ceremony.
-  - On PATCH failure, revert by `.update(...)`-ing the previous value back into `linkedSignal`.
-  - **Anti-pattern banned by this rule:** constructor-side-effect `loadX()` + `WritableSignal<T>` +
-    imperative `_signal.set(response)` inside `.subscribe()`. That stack drops switchMap
-    cancellation on rapid tenant switches and rebuilds what `linkedSignal` already gives you
-    for free. The reactive pattern is mandatory for any new component fitting this shape;
-    legacy components should be migrated when next touched.
-- **[STRICT] Subordinate/dependent filters must stay reactively consistent with their parent:**
-  - When one facet's valid option set depends on another facet's current selection (e.g. a catalog
-    "category" filter that only makes sense within the active "type"), the subordinate's options MUST be
-    a `computed()` derived from the parent's current value — never a static/pre-fetched list — and the
-    subordinate's own selection MUST be reset (to its "All" value) the moment it becomes invalid under a
-    new parent value. Never leave a stale child selection referencing an option that no longer exists
-    under the new parent.
-  - ✅ Reference pattern: a `categoryOptions` computed signal derives from an `availableCategories()`
-    computed signal, itself derived from the active `type` selection; `setType()` explicitly clears
-    `selectedCategory` when it no longer exists in the new set.
-  - **Why:** an inconsistent child filter either shows the user options that silently produce zero
-    results (bug), or worse, keeps a stale selection active that the UI no longer displays a chip for —
-    invisible, unrecoverable-without-refresh state. Codified after Tech-Lead review confirmed this pattern
-    must generalize beyond catalog type→category to any future dependent-filter pair.
+
+- **`signal()`** for mutable local state · **`computed()`** for derived state · **`effect()`** only for
+  side effects (storage, logging, DOM), never to derive state · **`linkedSignal()`** for state derived
+  from inputs that the user can override · **`input()` / `output()` / `model()`** between components.
+- **[STRICT] Optimistic updates on a server-owned list:** `toSignal(http$, { initialValue })` →
+  `linkedSignal(() => serverSignal())`. `toSignal` owns the subscription; the `linkedSignal` takes
+  `.update()` edits, resets itself when the source re-emits (a route or tenant switch, a refetch), and a
+  failed PATCH reverts with `.update()`. **Banned:** a constructor `loadX()` + `WritableSignal` + `.set()`
+  inside `.subscribe()` — it loses `switchMap` cancellation on a fast tenant switch. Migrate a legacy
+  component when you next touch it.
+- **[STRICT] No debounce or delay between an input and the state it changes** — the Angular form of
+  `AGENTS.md §3` *What a user's input changes depends on what they did*: no `debounceTime` or
+  `setTimeout` on that path, and worst of all on a persisted identity (a route slug, a storage key). A
+  display-only timer is fine — `{webapp}/projects/platform/src/services/ui/toast.service.ts:67` auto-dismisses a toast.
+  - **The tell:** a spec needs `vi.useFakeTimers()` to describe production behaviour.
+  - **The number:** the booking-draft write the deleted debounce batched cost **0.10 ms, 0.64 % of a
+    16 ms frame** (#911, #912). Why it is a rule: `archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 54, finding 3.
+- **[STRICT] A dependent filter follows its parent.** Its options are a `computed()` of the parent's
+  value, and its selection resets to "All" the moment it becomes invalid — never a stale child selection.
+  Reference: `setType()` in `features/group-tab-page/group-surface-facet.controller.ts:161` clears
+  `selectedCategory` once it is no longer in `availableCategories()`.
 
 ## 8. File & Folder Structure
-- **Feature Modules:** Organize code by business feature rather than technical type (e.g., `features/auth/` containing its own components, services, models).
-- **Naming Convention:** All Angular files must follow standard `kebab-case` naming (e.g., `user-profile.component.ts`).
-- **Barrel Exports:** Use `index.ts` files inside feature folders to explicitly expose only the public API of that feature, preventing deep imports.
+
+- **Code is organised by business feature** — `features/<feature>/` holds its components, services and
+  models — not by technical type.
+- **File names are kebab-case** (`user-profile.component.ts`).
+- **A feature folder exposes its public API through an `index.ts` barrel**, so nothing imports deep into
+  it. Today 1 of 15 feature folders has one (`features/fallback/index.ts`); the other 14 are logged in
+  `backlog/frontend.md`. The `core/services/*` folders already have theirs.
 
 ## 10. Multi-Tenant Architecture [STRICT]
-- **Resource Resolution:**
-  - **MUST** resolve all brand-specific brand assets (logos, favicons, primary images) dynamically via the `ITenantConfigService.getResourceUrl()` pattern.
-  - Hardcoded paths to tenant assets in the `assets/` directory are forbidden for multi-tenant features.
-- **Data Segregation:**
-  - **MUST** use tenant-segregated keys for all browser-side persistence (localStorage, sessionStorage).
-  - Implementation: Keys must be prefixed with a unique tenant identifier (e.g., `{appPrefix}_{tenantId}_{key}`).
-- **Mode-Aware UI:**
-  - Standard components (Booking, Catalog) must adapt their behavior and terminology based on the `businessType` signal from `ITenantConfigService` to support diverse business models (e.g., Reservation vs. Order).
-- **Mode Logic Centralization [STRICT]:**
-  - When a config value drives conditional behavior across multiple components (e.g., a `businessType`, `userRole`, or `featureFlag`), create a dedicated injectable service that exposes named boolean signals and config methods derived from that value.
-  - Direct string comparisons against config values (e.g., `config.type === 'x'`) are **forbidden** in components and templates. Components consume named signals from the centralized service instead.
-  - Config methods on the service (e.g., `getDatePickerConfig()`, `getFormValidators()`) return typed config objects — templates bind to their properties rather than containing inline conditional expressions.
+
+- **Tenant assets resolve at runtime** through `StorageService.getResourceUrl()`
+  (`{webapp}/projects/platform/src/services/tenant/storage/storage.service.ts:96`) — never a hardcoded `assets/` path to a tenant's
+  logo, favicon or image.
+- **Browser storage keys are tenant-prefixed** — `{short}_{tenantId}_{key}`, built in
+  `{webapp}/projects/platform/src/services/persistence/local-persistence.service.ts:23`.
+- **Components adapt their behaviour and wording to the tenant's business type.**
+- **[STRICT] A config value that drives behaviour in several components is centralised in one service of
+  named signals** — never `config.type === 'x'` in a component or template (`AGENTS.md §2`
+  *Data-Driven State*). Reference: `BusinessModeService` — `isReservationMode`, `isOrderMode`,
+  `isAppointmentMode` (`core/services/business-mode/business-mode.service.ts:79`) and typed config
+  signals such as `datePickerConfig` (`:103`) that templates bind to.
+
+## 13. Routing & Navigation — moved
+
+Every navigation rule is in `stack-navigation.md`. Two of them apply to any page, so they are stated here:
+
+- **A route meant for repeat access is reachable from persistent chrome** (header icons, the nav row, the
+  account menu) — an inline link in another page does not count.
+- **A detail page that no nav entry reaches renders `<app-breadcrumb>` first**, built as a `computed()`
+  `BreadcrumbItem[]`.

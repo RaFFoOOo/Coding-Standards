@@ -33,5 +33,5 @@ Add a file when an area earns one — a spoke project will typically need `front
 **Verified YYYY-MM-DD:** <the command or file:line showing it is still open>
 ```
 
-Lifecycle — adding, marking, closing, auditing and the sprint-close sweep — is
-[`.agents/skills/todo-manager/SKILL.md`](../.agents/skills/todo-manager/SKILL.md).
+Lifecycle: `plan` promotes an entry into a sprint, `build` marks the items it ships, and `close`
+sweeps the backlog at the end of each sprint (`.agents/skills/`).

@@ -1,137 +1,237 @@
 ---
-name: Stack Shared UI
-trigger: glob
-globs: ["**/*.ts", "**/*.html", "**/*.scss"]
-description: Shared UI primitives — inventory before building, controls, form grid
+paths:
+  - "**/*.html"
+  - "**/src/app/shared/components/**"
+  - "**/projects/ui/**"
+  - "**/src/styles/_forms.scss"
+  - "**/src/styles/_buttons.scss"
 ---
 
-# Stack Shared UI
+# Shared UI — primitives, controls, overlays and form layout
+
+These are `stack-angular.md` §4 (*Iconography* and the shared-component rules), §4a, §11 and §14; the
+headings keep the numbers, so those citations land here. Paths are relative to `{webapp}/src/app/`.
 
 ## 4a. Shared-Surface Inventory — grep before you draw, and before you build [STRICT]
 
-Every new user-facing surface reuses this app's existing primitives. The rule is not "prefer the
-shared component" — that is advice, and advice loses to a wireframe. **The rule is that you run the
-inventory below and record its output**, at the Mockup Gate (`plan-sprint/SKILL.md` step 3) and again
-before implementing a surface whose mockup predates this rule.
+Every new surface reuses the app's existing primitives. **Run the inventory and record its output** at
+the Mockup Gate (`plan/SKILL.md` step 3), and again before building a surface whose mockup
+predates this rule. Every row was a defect shipped to a preview in Sprint 45 and caught by the Tech
+Lead, not by a gate.
 
-It is written as commands because **a rule you verify by grepping cannot be re-argued, and a rule you
-verify by judgement will be.** Every row below was a real defect shipped to a preview build and
-caught by the Tech Lead, not by any gate.
-
-| Element on your surface | Run this | Use what it shows |
+| Element on your surface | Run | Use what it shows |
 |---|---|---|
-| A page-level commit (Save / Continue / Confirm) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`. **Not** a button in the page body. A bare `type="submit"` is only for a *sub-action* — save one card, add a row to a list. |
-| A page title + subtitle | `grep -rn "page-header" src/app --include=*.html` | `<header class="page-header">` > `.section-title` + `.intro-text`. Never a hand-rolled heading: the global `h1` is hero-sized, which §4 *Token Scope* bans on inner pages. |
-| Any button | `grep -n "&--" src/styles/_buttons.scss` | The **BEM** variants: `.btn.btn--primary`, `.btn--danger`, … `.btn-primary` (single dash) matches nothing and renders an unstyled grey box. |
-| A form row's column widths | `grep -rho "form-col-[a-z0-9-]*" src/app --include=*.html \| sort \| uniq -c` | Rows are filled `6+6` pairs or `12 → md-4/6`. **No row in this app leaves an unfilled half on mobile** — a lone `col-6` reads as a layout accident, whatever §14 permits in the abstract. |
-| A helper hint under a control | `grep -rn "form-hint" src/styles/_forms.scss` | `.form-hint` as a **child of the field it describes**, with `aria-describedby` on the `<input>`, not the wrapper. A hint in a cell of its own stacks margins and reads detached. |
-| An empty state, badge, dropdown, overlay | §4 *Shared UI Primitives*, §11 | The existing primitive. |
+| A page-level commit (Save / Continue / Confirm) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`, not a button in the page body. A bare `type="submit"` is only for a sub-action — save one card, add a row. |
+| A page title and subtitle | `grep -rn "page-header" src/app --include=*.html` | `<header class="page-header">` > `.section-title` + `.intro-text`. Never a hand-rolled heading: the global `h1` is hero-sized (`stack-css.md` *Hero tokens*). |
+| Any button | `grep -n "&--" src/styles/_buttons.scss` | BEM variants — `.btn.btn--primary`, `.btn--confirm`, `.btn--cancel`, `.btn--danger`. `.btn-primary` (one dash) matches nothing and renders a grey box. |
+| A form row's column widths | `grep -rho "form-col-[a-z0-9-]*" src/app --include=*.html \| sort \| uniq -c` | Rows are filled `6+6` pairs or `12 → md-4/md-6`. No row leaves an unfilled half on mobile — a lone `col-6` reads as an accident, whatever §14 permits. |
+| A hint under a control | `grep -rn "form-hint" src/styles/_forms.scss` | `.form-hint` as a child of the field it describes, with `aria-describedby` on the `<input>`, not the wrapper. |
+| An empty state, badge, dropdown or overlay | §4 and §11 below | The existing primitive. |
+| Photos an owner adds, removes, reorders or replaces | `grep -rn "app-media-strip" src/app --include=*.html` | `<app-media-strip>`, never a new list of thumbnails with its own upload button (§4 *Photos edited in place*). |
+| An alignment, spacing or rhythm rule added to an existing stylesheet | `grep -n "on purpose\|deliberately\|INTERNALLY\|not on desktop\|stays" <that file>.scss` | The decision already recorded there — contradicting it is a regression that passes every gate (`DECISIONS.md` 2026-09-07). The weakest row, since it resolves to prose a reader must weigh; it stays because the check is one grep. |
 
-**Two traps that make this fail silently, both hit by the same task:**
+**Two silent traps:**
 
-1. **A class name that resolves to nothing looks exactly like one that works.** `ng lint`, `ngc` and
-   the unit suite were all green with the submit button unstyled — nothing in this project checks
-   that a class in a template matches a rule. **The only gate that catches it is a computed-style
-   assertion on a real build.** When you add a surface, add one (`getComputedStyle` /
-   `getBoundingClientRect` in the smoke walk), not a "does it render" check.
-2. **Is the partial global?** `styles.scss` loads `_forms.scss`, `_buttons.scss`, `_badges.scss`,
-   `_theme-variables.scss` and others — those need no `@use`; read `styles.scss` for the live list. `_shared-sections.scss` is **not** loaded there, so
-   `.page-header`/`.section-title`/`.intro-text` need an explicit `@use 'shared-sections'`. Check
-   `styles.scss` rather than assuming either way; the tell-tale of getting it wrong is a class that
-   works on one surface and silently does nothing on yours.
+1. **A class that matches nothing looks exactly like one that works** — lint, `ngc` and the unit suite
+   stay green. Only a computed-style assertion on a real build catches it: add `getComputedStyle` /
+   `getBoundingClientRect` to the smoke walk, not a "does it render" check.
+2. **Is the partial global?** Read `src/styles.scss`'s `@use` list: `_forms`, `_buttons`, `_badges` need
+   no `@use`; `_shared-sections` (`.page-header`, `.section-title`, `.intro-text`) does.
 
-**And when you place a shared component somewhere new, re-check its own assumptions.**
-`<app-action-bar>` positions itself `bottom: var(--mobile-nav-height)` and relies on `margin-top:
-auto` against a flex column — both true on every page that existed when it was written, neither true
-on a route that hides the bottom nav and the footer. A shared component is not automatically correct
-in a context none of its consumers had; measure it where you put it.
+**Placing a shared component somewhere new, re-check its assumptions there.** `<app-action-bar>` sits
+at `bottom: var(--mobile-nav-height)` (`{webapp}/projects/ui/src/lib/action-bar/action-bar.component.scss:14`) and
+relies on `margin-top: auto` in a flex column — neither holds on a route that hides the bottom nav and
+the footer. Measure it where you put it.
+
+**`<app-action-bar>` shows only while one of its actions can run** (`hasExecutableAction`,
+`DECISIONS.md` 2026-10-09). Gate every button on what is staged; a navigate-only Cancel is disabled at
+rest, and the page's breadcrumb is its exit. Never reserve room for the bar in a page: it publishes its
+height to `<main>` itself.
+
+## 4. Shared components
+
+### Icons
+
+- **Never a text character as an icon** (`x`, `<`, `>`, `+`).
+- **Icons are FontAwesome, rendered with `<fa-icon>`** — never `<i class="fa-solid …">`; the component
+  tree-shakes and type-checks.
+
+### Primitives [STRICT]
+
+- **A visual block used in 3 templates becomes a shared primitive before the 4th.**
+- **Empty states use `EmptyStateComponent`** (`[icon]`, `[message]`) — never a fresh
+  `<div class="empty-state">`.
+- **Status and source badges are global classes in `src/styles/_badges.scss`** — never redefined in a
+  component stylesheet.
+
+### A card's actions: one row, no ground [STRICT]
+
+- **Every action on a card sits in its one `.card-action-bar` row** — state (a toggle) then actions,
+  destructive last (`src/styles/_card-action-bar.scss`). No second button block below the card's
+  content: *Modifica* on an order is the row's ✎.
+- **No resting background on the row or its controls** — a hairline above the row separates it; the
+  hover wash is the only fill. A glyph with no circle is the whole affordance, so it takes a text
+  token (`--primary-text`, AA), never `--primary` (under 3:1).
+
+### Mutually exclusive elements share one slot
+
+Two elements that are never on screen together take the same place: a state **replaces** the element
+it excludes, it never adds a row beside a disabled or hidden one. Fewer elements, no layout shift
+between states, and the answer sits where the user looks to act.
+
+- **The canonical case:** a refused catalog card shows ⛔ *Al completo* where *Aggiungi* was — not a
+  reason chip under the details plus a disabled button (`catalog-card.component.html`, `DECISIONS.md`
+  2026-10-03).
+- **A disabled control is the tell.** Before shipping one, ask whether its reason could stand in its
+  place instead. Keep it disabled only when the user needs to see the action exists and what unlocks it
+  (*Salva* on a form with an error).
+- **Check at the Mockup Gate:** for each state in the matrix, name the element it replaces; a state that
+  only adds is a finding.
+
+### Photos edited in place are one strip [STRICT]
+
+- **A collection of photos, or other compact media of one shape, edited in place is
+  `<app-media-strip>`** (`{webapp}/projects/ui/src/lib/media-strip/`). It is one row of equal tiles that scrolls
+  sideways, with the next tile always partly visible. Each tile has its controls under it; tapping the
+  photo replaces it. The add tile comes last and picks a file.
+- **The strip reports and the host decides.** It emits `reordered`, `removed`, `replaced`, `added` and
+  `coverRequested`, and owns no list. Home confirms a removal, the item editor does not; each host's
+  draft rules stay in its own controller.
+- **A list of text items stays vertical.** The strip is for things recognised by their picture.
+
+### A shared control takes a value in, not only out
+
+**Ask of any shared control: could a host restore it to a previous state?** A control that only emits
+(`dateChange` out, nothing in) works until the first consumer needs to reopen saved data — then the
+value is correct in the model and invisible on screen (Sprint 46 T17, `app-date-picker`).
+
+### Share the renderer when the fields match; share the component only when the lifecycle does
+
+Two surfaces that render the same fields are not therefore one component. **Same fields ⇒ share the
+renderer. Same lifecycle and same audience ⇒ share the component.** The order confirmation (a cart
+draft, anonymous-capable) and the order detail (a persisted order, behind guards) share the line
+renderer, `<app-order-lines>` (`features/reservation/booking.component.html:25`,
+`features/account/order-detail/order-detail.component.html:102`), and stay two components (Sprint 46 T19).
+
+- **A shared renderer takes capabilities, never a variant:** `canEditQuantity`, `canRemove`
+  (`shared/components/order-lines/order-lines.component.ts:44`, `:46`) — not `variant: 'cart' | 'detail'`.
+  Branching on *who renders it* moves the divergence inside one file, where it is harder to see.
+
+### Filter, search and view bar — one shared component [STRICT]
+
+- **Every list surface with filters, sort, search or a view toggle uses `FilterBarComponent`**, driven
+  by a config object. No bespoke filter row.
+- **Data controls and presentation stay separate:** filter facets and sort are config facets and
+  search is optional; the **view toggle is not in the filter bar** — it sits in `<app-results-bar>`
+  under it, right of the count (`/history`; the catalog and friends have one layout and no toggle, `DECISIONS.md` 2026-10-15). Never fold the view into the facets or
+  branch on `key === 'view'` (`AGENTS.md §2` *Data-Driven State*).
+- **A segmented toggle shows its icon and its word at every width** (`<app-view-toggle>`):
+  *Lista | Calendario*, *Approva | Rifiuta*. No icon-only or
+  selected-word-only variant — the choice must not depend on which segment is selected.
+- **The bar is presentational.** It emits `facetChange` and `searchQuery`; the host owns state and URL
+  sync.
+- **A row of controls stays one row.** The results bar's count and toggle never
+  wrap (`white-space: nowrap`); when they do not fit at 360 px the content gets shorter — *1 richiesta*,
+  not *1 richiesta a settembre* when the period is already on screen — never a second line or an
+  ellipsis. Checked by the smoke walk at 360 px on `/history`.
+
+### Dropdowns and overlays close on an outside click, one open at a time [STRICT]
+
+A floating panel closes on a `document:click` whose target is outside its host, and **its trigger click
+never calls `stopPropagation()`** — that propagation is what lets a sibling's listener close the sibling.
+
+```typescript
+// ❌ opening dropdown B leaves A open
+toggle(event: Event) { event.stopPropagation(); this.isOpen.update(v => !v); }
+
+// ✅
+toggle() { this.isOpen.update(v => !v); }
+@HostListener('document:click', ['$event'])
+onDocumentClick(event: Event) { if (!this.eRef.nativeElement.contains(event.target)) this.close(); }
+```
+
+Reference: `CustomDropdownComponent` (`{webapp}/projects/ui/src/lib/custom-dropdown/custom-dropdown.component.ts:143`
+listener, `:148` trigger). Stopping propagation on an **option** click or a handled key is fine — only
+the trigger must propagate.
+
+### A panel's open class is not its active-descendant class [STRICT]
+
+Bind the panel's visibility and the trigger's "a route inside me is active" highlight to **two
+different classes**. One class for both pins the panel open whenever the route matches.
+
+```html
+<!-- ❌ with `&.open .panel { display: block }` -->
+<li [class.open]="isActiveDescendant() || isManuallyOpened()">
+
+<!-- ✅ -->
+<li [class.open]="isManuallyOpened()" [class.is-active]="isActiveDescendant() || isManuallyOpened()">
+```
+
+- Reference: the header's "More" item (`layout/header/header.html:33`), fed by
+  `CatalogMenuStateService.isGroupActive` (`core/services/catalog/catalog-menu-state.service.ts:130`).
+- **Verify with `getComputedStyle` on the panel in a live browser.** Unit tests with a mocked DOM passed
+  both times this shipped — the second time (PR #521) on the same dropdown.
+- **Grep on touch:** before writing a `[class.open]` on a collapsed trigger, grep this file for
+  "active-descendant".
+
+### A full-viewport overlay is a root-level sibling [STRICT]
+
+`<app-bottom-sheet>`, or any `position: fixed` overlay, sits at the template root — **never inside an
+ancestor that is a stacking context** (`sticky` or `fixed` with a `z-index`). Inside one, its own
+`z-index` competes only within that context and loses to page-level fixed elements, which can then
+block the sheet's touch and scroll.
+
+```html
+<!-- ❌ -->
+<div class="sticky-bar-with-zindex"> … <app-bottom-sheet>…</app-bottom-sheet> </div>
+
+<!-- ✅ -->
+<div class="sticky-bar-with-zindex">…</div>
+<app-bottom-sheet>…</app-bottom-sheet>
+```
+
+It shipped twice, in two unrelated components, before it became a rule.
 
 ## 11. Select / Dropdown / Native-Control Avoidance [STRICT]
-- **Never use a native browser/OS-rendered control whose picker UI cannot be restyled with CSS —
-  unless the User has explicitly requested that exact native control for that exact field.** This
-  covers native `<select>`, `<input type="color">`, and `<input type="date">`/`type="time"`/
-  `type="datetime-local">` — each hands rendering to the OS/browser chrome (Android's system color
-  wheel, iOS's date wheel, …), which varies by platform, cannot be themed, and reads as visually
-  disconnected from the rest of the app. Build a themed custom component instead, reusing the
-  established overlay pattern already shipped twice (an icon picker, and a colour field after its
-  live-walk fix): a trigger button + a `position: fixed; inset: 0` invisible
-  backdrop (click-to-close, no `document:click` listener needed) + a `position: absolute` panel
-  anchored under the trigger. **Exempt:** controls where the OS surface *is* the expected UX and
-  has no themed equivalent — `<input type="file">` (the file picker is a filesystem/security
-  boundary), camera/mic/geolocation permission prompts, `<input type="checkbox">`/`type="radio">`
-  (themed via CSS `accent-color`/pseudo-elements, not a full OS takeover).
-  *(Originated as the native-`<select>` ban below; generalized 2026-07-21 after
-  a colour field shipped with a raw `<input type="color">` — the Android system
-  color-picker dialog a live-device walk flagged as visually non-compliant. Explicit-request escape
-  hatch matters: a future field genuinely needing OS-level pickers, e.g. a native file input, is not
-  a violation.)*
-- **`CustomDropdownComponent` (`shared/components/custom-dropdown/`) is the canonical dropdown
-  widget project-wide** — never a native `<select>`. It renders its own option list so it stays
-  visually consistent across desktop AND mobile (a native `<select>` falls back to the unstyled OS
-  picker on mobile, which cannot be themed). Reactive-form consumers bind via `formControlName`
-  (it implements `ControlValueAccessor`); non-form/per-row consumers (e.g. a table cell) use the
-  legacy `[value]` + `(selectionChange)` API. *(Amends the 2026-07-10 catalog-manager decision,
-  which restored `CustomDropdownComponent` after a locked mockup had briefly reverted to native
-  `<select>` — that rationale is general, not scoped to one component. A follow-up task migrated the
-  one remaining native-`<select>` holdout, a user-management role picker, to match.)*
-- **Never render a raw value as an option label.** Every dropdown option (and any user-facing
-  enum) MUST display an **i18n lookup label** resolved per active language — the underlying value
-  (`'grid'`, `'order'`, `'website'`, a status enum, …) is for the form control and persistence only
-  and must never reach the user verbatim.
-- **Option shape:** model options as `DropdownOption[]` (`{ value, label }[]`, `label` already
-  translated — e.g. via a `toDropdownOptions()` helper mapping `{ value, labelKey }` →
-  `{ value, label: translate.instant(labelKey) }`). `CustomDropdownComponent` renders `option.label`
-  directly with no pipe, so the label MUST already be resolved before it reaches the component.
-- **Consistency:** all dropdowns in a form use `CustomDropdownComponent`'s default styling (which
-  already matches `.form-input`'s height/padding, see `custom-dropdown.component.scss`) so field
-  styling is uniform; do not introduce a parallel dropdown style.
-- *(Rationale: raw lowercase enum values shipped as option labels (`grid`, `order`) read as
-  untranslated and visually inconsistent with the form's labelled fields. A native `<select>` also
-  reads as visually inconsistent with the rest of the app's design system, per the 2026-07-10
-  finding above.)*
+
+- **No native control whose picker the OS draws** — `<select>`, `<input type="color">`, `type="date"`,
+  `type="time"`, `type="datetime-local"` — unless the Tech Lead asked for that exact control on that
+  exact field. Build a themed component instead: a trigger button, a `position: fixed; inset: 0`
+  invisible backdrop that closes on click, and a `position: absolute` panel under the trigger — as
+  `IconPickerComponent` and `ColorFieldComponent` do.
+  **Exempt:** `type="file"` (a filesystem boundary), permission prompts, and checkbox/radio (themed with
+  `accent-color`).
+- **`CustomDropdownComponent` is the dropdown**, never `<select>`. It implements
+  `ControlValueAccessor`, so a form binds it with `formControlName`; outside a form use `[value]` +
+  `(selectionChange)`. Its styling already matches `.form-input` — no second dropdown style.
+- **Never show a raw value as a label.** Every option and user-facing enum shows a translated label; the
+  value is for the control and for persistence only.
+- **Options are `DropdownOption[]`** (`{ value, label, icon?, description? }`) **with `label` already
+  translated** — the component renders it without a pipe. A mapping example: `toDropdownOptions()` in
+  `features/admin/components/catalog-manager/catalog-form-options.controller.ts`.
 
 ## 14. Compact Forms — 12-Column Grid [STRICT]
-- **`.form-row` is a Bootstrap-like 12-column CSS Grid**, not an equal-width flex row. Any owner/admin
-  form with 2+ fields on a conceptual "row" MUST wrap them in the shared `.form-row` class
-  (`src/styles/_forms.scss`) and give each direct `.form-field` child an explicit width via
-  `.form-col-{n}` — never rely on equal flex-basis distribution (`flex: 1 1 0`) to size fields, and
-  never leave a field's width unset inside a `.form-row`.
-- **Values are restricted to Bootstrap's common divisors of 12 — `2, 3, 4, 6, 12`** — so every field
-  lands on a clean fraction (1/6, 1/4, 1/3, 1/2, full) instead of an ad-hoc percentage. Size each field
-  to its actual content, not to "however many siblings it has": a small trigger (icon picker) gets a
-  small column (`form-col-2`/`form-col-3`); a free-text title gets a wide one (`form-col-8`+). A row's
-  columns do **not** need to sum to 12 — unfilled columns are intentional compactness, not a bug;
-  `.form-row` never redistributes leftover space to fill the row.
-- **Mobile-first, Bootstrap-named breakpoint override:** the unprefixed `.form-col-{n}` is the
-  **default that applies at every size** (including mobile) unless overridden; `.form-col-md-{n}`
-  (`≥769px`, matching `.form-row`'s own `768px` mobile breakpoint) overrides it on desktop only. A
-  field MUST NOT always be `form-col-12` (full width) on mobile by default — compact 2-up pairing
-  (`form-col-6`) is the mobile baseline for short fields (single-line text inputs, small dropdowns);
-  reserve `form-col-12` for content that genuinely needs the full line (a textarea, a 3-way dropdown
-  row where the third field is the natural odd-one-out).
-  ```html
-  <!-- ✅ Mobile pairs 6+6; desktop compacts to 4+8 (title gets more room, id stays narrow) -->
-  <div class="form-row">
-    <div class="form-field form-col-6 form-col-md-4"> ... catalogType ... </div>
-    <div class="form-field form-col-6 form-col-md-8"> ... title ... </div>
-  </div>
-  <!-- ❌ Equal flex distribution (the retired `.form-field--inline`) — wastes space when one
-       field's content is much narrower than its sibling -->
-  <div class="form-row">
-    <div class="form-field form-field--inline"> ... icon-picker (small) ... </div>
-    <div class="form-field form-field--inline"> ... currency dropdown ... </div>
-  </div>
-  ```
-- **A conditionally-shown field group stays in the same `.form-row` as its trigger control**, not a
-  separate nested row below it — e.g. a "Limit bookings" toggle and the two capacity fields it reveals
-  sit in one `.form-row` (`toggle: form-col-md-4`, each revealed field `form-col-md-4`) so the revealed
-  fields appear *beside* the toggle on desktop, not stacked underneath it. CSS Grid re-flows
-  automatically when an `@if`-gated grid item is added/removed — no extra layout code needed.
-- Reference implementation: `catalog-builder-form.component.html`/`.scss`, `_forms.scss`'s
-  `.form-row`/`.form-col-*` classes.
-- *(Rationale: the prior `.form-field--inline` (`flex: 1 1 0`, equal-width) split every row's fields
-  evenly regardless of content — a small icon-picker trigger next to a currency dropdown each took 50%,
-  leaving a large dead gap between them; mobile fell back to `flex-direction: column`, fully stacking
-  every field to one-per-row even for short single-line inputs that could easily pair up. Codified
-  after a live-walk flagged both — the Tech Lead explicitly requested a Bootstrap-like
-  2/3/4/6/12 proportion system as the general, durable pattern, not a one-off fix to this one form.)*
+
+- **`.form-row` is a 12-column CSS grid** (`src/styles/_forms.scss`). Two or more fields on one
+  conceptual row share a `.form-row`, and every direct `.form-field` child sets its width with
+  `.form-col-{n}` — never equal flex distribution, never an unset width.
+- **`n` is `2`, `3`, `4`, `6` or `12`; nothing else exists.** `_forms.scss:122` generates only those, so
+  `form-col-8` compiles, lints and renders with no error while matching nothing. Check a field's real
+  width with `getComputedStyle(el).gridColumn`. Size a field to its content: a row's columns need not
+  sum to 12, and leftover space is never redistributed.
+- **Mobile-first.** `.form-col-{n}` applies at every width; `.form-col-md-{n}` overrides it from 769 px
+  (`_forms.scss:129`; mobile is ≤ 768 px). Short fields pair `6+6` on mobile; `12` is for content that
+  needs the whole line — a textarea, the odd one out of three.
+- **A field group that an input reveals stays in that input's `.form-row`**, so it appears beside the
+  input on desktop; the grid re-flows when an `@if`-gated item appears.
+
+```html
+<!-- ✅ features/admin/components/catalog-manager/catalog-builder-form.component.html:81 -->
+<div class="form-row">
+  <div class="form-field form-col-12 form-col-md-4"> … limit-bookings toggle … </div>
+  @if (form.controls['limitBookings'].value) {
+    <div class="form-field form-col-6 form-col-md-4"> … max per day … </div>
+    <div class="form-field form-col-6 form-col-md-4"> … max per hour … </div>
+  }
+</div>
+```
