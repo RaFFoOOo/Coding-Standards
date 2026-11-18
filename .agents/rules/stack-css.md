@@ -38,8 +38,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
   padding-inline: var(--section-pad-x);
   ```
 - **A single-valued token in a shorthand slot is fine:** `padding: var(--space-2) var(--space-4)`. The
-  ban is on the token's arity, not on shorthand properties — `DECISIONS.md` 2026-09-04. Read the other
-  way, it would need a 147-entry exemption baseline in `check-design-tokens.sh`.
+  ban is on the token's arity, not on shorthand properties.
 - **Verify position and spacing by computed style** (`getComputedStyle`), never by reading the
   authored rule — none of these failures is visible in the source.
 
@@ -52,12 +51,37 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
   header and above the phone's bottom nav. A page carrying the section chips' sticky row sizes anything
   a chip lands on with `--section-screen-height`, the screen minus that row. Never re-derive either
   from `100vh` in a component.
+- **A screen-sized block is a `min-height`, never a `height`.** A larger text size or a zoomed page
+  wraps its content onto more lines, and a fixed height lets it spill over the section below. Sizes
+  that hold text are in `rem`, so they grow with the reader's text size. Check it at 200% text
+  (`html { font-size: 200% }`) and at a 206 px-wide viewport (a 412 px phone zoomed to 200%).
 - **A bar fixed under the header carries `data-anchor-offset`**: `ScrollRestorationService` adds its
   height to every in-app anchor jump. The page raises `--anchor-scroll-offset` by the same token, so
   a cold `#hash` load lands the same way.
 - **A section a chip lands on shows whole**, unless its content alone is longer than a screen. Check it
   by jumping to every chip at 375×690 and 360×640 and reading where the section's last element ends
   against the bottom nav's top.
+
+### One content column, one alignment grammar [STRICT]
+
+- **Every page's content is one column, `--measure-content`** (`styles/_theme-variables.scss`). A page
+  container padded with `--section-pad-x` caps at `--measure-page` (the column plus that padding); one
+  padded otherwise caps at `calc(var(--measure-content) + 2 * <its padding>)`. Only the header and
+  footer bars read `--measure-chrome`; Home's hero carousel is full-bleed. A page never adds a wider
+  or narrower container of its own, and a component that renders inside a page never brings a second
+  page wrapper (`.owner-workspace`) — that pads the column twice.
+- **A breadcrumb lives inside the page container**, its text on the content's left edge, and on one
+  line: a long trail truncates the current page, so every page with a breadcrumb has its title at the
+  same height. Every page's top is `--section-pad-top`, so every page without one does too.
+- **Short free text is centred:** titles, intros, one- or two-line notes, empty states.
+- **A paragraph block is the column's width**, left-aligned — never a narrower centred measure.
+- **An interactive component keeps its text left and its actions right or below.** This covers
+  cards, forms, list rows and any control a user acts on.
+- **A phone's page edge is the header's** (`--section-pad-x`, 24 px): content starts under the logo.
+- **Check it** by the left edge of every visible block below the title — paragraph, photo, form field,
+  card — against the container's content box, on two tenants whose fonts differ in width, at desktop
+  and at 375: one edge. A container check alone passes while the blocks inside it drift. The smoke
+  walk asserts it (`e2e/smoke-walk.column.spec.ts`).
 
 ### Encapsulation and budget
 
@@ -67,6 +91,10 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 - **Before persisting a new value, check whether CSS can derive it** from tokens that already ship
   (`color-mix()`, `calc()`) — no seed, migration or backend deploy. Full rule: `stack-angular.md §3`.
 - **Never `!important`.** Fix the specificity instead.
+- **[STRICT] A `:hover` style sits inside `@media (hover: hover)`** — the `hover` mixin
+  (`{webapp}/projects/ui/styles/_hover.scss`). A phone keeps `:hover` on the last control tapped, so a
+  hover colour reads as a button stuck pressed; `:focus-visible` stays outside, for the keyboard.
+  Check: `scripts/ci/generic/check-touch-hover.sh`.
 - **[STRICT] A component that applies a shared class `@use`s its partial.** View encapsulation emits a
   partial's rules only into components that import it; without the `@use`, the class is silently
   unstyled — right on some surfaces, wrong on the ones missing the import. Example: `.inline-edit-chip`

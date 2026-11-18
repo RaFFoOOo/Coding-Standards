@@ -43,6 +43,18 @@ The C# form of `AGENTS.md §2` *Design for replaceable parts*:
   those files out; `ci-backend.yml` builds and tests what it generates, so a domain type in a platform
   file fails CI.
 
+### One write service per kind of content; a read only when it carries a rule [STRICT]
+
+- **Every write of one kind of content goes through one service** in `{Backend}.Domain/Services` (`PageDocuments`,
+  `CatalogItemWriter`, `CatalogWriter`), answering a `WriteResult`: the stored value, or a refusal with its kind
+  (invalid, not found, conflict, unavailable). An endpoint parses the request and maps the kind to a status; an
+  agent tool parses its arguments and maps it to its own answer. The rule sequence exists once.
+- **A read goes through a service only when it carries a rule:** who may see it, a value computed by rule (a
+  price, free dates), a status derived from several facts. A plain read stays a repository read, projected for
+  its own screen (`stack-dotnet-data.md` *A read returns what its screen shows*).
+- **No host type outside the host's adapters.** A service, a rule or a tool never takes the host's request or
+  context type, so the host can change. **Check:** `check-host-types.sh`.
+
 ## 3. Resilience & Data
 
 - **No magic strings or numbers:** a `const` in `{Backend}.Functions/Constants/AppConstants.cs`, or an
@@ -71,8 +83,8 @@ The C# form of `AGENTS.md §2` *Design for replaceable parts*:
   instance that a test adjusts with `with { … }`, and a factory for a class with more than a few
   constructor dependencies. Pattern: `UserTestFixtures.cs`; `TenantConfigTestFixtures.cs` is enforced by
   `scripts/ci/project/check-test-fixture-builders.sh`.
-  **Why:** in S59 T11 one new `required` property edited **10** test files, and removing one
-  constructor dependency from `RequestFunction` edited **38** construction sites across **9** files.
+  **Why:** without a builder, one new `required` property or constructor dependency edits every test
+  that constructs the type inline.
 
 ## 5. Async Patterns
 
@@ -97,4 +109,4 @@ The C# form of `AGENTS.md §3` *Asynchronous work never blocks*:
   (`{Backend}.Functions.csproj:8`). A newly published advisory must not break a build nobody changed;
   `dotnet list package --vulnerable` at the gate is where it is handled.
 - **`NU1510` is therefore an error:** do not add an explicit `PackageReference` to a package the
-  framework already provides (e.g. `System.Text.Json`). Recorded in #1001.
+  framework already provides (e.g. `System.Text.Json`).

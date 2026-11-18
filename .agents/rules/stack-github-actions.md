@@ -30,10 +30,9 @@ behind the pointer in each section.
 
 ### Previews
 - **`ci-preview-swa.yml` is `workflow_dispatch`-only**: a preview is always an explicit act for the
-  branch you want to see. The `push` trigger on `main` was removed 2026-09-01 — it duplicated the dev
-  deploy and raced PR dispatches for the one shared slot (`ci-preview-swa.yml:13`).
+  branch you want to see. A `push` trigger on `main` would duplicate the dev deploy and race PR dispatches for the one shared slot (`ci-preview-swa.yml:13`).
 - **Its build-config fallback is the all-Mock `preview`** (`inputs.build-config || 'preview'`), so a
-  preview never calls the real dev backend (🔒 `DECISIONS.md` 2026-07-08 rev.2). Validate against dev
+  preview never calls the real dev backend. Validate against dev
   with a local `ng serve` or a `build-config: production` dispatch.
 - **If a preview is ever push-triggered again**, it covers every branch prefix (`feature/**`,
   `chore/**`, `bugfix/**`, `refactor/**`, `sprint/**`, `task/**`) — and cost it first (§7.1): each run
@@ -47,9 +46,7 @@ behind the pointer in each section.
 - **Never make a `paths:`-filtered check a required status check.** When a PR matches no path the
   context never reports, and the check blocks merge forever. If it must be required, leave the
   workflow unfiltered and skip with a job-level `if:` (a skipped job reports success), or add an
-  always-running job that reports the context. This repo protects `main` with no required checks
-  (GitHub Pro since 2026-10-16: a PR is required, force-push and deletion are blocked, no approval
-  count — the only reviewer is the PR's own author).
+  always-running job that reports the context. The project's `CLAUDE.md` says how `main` is protected.
 
 ### One job per logical gate, except trivial guards [cost]
 GitHub bills each **job** rounded up to a whole minute. Sub-second guards share **one** job with one
@@ -75,7 +72,7 @@ heavy, parallelisable work (build, test, schema drift, the walk) in separate job
 
 | Identity | Type | Purpose | Grants |
 |---|---|---|---|
-| `eudw{prefix}umi01` | User-Assigned Managed Identity | Function App runtime → storage + SQL | Storage Blob Delegator + Blob/Queue/Table/File data roles, `db_datareader` + `db_datawriter` (`scripts/azure-setup/assign-roles.sh:81`–`:117`) |
+| `eudw{prefix}umi01` | User-Assigned Managed Identity | Function App runtime → storage + SQL | Storage Blob Delegator + Blob/Queue/Table/File data roles, `db_datareader` + `db_datawriter` (`scripts/azure-setup/uami-roles.sh`, SQL in `assign-roles.sh`) |
 | `{app}-spa` | App Registration | SPA MSAL authentication | — |
 | `{services}-api` | App Registration | Backend JWT audience | — |
 | `eudw{prefix}spn01` | App Registration / SPN | CD — development | `Reader` on the subscription + `Website Contributor` on `eudw{prefix}azf01` (`provision-cd-identity.sh:131`) |
@@ -144,6 +141,16 @@ Reference: the `deploy-dev` / `smoke` pairs in `cd-backend-azure-functions.yml:5
   expire and does not count against Actions storage.
 - **One runtime per shared workflow** — `shared-build-dotnet.yml` installs no Node.
 
+### Current host — a publish that names a runtime names the Function App's [STRICT]
+*Deleted when the backend moves to an ASP.NET Core host.*
+
+ReadyToRun needs `--runtime`, and a runtime also picks the native files each package ships per
+platform. Read the app's platform before choosing it — `az functionapp show --query reserved`
+(`false` = Windows), `use32BitWorkerProcess` for the bitness — never assume Linux. A `linux-x64`
+publish to a Windows app drops SqlClient's `Microsoft.Data.SqlClient.SNI.dll` and the worker never
+starts (HTTP 500.30); `shared-build-dotnet.yml` publishes the app's runtime. The check is
+the dev deploy itself: a worker that never starts fails its health wait and the smoke gate, before prod.
+
 ### Current host — Azure Functions: the `.azurefunctions/` folder [STRICT]
 *Deleted when the backend moves to an ASP.NET Core host.*
 
@@ -168,26 +175,22 @@ does not, Log Stream shows `Could not find the .azurefunctions folder…` and `0
 ## 6. Security Gates
 
 ### A06 — CVE checks [STRICT]
-- **Every Node workflow runs `npm audit --audit-level=moderate`; every .NET workflow runs
+- **Every Node workflow fails on an npm advisory of moderate severity or worse; every .NET workflow runs
   `dotnet list package --vulnerable --include-transitive` and fails on High or Critical.** Never
   `continue-on-error: true`.
+- **An advisory with no patched release may be allowed, one entry at a time,** in the npm project's
+  `npm-audit-allowlist.json`: its id, package, reason, date, and the latest affected version. The gate
+  (`scripts/security/npm-audit-gate.mjs`) fails an unlisted advisory, an entry npm no longer reports, and
+  an entry whose package has published a newer release, so an exception cannot outlive its cause.
 - **Run `npm audit` last — after lint, tests and build, before the artifact upload.** It is a network
   call; placed after `npm ci`, a 12-hour npm registry outage failed **six** PRs with no signal from the
   suite or the build (`shared-build-angular.yml:142`).
 - **Say when the failure is the registry, not a CVE — and still fail.** A refused connection and an
-  HTTP 503 both exit 1 with `audit endpoint returned an error`, which reads like a finding; one
-  2026-09-04 outage took three re-runs to tell apart.
+  HTTP 503 both exit 1 with `audit endpoint returned an error`, which reads like a finding.
 
 ```yaml
 - name: Audit npm dependencies
-  run: |
-    status=0
-    npm audit --audit-level=moderate > "$RUNNER_TEMP/npm-audit.log" 2>&1 || status=$?
-    cat "$RUNNER_TEMP/npm-audit.log"
-    if [ "$status" -ne 0 ] && grep -q 'audit endpoint returned an error' "$RUNNER_TEMP/npm-audit.log"; then
-      echo "::error::npm registry unreachable — this is not a CVE finding. Re-run the job."
-    fi
-    exit "$status"
+  run: node "$GITHUB_WORKSPACE/scripts/security/npm-audit-gate.mjs" npm-audit-allowlist.json
 ```
 ```yaml
 - name: Audit .NET dependencies        # after dotnet restore — shared-build-dotnet.yml:71
@@ -213,14 +216,14 @@ uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c  # v3.0.2 — pinned 
 **Free for public repositories only.** On a private repo, uploading results needs GitHub Advanced
 Security, which neither Free nor Pro can buy (`HTTP 422 "Advanced security has not been purchased"`), and
 running the CLI with `upload:false` to avoid it is licence-gray. So `codeql.yml` ships dormant —
-dispatch-only and gated on `ENABLE_CODEQL` (🔒 `DECISIONS.md` 2026-06-02). Free SAST on a private repo
+dispatch-only and gated on `ENABLE_CODEQL`. Free SAST on a private repo
 means another tool: semgrep OSS, eslint security plugins, Roslyn analyzers.
 
 ## 7. Cost Governance [STRICT]
 
-On a private repo Actions minutes are a monthly allowance — 3 000 on Pro since 2026-10-16 (2 000 on
-Free ran out on 2026-10-16) — and past it, with a $0 spending limit, every workflow fails in seconds
-with no logs, which reads like a broken repo (`DECISIONS.md` 2026-08-23).
+On a private repo Actions minutes are a monthly allowance (the plan's figure is in the project's
+`CLAUDE.md`), and past it, with a $0 spending limit, every workflow fails in seconds with no logs,
+which reads like a broken repo.
 
 ### 7.1 Cost a job in billed minutes per sprint
 
@@ -253,16 +256,15 @@ on:
 - **List every step in the job before choosing where the gate goes.** Gate the job only when no step
   in it must run on a draft; otherwise move that step to a job that already runs, rather than keep a
   job alive for it. The e2e type-check lives in `validate-build` (`run-e2e-typecheck`), so the
-  smoke-walk job and its scope run only where the walk does. `build-and-test` and `validate-build` are gated whole
-  (2026-09-16): on a draft they defer build, tests, lint, schema drift and both CVE audits. The
+  smoke-walk job and its scope run only where the walk does. `build-and-test` and `validate-build` are gated whole:
+  on a draft they defer build, tests, lint, schema drift and both CVE audits. The
   draft that matters is the sprint PR, and its task PRs already ran all of them — **a sprint +
   `main` failure is found at `ready_for_review`, not at merge**.
-- **The walk also skips every PR that does not target the default branch** (2026-09-17, `DECISIONS.md`):
+- **The walk also skips every PR that does not target the default branch**:
   a task PR into `sprint/*` runs build, tests, lint and the e2e type-check, never the walk. The
   condition sits on the `walk-scope` job, and the walk job needs it, so both are skipped — not run to
   say "skipped" — and bill nothing.
-- **A job is billed a whole minute however short it is** (measured 2026-10-16: two scope jobs of 8 s
-  and 5 s, a 29 s type-check job and a 51 s build billed 4 minutes for one task-PR push). Before adding
+- **A job is billed a whole minute however short it is**: four short jobs bill four minutes. Before adding
   a job, ask which running job could host the step; on a draft, skip the scope jobs too, since
   everything they gate skips there.
 
@@ -271,8 +273,7 @@ Enforced by `scripts/ci/generic/check-workflow-cost-guards.sh` (rules 1–5).
 ### 7.2b `paths:` does not filter a pull_request's individual pushes [STRICT]
 
 **`paths:` is evaluated against the cumulative PR diff**, so once a PR holds one matching file every
-later push re-runs the workflow. On #970, **21 of 33 commits were docs-only and each billed 10
-minutes** (`LESSONS_LEARNED.md` Sprint 58).
+later push re-runs the workflow, and every docs-only push bills the full run.
 
 **The fix is `shared-push-scope.yml`**, which compares this push against the **last tested head** —
 the newest run on the branch whose `tested-job` passed — and gates the expensive jobs on its
@@ -313,7 +314,7 @@ validate-build:
 
 | | Why |
 |---|---|
-| `opened` / `reopened` / `ready_for_review` ⇒ the whole PR | no earlier push to compare; until 2026-09-27 this answered "run everything", so every new PR ran every job |
+| `opened` / `reopened` / `ready_for_review` ⇒ the whole PR | no earlier push to compare |
 | no tested run ⇒ the whole PR; Actions API unreadable ⇒ `before` | nothing on the branch was built; without the API it is no worse than before the lookup |
 | a tested head that is not an ancestor, or `\|\| files=""` ⇒ `true` | a force-push leaves the base unresolvable |
 | consumers test `!= 'false'`, never `== 'true'` | an unset output must still run the job |
@@ -325,9 +326,8 @@ validate-build:
 - **Say which skip happened** with a `::notice::`, so a green check never reads as "the app was
   walked" (`ci-angular.yml:222`).
 - **Never cancel a superseded run whose push touched code when the newer push did not.** Scope is
-  per push, so the code push's run is the only one that tests the code. On 2026-09-17 PR #1010's code
-  push (`4264ffff`) was cancelled to free the self-hosted runner, its docs-only follow-up went green
-  with `build-and-test` and `validate-build` both **skipped**, and nothing had been tested. Re-run the
+  per push, so the code push's run is the only one that tests the code: cancel it and a docs-only
+  follow-up goes green with every test job **skipped**, and nothing was tested. Re-run the
   cancelled run (`gh run rerun <id>`) — it keeps its own `before…after`.
 
 ### 7.3 Every `pull_request` runner job cancels superseded runs
@@ -378,8 +378,7 @@ ubuntu-latest                hard fallback, never removed
 - **While `CI_RUNNER=self-hosted` is set, a PR opened with the runner offline queues and its check
   never reports.** It is a global mode switch: set it for an outage, unset it after. For one run, the
   dispatch input is the safer instrument.
-- **Not every job follows it:** `cd-angular-azure-storage.yml:59`, `:114` and `codeql.yml:32` hardcode
-  `ubuntu-latest`.
+- **Not every job follows it:** `codeql.yml:32` hardcodes `ubuntu-latest`.
 
 Callers compute the chain; reusable workflows accept it:
 
@@ -413,18 +412,18 @@ jobs:
 
 ### 8.2 What the runner host provides
 
-**The workflows assume Linux with bash**, measured 2026-09-14 across `.github/`: 5 × `sed -i` (GNU
-semantics), 3 × `set -euo pipefail`, 7 × `[[ ]]`, `jq` in `deploy-swa` and `shared-push-scope`. Only
-the 8 composite-action `run:` blocks pin `shell: bash`; the 11 in workflows rely on the Linux default,
-and would run under `pwsh` on Windows.
+**The workflows assume Linux with bash**: `sed -i` (GNU semantics), `set -euo pipefail`, `[[ ]]`,
+`jq`. Composite-action `run:` blocks pin `shell: bash`; workflow steps rely on the Linux default and
+would run under `pwsh` on Windows. A macOS runner cannot run a container action either.
 
 **Linux is not Debian.** Name the actual need — a package manager, a libc, systemd. `playwright install
 --with-deps` died on this non-apt runner with `apt-get: command not found` (exit 127) before any test
-ran (PR #802).
+ran.
 
 **Needed on the host:** the `az` CLI (`deploy-functions` runs `az functionapp deploy`), `jq`, `gh`
-and `zip` (`publish-release-asset` creates the release and zips the artifact), and Chromium's system
-libraries. Node and the .NET SDK come from `setup-node` / `setup-dotnet`. If a host lacks the libraries,
+and `zip` (`publish-release-asset` creates the release and zips the artifact), Docker (Testcontainers,
+and `deploy-swa`'s container action, which GitHub runs only on a Linux runner — so a macOS machine hosts
+the runner in a Linux VM), and Chromium's system libraries. Node and the .NET SDK come from `setup-node` / `setup-dotnet`. If a host lacks the libraries,
 `playwright install-deps --dry-run` names them — never assert they are missing without a launch
 failure that says so.
 

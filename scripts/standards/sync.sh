@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # scripts/standards/sync.sh — merge the shared standards from one repository into another.
 #
-#   scripts/standards/sync.sh <from-repo> <to-repo>     merge, in either direction
-#   scripts/standards/sync.sh --check <repo>            fail if a shared file names the project
+#   scripts/standards/sync.sh [--allow-delete] <from-repo> <to-repo>   merge, in either direction
+#   scripts/standards/sync.sh --check <repo>        fail if a shared file names the project or a date
 #
 # The shared set is what .agents/standards-manifest.txt lists (one path or glob per line, `#`
 # comments), read from both repositories. Exactly one of the two is the hub: it holds
@@ -12,6 +12,13 @@
 #   changed on one side only     → that side wins, deletions included
 #   changed on both sides        → git merge-file; overlapping hunks get conflict markers
 #   no ancestor (first sync, or a file new on both sides) and different → conflict markers
+#
+# A project opts out of shared files with .agents/standards-exclude (its own, never shared): one glob
+# per line. An excluded path is never read, written or deleted on either side. A file the project
+# lacks is never deleted from the hub unless --allow-delete is given: a missing file is not a decision.
+#
+# A shared file states rules, not history: --check also fails a dated line, a PR number or a sprint
+# tag, which belong in the project's own records.
 #
 # Merging into the hub, every resulting file is first checked against the source's
 # scripts/standards/project-terms.txt (one extended regex per line): a project name never reaches
@@ -31,19 +38,31 @@ MANIFEST=.agents/standards-manifest.txt
 HUB_MARK=.agents/standards-hub
 VERSION=.agents/standards-version
 TERMS=scripts/standards/project-terms.txt
+EXCLUDE=.agents/standards-exclude
+HISTORY='\b20[0-9]{2}-[01][0-9]-[0-3][0-9]\b|(^|[^&[:alnum:]])#[0-9]{3,}\b|\bSprint [0-9]+|\bS[0-9]{2,3} T[0-9]+'
 
-usage() { echo "usage: $0 <from-repo> <to-repo> | --check <repo>" >&2; exit 2; }
+usage() { echo "usage: $0 [--allow-delete] <from-repo> <to-repo> | --check <repo>" >&2; exit 2; }
 root() { git -C "$1" rev-parse --show-toplevel 2>/dev/null || { echo "not a git repository: $1" >&2; exit 2; }; }
+
+# Prints the non-comment lines of file $1, trimmed.
+globs() { [[ -f "$1" ]] || return 0; local l; while IFS= read -r l; do l="${l%%#*}"; l="${l//[[:space:]]/}"; [[ -n "$l" ]] && echo "$l"; done < "$1"; }
 
 # Prints every file the manifest names in repo $1, one path per line, relative to its root.
 expand() {
   local repo="$1" line
-  [[ -f "$repo/$MANIFEST" ]] || return 0
   while IFS= read -r line; do
-    line="${line%%#*}"; line="${line//[[:space:]]/}"
-    [[ -n "$line" ]] || continue
     (cd "$repo" && for f in $line; do if [[ -f "$f" && ! -L "$f" ]]; then echo "$f"; fi; done)
-  done < "$repo/$MANIFEST"
+  done < <(globs "$repo/$MANIFEST")
+}
+
+# Filters stdin, dropping each path that matches a glob in repo $1's exclude file.
+included() {
+  local -a ex; mapfile -t ex < <(globs "$1/$EXCLUDE")
+  local p g
+  while IFS= read -r p; do
+    for g in "${ex[@]}"; do [[ "$p" == $g ]] && continue 2; done
+    echo "$p"
+  done
 }
 
 # Prints the lines of the files under $2 (relative paths on stdin) that match a term in $1.
@@ -58,16 +77,25 @@ term_hits() {
 if [[ "${1:-}" == "--check" ]]; then
   [[ $# -eq 2 ]] || usage
   repo="$(root "$2")"
-  hits="$(expand "$repo" | term_hits "$repo/$TERMS" "$repo")"
+  files="$(expand "$repo" | included "$repo")"
+  hits="$(term_hits "$repo/$TERMS" "$repo" <<< "$files")"
   if [[ -n "$hits" ]]; then
     echo "$hits"
     echo "::error::a shared file names this project — use a placeholder (CLAUDE.md, Placeholders)" >&2
     exit 1
   fi
-  echo "check-shared-standards: $(expand "$repo" | wc -l) shared files, no project term"
+  hist="$(cd "$repo" && while IFS= read -r f; do [[ -n "$f" ]] && grep -nHE "$HISTORY" "$f"; done <<< "$files" || true)"
+  if [[ -n "$hist" ]]; then
+    echo "$hist"
+    echo "::error::a shared file carries history (a date, PR number or sprint tag) — state the rule; the incident belongs in the project's own records" >&2
+    exit 1
+  fi
+  echo "check-shared-standards: $(grep -c . <<< "$files") shared files, no project term, no history"
   exit 0
 fi
 
+ALLOW_DELETE=false
+if [[ "${1:-}" == "--allow-delete" ]]; then ALLOW_DELETE=true; shift; fi
 [[ $# -eq 2 ]] || usage
 SRC="$(root "$1")"; DST="$(root "$2")"
 [[ "$SRC" != "$DST" ]] || usage
@@ -90,8 +118,8 @@ else
 fi
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
-mapfile -t PATHS < <({ expand "$SRC"; expand "$DST"; } | sort -u)
-conflicts=(); changed=()
+mapfile -t PATHS < <({ expand "$SRC"; expand "$DST"; } | sort -u | included "$PROJECT")
+conflicts=(); changed=(); kept=()
 
 # True when both files are missing, or both exist with the same bytes.
 same() { if [[ -f "$1" && -f "$2" ]]; then cmp -s "$1" "$2"; else [[ ! -f "$1" && ! -f "$2" ]]; fi; }
@@ -104,7 +132,9 @@ for p in "${PATHS[@]}"; do
   same "$s" "$b" && continue                                      # only the target changed
   mkdir -p "$(dirname "$out")"
   if same "$t" "$b"; then                                         # only the source changed
-    if [[ -f "$s" ]]; then cp "$s" "$out"; else : > "$out.deleted"; fi
+    if [[ -f "$s" ]]; then cp "$s" "$out"
+    elif [[ "$DST" == "$HUB" && "$ALLOW_DELETE" != true ]]; then kept+=("$p"); continue
+    else : > "$out.deleted"; fi
   else                                                            # both changed, or no ancestor
     [[ -f "$b" ]] || : > "$b"
     theirs="$s"; [[ -f "$s" ]] || { theirs="$WORK/empty"; : > "$theirs"; }
@@ -140,6 +170,10 @@ if [[ "$DST" == "$PROJECT" ]]; then
   echo "marker   $VERSION = $(cat "$PROJECT/$VERSION")"
 else
   echo "merged into the hub: once its PR is merged, sync back from the hub to move the project's marker"
+fi
+
+if (( ${#kept[@]} )); then
+  printf 'kept     %s (absent in the project: exclude it there, or rerun with --allow-delete)\n' "${kept[@]}"
 fi
 
 if (( ${#conflicts[@]} )); then

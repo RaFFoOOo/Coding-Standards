@@ -47,7 +47,7 @@ exceptions map to RFC 7807 `ProblemDetails`; the server test covers the rule.
 ## 6. Performance budget
 - Bundle headroom is **`1 000 kB − initial total`** (Angular counts 1 kB = 1 000 B). Report it.
 - A test count carries its configuration (backend Debug runs `#if DEBUG` tests Release does not).
-- Context budget: `wc -c CLAUDE.md AGENTS.md .agents/rules/agent-workarounds.md`.
+- Context budget: `wc -c CLAUDE.md AGENTS.md .agents/rules/agent-workarounds.md .agents/rules/project-environment.md`.
 - `FILE_LENGTH_NEAR=190 bash scripts/ci/generic/check-file-length.sh` — one line per listed file: split
   (what moves) or keep (why cohesive).
 
@@ -56,13 +56,13 @@ Runs at the sprint gate, after a fix a Mock walk cannot see, and when a shared c
 changed. **Local Http + `devauth` is the default**: real backend, real dev database, real
 authorization, no sign-in. The all-Mock `preview` walk (`npm run smoke:walk`) is not UAT.
 **In a remote sandbox** it runs too, with the backend in `DATA_ACCESS_MODE=Mock`:
-`agent-workarounds.md` *The Http + `devauth` walk in the sandbox*. Never report it as impossible.
+`project-environment.md` *The local Http walk*. Never report it as impossible.
 
 1. **Environment and identity.** Backend in Debug with, in `local.settings.json` (never commit a
    value): `"DEV_FAKE_AUTH_USERS": "owner=<oid>,customer=<oid>"`, `"BOOTSTRAP_OWNER_ENTRA_ID": "<owner oid>"`;
    `cd {webapp} && ng serve --configuration devauth`. Sign out, then pick the dev role. Prove it:
    ```bash
-   curl -s "$API/v1/me?tenantId=$TID" -H 'X-Dev-User: owner'   # must report "role":"owner"
+   curl -s "$API/v1/tenants/$TID/me" -H 'X-Dev-User: owner'   # must report "role":"owner"
    ```
    and one **browser** request logged `DEV FAKE AUTH accepted` (curl skips CORS and interceptors).
    A deployed environment needs the Tech Lead's interactive sign-in; say so in the report.

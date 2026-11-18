@@ -26,15 +26,14 @@ at the end, so a migration deletes that section and nothing else.
 - **Authorization is role-based application logic, never token claims.** Roles come from
   `TenantUserRole` and are enforced per tenant by `ITenantScopeAuthorization` / `RequireOwnerAsync`.
   Combine role-based and policy-based checks. The token only authenticates the caller; its claims,
-  `scp` included, grant nothing. 🔒 `archive/DECISIONS_ARCHIVE.md` 2026-05-22.
+  `scp` included, grant nothing.
 - **Server-side validation is the security boundary** (`AGENTS.md §3` *Dual-Side Validation*). Validate
   the body, the query string and route values before any business logic, and reject with
   `ProblemDetails` / `4xx`. Never assume a request came through the frontend. Parameterized queries
   (A03) make a filter injection-safe; they do not replace validating its shape.
   - **Idiom:** an inline static validator returning the first error or `null`
     (`Http/TenantConfigUpdateValidator.cs:16`); a single scalar gets a route constraint (`{id:guid}`)
-    or an inline guard. **FluentValidation is not used here** — 🔒 `DECISIONS.md` 2026-07-20 and
-    2026-06-24.
+    or an inline guard. No validation library unless the project's `DECISIONS.md` records one.
 - **CORS and rate limiting are least-privilege** on every public-facing API.
 
 ### §8.2 OWASP-aligned mandates
@@ -107,7 +106,7 @@ and `UseHsts()` do not apply. Delete this section when the API moves to an ASP.N
 
 | Rule | Where the worker does it |
 |---|---|
-| §8.1 closed by default | `[FunctionAuthorize]` opts a function in — **23 of 34** `[Function]` methods, counted 2026-09-14; the rest are anonymous by design. Why a custom attribute: 🔒 `archive/DECISIONS_ARCHIVE.md` 2026-04 |
+| §8.1 closed by default | `[FunctionAuthorize]` opts a function in; the rest are anonymous by design |
 | §8.1 CORS, rate limiting | `Middleware/CorsMiddleware.cs`, `Middleware/RateLimitingMiddleware.cs` |
 | A02 app settings | `az functionapp config appsettings set` |
 | A05 headers | `host.json` `extensions.http.customHeaders` — the host adds them to every response, its own 404s included; JSON-API CSP `default-src 'none'`, CORP `same-origin` |
@@ -117,8 +116,7 @@ and `UseHsts()` do not apply. Delete this section when the API moves to an ASP.N
 - **A07 — the manual validation is compliant; do not "fix" it into `[Authorize]`.** `Program.cs:48`
   registers `AddMicrosoftIdentityWebApi` for discovery, key rotation and issuer/audience;
   `FunctionAuthorizationMiddleware.cs:94` calls `JsonWebTokenHandler.ValidateTokenAsync` with
-  parameters taken from those resolved options, never hand-built. Reviewed in the Sprint 33 OWASP
-  audit (`archive/PLAN_sprint_033.md:140`).
+  parameters taken from those resolved options, never hand-built.
 - **A07 — keep the DI stub, or the host crashes at startup with no useful error.**
   `AddMicrosoftIdentityWebApi` v3+ registers `AuthorizationPolicyCache`, which needs an
   `EndpointDataSource` the worker does not have:

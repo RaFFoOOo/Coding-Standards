@@ -20,7 +20,8 @@ Three procedures. `gh` commands assume a local session; in Claude Code use the G
 The first script starts the runner, dispatches with `runner=self-hosted`, waits, and always stops
 the runner it started. `self-hosted` as the global mode strands any PR opened while the runner is
 offline — say so when asked to flip it. Check no run is queued or in progress before stopping a
-runner; never run the local walk stack while a self-hosted job is active (7.7 GB machine).
+runner; never run the local walk stack while a self-hosted job is active. Where the runner lives in a
+VM, run the script through it as `project-environment.md` says, keeping the host awake.
 
 **Remote session** (Claude Code on the web): none of this is possible — the runner, `az`, `func`,
 `swa` and `gh` are absent and Azure is egress-denied. A remote session can dispatch a workflow with
@@ -31,8 +32,8 @@ from the *Post Preview URL as PR Comment* step, never the bare hostname (a diffe
 The slot is shared — redeploy from the branch under test right before walking it, and assert one
 string only that build has.
 
-**Production:** `promote-prod.yml`, dispatched from `main` by the Tech Lead with a release tag;
-`dry-run` is the default and the only kind an agent runs. Never deploy production from a script. `cd-angular-azure-storage.yml` is legacy, manual only.
+**Production:** `promote-prod.yml`, dispatched from `main` by the Tech Lead, one run for both halves;
+`dry-run` is the default and the only kind an agent runs. Never deploy production from a script.
 
 ## B. A red workflow run
 

@@ -45,8 +45,9 @@ The Angular form of `AGENTS.md §2` *Strict typing*.
 - **Animate with CSS transitions, not JavaScript**, and avoid layout thrashing.
 - **A value that is constant for the tenant is read where it is used — by a pipe or a service — never
   passed down as an input.** `MoneyPipe` reads `TenantConfig.currencySymbol` itself. As an input, the
-  symbol ran through 27 files, and removing it touched every one (S59 T11). The multi-language
-  editors read the tenant's languages through `injectTenantLanguages()` for the same reason (S60 T4).
+  symbol runs through every component between the source and the view, and removing it touches each
+  one. The multi-language editors read the tenant's languages through `injectTenantLanguages()` for the
+  same reason.
 
 ### A component is created only if it is rendered [STRICT]
 
@@ -63,8 +64,7 @@ subscriptions and HTTP requests.
 @if (isDesktop()) { <app-footer /> } @else { <app-mobile-nav /> }
 ```
 
-Measured on Home at 375 px (2026-09-01): the CSS-hidden footer still built **14 DOM nodes** and fired
-its own `contact.json` request — **3 identical fetches** on one page. `@if` made it 1 request and 0 nodes.
+A CSS-hidden component still builds its DOM and fires its own requests; `@if` builds nothing.
 
 - **The breakpoint comes from `ViewportService`** (`{webapp}/projects/platform/src/services/ui/viewport.service.ts`), which is
   `matchMedia`-backed — never a `resize` listener, never `window.innerWidth` in a component.
@@ -83,7 +83,7 @@ its own `contact.json` request — **3 identical fetches** on one page. `@if` ma
   *Depend on abstractions*.
 - **A Mock class bound through a token does not declare `@Injectable({ providedIn: 'root' })`**, so
   injecting the class directly fails at resolution instead of silently creating a second instance.
-  All 18 comply (`git grep -nE "^@Injectable" -- '{webapp}/src/app/**/mock-*.ts'`, 2026-10-16);
+  Check with `git grep -nE "^@Injectable" -- '{webapp}/src/app/**/mock-*.ts'`;
   grep the decorator, not the text — each file's "Does NOT declare" comment matches a bare search.
 - **Injected services are `private`, and templates never reach them.** Expose a named `readonly`
   property instead:
@@ -97,14 +97,12 @@ its own `contact.json` request — **3 identical fetches** on one page. `@if` ma
   `computed(() => { version(); return this.form.invalid; })`.
   - **[STRICT] `dirty`/`pristine` and `touched`/`untouched` emit nothing.** `markAsPristine()`,
     `markAsDirty()`, `markAsUntouched()` and `reset()` change the flag silently, so bump the version in
-    the same method that calls them — as `CatalogDirtyTrackingController.markSaved()` does
-    (`archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 37).
+    the same method that calls them — as `CatalogDirtyTrackingController.markSaved()` does.
   - **[STRICT] So does every `{ emitEvent: false }` write** — `patchValue`, `setValue`, `enable`,
     `disable`, `updateValueAndValidity`. Each one that can move validity bumps the version where it
     happens, including inside an `effect()` fed by data that arrives after construction. The all-Mock
     build resolves most such data synchronously, before the `computed` first reads, so **no Mock test
-    or walk sees the stale value**: S62 T14 locked *Conferma Prenotazione* on a valid form for every
-    customer on the real backend (`LESSONS_LEARNED.md` Sprint 62).
+    or walk sees the stale value** — only the real backend shows a valid form locked.
 - **Control flow is `@if` / `@for` / `@switch`**, never `*ngIf` / `*ngFor`.
 - **Separate `.html` and `.scss` files**, unless the template is static text under 3 lines.
   **`standalone: true`** on every component.
@@ -132,7 +130,7 @@ its own `contact.json` request — **3 identical fetches** on one page. `@if` ma
 - **[STRICT] Two halves of one user action share a lifetime.** When state accompanies something already
   persisted, ask what happens if only the other half survives a reload. `CartService` persisted the
   items while `EditOrderModeService` kept *"this is an edit"* in memory, so after a reload confirming
-  created a second order (Sprint 46 T18). Test it with a **second `TestBed` seeded from what the first
+  created a second order. Test it with a **second `TestBed` seeded from what the first
   stored** — a mocked `setItem`/`getItem` pair with no store between them cannot fail this way.
 - **[STRICT] Interface parameters identify a resource by its stable id** (`AGENTS.md §2`):
   `getAll(tenantId: string)`, never `getAll(tenantName: string)`. A mock that needs a name for a file
@@ -188,8 +186,8 @@ its own `contact.json` request — **3 identical fetches** on one page. `@if` ma
   `setTimeout` on that path, and worst of all on a persisted identity (a route slug, a storage key). A
   display-only timer is fine — `{webapp}/projects/platform/src/services/ui/toast.service.ts:67` auto-dismisses a toast.
   - **The tell:** a spec needs `vi.useFakeTimers()` to describe production behaviour.
-  - **The number:** the booking-draft write the deleted debounce batched cost **0.10 ms, 0.64 % of a
-    16 ms frame** (#911, #912). Why it is a rule: `archive/LESSONS_LEARNED_ARCHIVE.md` Sprint 54, finding 3.
+  - **The number:** a synchronous write of a draft costs a fraction of a millisecond; measure it before
+    claiming a debounce saves anything.
 - **[STRICT] A dependent filter follows its parent.** Its options are a `computed()` of the parent's
   value, and its selection resets to "All" the moment it becomes invalid — never a stale child selection.
   Reference: `setType()` in `features/group-tab-page/group-surface-facet.controller.ts:161` clears

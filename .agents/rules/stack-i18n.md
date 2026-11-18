@@ -18,13 +18,11 @@ citations land here. Paths are relative to `{webapp}/src/`.
 - **No user-facing text in a template or a component.** Every string is a key in a translation bundle.
 - **Read a label from every bundle's value, never from its key name** — `AGENTS.md §0` *No Fabrication*.
 - **Owner-facing copy says what is wrong, who it affects and what to do — never a metric, threshold or
-  spec term.** *"Il minimo è 4,5:1"* shipped onto a tab whose jargon had been removed twice before
-  (S35, S36 T5); the sentence a shopkeeper would say is *"«Colore dei Titoli» non si distingue
-  abbastanza dal suo sfondo: i tuoi clienti faranno fatica a leggerlo."* Keep the number for tooltips
+  spec term.** Not *"the minimum is 4.5:1"* but *"«Title colour» does not stand out enough from its
+  background: your customers will struggle to read it."* Keep the number for tooltips
   and logs, and avoid a direction that can be wrong ("too light" on a dark failure).
-- **Trace every behavioural claim in a hint to the code before the string ships.** Sprint 44 shipped
-  three hints that were false about the product — *"customers cannot send you orders"* when the flag
-  only picks a channel (`archive/LESSONS_LEARNED_ARCHIVE.md`, Sprint 44 §1).
+- **Trace every behavioural claim in a hint to the code before the string ships** — a hint that says
+  *"customers cannot send you orders"* when the flag only picks a channel is false about the product.
 
 ## 9. ngx-translate Runtime Usage [STRICT]
 

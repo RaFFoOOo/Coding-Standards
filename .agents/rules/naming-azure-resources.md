@@ -21,7 +21,7 @@ paths:
 
 **Dev is the exception.** Every existing dev resource is `eudw…` — `env` placed before the
 region-suffix, a recorded mistake. **Never rename one.** A **new** dev resource uses the corrected
-order, `euwd…` (`DECISIONS.md` 2026-09-14), so dev mixes both prefixes until it is re-provisioned. The
+order, `euwd…`, so dev mixes both prefixes until it is re-provisioned. The
 dev resource group, `{dev-rg}` (`scripts/azure-setup/env.sh:55`), predates the scheme.
 
 ```
@@ -40,6 +40,7 @@ dev resource group, `{dev-rg}` (`scripts/azure-setup/env.sh:55`), predates the s
 | `umi` | User-Assigned Managed Identity |
 | `swa` | Static Web App |
 | `aai` | Application Insights |
+| `law` | Log Analytics workspace |
 | `sql` | Azure SQL Server |
 | `sqldb` | Azure SQL Database |
 | `spn` | App Registration / Service Principal — CD identities only |
@@ -68,7 +69,7 @@ or PR that proposes the resource.
   to **`scripts/azure-setup/env.sh`**, which the scripts read.
 - **[STRICT] A runtime identity and a CD identity are always separate — one CD SPN per environment.**
   The UAMI holds only access roles: Storage Blob Delegator and Blob/Queue/Table/File data roles on its
-  environment's storage, and `db_datareader` + `db_datawriter` on SQL (`assign-roles.sh:81`–`:117`). The SPN holds
+  environment's storage, and `db_datareader` + `db_datawriter` on SQL (`uami-roles.sh`, SQL in `assign-roles.sh`). The SPN holds
   `Reader` on the subscription and `Website Contributor` on its own environment's Function App
   (`provision-cd-identity.sh:131`–`:132`). Never grant a deployment role to a UAMI, and never share an
   SPN across environments. Full taxonomy: `stack-github-actions.md §2`.

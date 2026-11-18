@@ -28,6 +28,7 @@ When `main` has moved, merge it into the sprint branch and the sprint branch int
 branch now — merge, never rebase, on a published branch.
 
 ## 3. Implement
+- **An operation behind a sign-in changes its AI agent tool in the same PR, or says why not** (where the project has agent tools: `project-agent-tools.md`).
 - Follow the plan's design. **Fix, don't defer:** a gap you find on the surface or in the files the task
   touches is fixed in this task, not logged. Only an unrelated idea goes to `backlog/`.
 - **Tests only where they earn their upkeep:** server-side rules, date/time/money, database

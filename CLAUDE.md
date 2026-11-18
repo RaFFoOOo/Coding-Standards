@@ -15,6 +15,11 @@ the two project sections below.
 - `.claude/rules` and `.claude/skills` are folder links to them, the only places Claude Code looks.
   Edit the `.agents/` path.
 - **Shared standards:** `.agents/standards-manifest.txt` lists what `sync-templates` merges.
+- **A project's own rules** are `.agents/rules/project-*.md`, never shared; its environment (runner,
+  hosts, local walk) goes in `project-environment.md`, which loads in every session. A shared file
+  states the rule and its check; dates, PR numbers and incidents stay in the project's records.
+- **A project skips a shared file** for a stack it does not run by listing it in its own
+  `.agents/standards-exclude` (one glob per line).
 
 ### Skills Available
 | Command | Purpose |
