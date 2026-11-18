@@ -1,10 +1,10 @@
 ---
 paths:
   - "**/alembic/**"
-  - "**/migrations/**"
-  - "**/models/**"
-  - "**/repositories/**"
-  - "**/*.sql"
+  - "**/alembic.ini"
+  - "**/models.py"
+  - "**/models/**/*.py"
+  - "**/repositories/**/*.py"
 ---
 
 # PostgreSQL — schema, migrations and queries
