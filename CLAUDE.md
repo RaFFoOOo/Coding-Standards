@@ -53,13 +53,13 @@ in the hub the values stay empty.
 ### Stack Rules Reference
 Each rule is path-scoped, so only the ones matching the files you touch load.
 
-| Angular / TypeScript | ASP.NET Core / C# | Any stack |
-|---|---|---|
-| `stack-angular.md` — architecture, state, DI, structure | `stack-dotnet-core.md` — syntax, architecture, testing, async, nullability | `stack-github-actions.md` |
-| `stack-shared-ui.md` — shared primitives, controls, form grid | `stack-dotnet-api.md` — endpoints, validation, security | |
-| `stack-navigation.md` — routing and placement | `stack-dotnet-data.md` — persistence, resilience, DB auth | |
-| `stack-i18n.md` — assets and translation | | |
-| `stack-angular-testing.md` — frontend test strategy | | |
-| `stack-css.md` — styling, tokens, budgets | | |
+| Angular / TypeScript | ASP.NET Core / C# | Python / PostgreSQL | Any stack |
+|---|---|---|---|
+| `stack-angular.md` — architecture, state, DI, structure | `stack-dotnet-core.md` — syntax, architecture, testing, async, nullability | `stack-python.md` — toolchain, structure, errors, tests | `stack-github-actions.md` |
+| `stack-shared-ui.md` — shared primitives, controls, form grid | `stack-dotnet-api.md` — endpoints, validation, security | `stack-postgres.md` — migrations, types, queries | `stack-portability.md` — a host chosen by someone else |
+| `stack-navigation.md` — routing and placement | `stack-dotnet-data.md` — persistence, resilience, DB auth | | |
+| `stack-i18n.md` — assets and translation | | | |
+| `stack-angular-testing.md` — frontend test strategy | | | |
+| `stack-css.md` — styling, tokens, budgets | | | |
 
 All live in `.agents/rules/`.
