@@ -33,7 +33,7 @@ shipped under another task's id is marked in both rows.
 Run `verify` at sprint scope, then the full battery:
 ```bash
 cd {webapp} && npm test && npm run lint && npx ngc -p tsconfig.app.json --noEmit && npm run build   # headroom = 1 000 kB − initial total
-npm audit --audit-level=high
+npm audit --audit-level=moderate                                    # the level CI gates on
 cd ../{services} && dotnet build && dotnet test -c Release                                          # count carries its configuration
 dotnet list package --vulnerable --include-transitive
 ls -1 scripts/ci/*/*.sh | wc -l                                          # derived, never written

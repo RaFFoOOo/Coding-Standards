@@ -16,19 +16,18 @@ headings keep the numbers, so those citations land here. Paths are relative to `
 
 Every new surface reuses the app's existing primitives. **Run the inventory and record its output** at
 the Mockup Gate (`plan/SKILL.md` step 3), and again before building a surface whose mockup
-predates this rule. Every row was a defect shipped to a preview in Sprint 45 and caught by the Tech
-Lead, not by a gate.
+predates this rule. Every row is a defect that reached a preview past every gate.
 
 | Element on your surface | Run | Use what it shows |
 |---|---|---|
-| A page-level commit (Save / Continue / Confirm) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`, not a button in the page body. A bare `type="submit"` is only for a sub-action — save one card, add a row. |
+| A page's main action — a commit (Save / Continue / Confirm), a decision (Approve / Reject), a jump taken on nearly every visit (a dated list's *Today / Next*) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`, not a button in the page body: secondary left, primary right, buttons on the content column. A bare `type="submit"` is only for a sub-action — save one card, add a row. Other navigation stays in the page. |
 | A page title and subtitle | `grep -rn "page-header" src/app --include=*.html` | `<header class="page-header">` > `.section-title` + `.intro-text`. Never a hand-rolled heading: the global `h1` is hero-sized (`stack-css.md` *Hero tokens*). |
 | Any button | `grep -n "&--" src/styles/_buttons.scss` | BEM variants — `.btn.btn--primary`, `.btn--confirm`, `.btn--cancel`, `.btn--danger`. `.btn-primary` (one dash) matches nothing and renders a grey box. |
 | A form row's column widths | `grep -rho "form-col-[a-z0-9-]*" src/app --include=*.html \| sort \| uniq -c` | Rows are filled `6+6` pairs or `12 → md-4/md-6`. No row leaves an unfilled half on mobile — a lone `col-6` reads as an accident, whatever §14 permits. |
 | A hint under a control | `grep -rn "form-hint" src/styles/_forms.scss` | `.form-hint` as a child of the field it describes, with `aria-describedby` on the `<input>`, not the wrapper. |
 | An empty state, badge, dropdown or overlay | §4 and §11 below | The existing primitive. |
-| Photos an owner adds, removes, reorders or replaces | `grep -rn "app-media-strip" src/app --include=*.html` | `<app-media-strip>`, never a new list of thumbnails with its own upload button (§4 *Photos edited in place*). |
-| An alignment, spacing or rhythm rule added to an existing stylesheet | `grep -n "on purpose\|deliberately\|INTERNALLY\|not on desktop\|stays" <that file>.scss` | The decision already recorded there — contradicting it is a regression that passes every gate (`DECISIONS.md` 2026-09-07). The weakest row, since it resolves to prose a reader must weigh; it stays because the check is one grep. |
+| Photos an owner adds, removes, reorders or replaces | `grep -rn "app-media-strip" src/app --include=*.html` | `<app-media-strip>`, never a new list of thumbnails with its own upload button (§4 *Photos edited in place are one list of rows*). Photos that are a record to look at rather than page content are `<app-photo-carousel>`: a tap opens one full screen (`<app-lightbox>`), ✎ edits them in the same strip. A cap on how many is the strip's `max`. |
+| An alignment, spacing or rhythm rule added to an existing stylesheet | `grep -n "on purpose\|deliberately\|INTERNALLY\|not on desktop\|stays" <that file>.scss` | The decision already recorded there — contradicting it is a regression that passes every gate. The weakest row, since it resolves to prose a reader must weigh; it stays because the check is one grep. |
 
 **Two silent traps:**
 
@@ -43,10 +42,10 @@ at `bottom: var(--mobile-nav-height)` (`{webapp}/projects/ui/src/lib/action-bar/
 relies on `margin-top: auto` in a flex column — neither holds on a route that hides the bottom nav and
 the footer. Measure it where you put it.
 
-**`<app-action-bar>` shows only while one of its actions can run** (`hasExecutableAction`,
-`DECISIONS.md` 2026-10-09). Gate every button on what is staged; a navigate-only Cancel is disabled at
-rest, and the page's breadcrumb is its exit. Never reserve room for the bar in a page: it publishes its
-height to `<main>` itself.
+**`<app-action-bar>` shows only while one of its actions can run** (`hasExecutableAction`). Gate every button on what is staged; a navigate-only Cancel is disabled at
+rest, and the page's breadcrumb is its exit. **A bar of jumps sets `alwaysShown`** (*Today / Next*):
+its greyed button says "you are here" and its note says why the other goes nowhere, so it never vanishes.
+Never reserve room for the bar in a page: it publishes its height to `<main>` itself.
 
 ## 4. Shared components
 
@@ -68,10 +67,23 @@ height to `<main>` itself.
 
 - **Every action on a card sits in its one `.card-action-bar` row** — state (a toggle) then actions,
   destructive last (`src/styles/_card-action-bar.scss`). No second button block below the card's
-  content: *Modifica* on an order is the row's ✎.
+  content: *Modifica* on an order card in a list is the row's ✎. An action that reaches the whole page
+  — editing every detail of the order a detail page shows — is that page's call to action, below the
+  last card, not an icon on one of them.
+- **An edited item offers ↺ immediately left of 🗑** (`OWNER_REVERT`, the owner-actions models). It
+  appears only while the item differs from what is saved (`sameEdit`, `shared/utils/inline-edit.utils.ts`)
+  and puts that item alone back where it stands. A field with no card row (a page intro, the slogan)
+  takes the same ↺ at the right of its own row, under the field. The language flags open that row at
+  the left, even under a centred intro.
 - **No resting background on the row or its controls** — a hairline above the row separates it; the
   hover wash is the only fill. A glyph with no circle is the whole affordance, so it takes a text
   token (`--primary-text`, AA), never `--primary` (under 3:1).
+
+### A row of action buttons has one layout [STRICT]
+
+One button alone is centred; two stand at the row's two edges, secondary left and primary right — the action bar,
+a dialog, a card's footer, a page's pair of calls to action alike. On a phone, two that do
+not fit side by side each fill a line, never a short button stranded at the left.
 
 ### Mutually exclusive elements share one slot
 
@@ -80,30 +92,37 @@ it excludes, it never adds a row beside a disabled or hidden one. Fewer elements
 between states, and the answer sits where the user looks to act.
 
 - **The canonical case:** a refused catalog card shows ⛔ *Al completo* where *Aggiungi* was — not a
-  reason chip under the details plus a disabled button (`catalog-card.component.html`, `DECISIONS.md`
-  2026-10-03).
+  reason chip under the details plus a disabled button (`catalog-card.component.html`).
 - **A disabled control is the tell.** Before shipping one, ask whether its reason could stand in its
   place instead. Keep it disabled only when the user needs to see the action exists and what unlocks it
   (*Salva* on a form with an error).
 - **Check at the Mockup Gate:** for each state in the matrix, name the element it replaces; a state that
   only adds is a finding.
 
-### Photos edited in place are one strip [STRICT]
+### Photos edited in place are one list of rows [STRICT]
 
-- **A collection of photos, or other compact media of one shape, edited in place is
-  `<app-media-strip>`** (`{webapp}/projects/ui/src/lib/media-strip/`). It is one row of equal tiles that scrolls
-  sideways, with the next tile always partly visible. Each tile has its controls under it; tapping the
-  photo replaces it. The add tile comes last and picks a file.
-- **The strip reports and the host decides.** It emits `reordered`, `removed`, `replaced`, `added` and
-  `coverRequested`, and owns no list. Home confirms a removal, the item editor does not; each host's
+- **A collection of photos edited in place is `<app-media-strip>`**
+  (`{webapp}/projects/ui/src/lib/media-strip/`): one short row per photo — a 64 px thumbnail that a tap
+  replaces, its number, its controls, the drag handle at the right edge — and an add bar last that picks
+  a file. It never scrolls sideways, so adding is always one tap at the bottom.
+- **The list reports and the host decides.** It emits `reordered`, `removed`, `replaced`, `added` and
+  `coverRequested`, and owns no photos. Home confirms a removal, the item editor does not; each host's
   draft rules stay in its own controller.
-- **A list of text items stays vertical.** The strip is for things recognised by their picture.
+- **One photo on its own** (an About photo block) is `<app-media-upload frame="natural">`: the photo
+  itself is the control.
+
+### An editor never loses what was typed, and an upload is named by an id [STRICT]
+
+- **A page editor (one JSON document) extends `CmsInlineEditController`**: it gets the browser-kept draft, the
+  restore offer and the merge of a refused save. Never re-implement them per page.
+- **An upload is named by a new id** — `MediaUploadComponent` does it unless its host fixes a name (the logo) —
+  **into a folder named by the owning record's id**, never by a position, a title or a typed identifier.
 
 ### A shared control takes a value in, not only out
 
 **Ask of any shared control: could a host restore it to a previous state?** A control that only emits
 (`dateChange` out, nothing in) works until the first consumer needs to reopen saved data — then the
-value is correct in the model and invisible on screen (Sprint 46 T17, `app-date-picker`).
+value is correct in the model and invisible on screen.
 
 ### Share the renderer when the fields match; share the component only when the lifecycle does
 
@@ -111,7 +130,7 @@ Two surfaces that render the same fields are not therefore one component. **Same
 renderer. Same lifecycle and same audience ⇒ share the component.** The order confirmation (a cart
 draft, anonymous-capable) and the order detail (a persisted order, behind guards) share the line
 renderer, `<app-order-lines>` (`features/reservation/booking.component.html:25`,
-`features/account/order-detail/order-detail.component.html:102`), and stay two components (Sprint 46 T19).
+`features/account/order-detail/order-detail.component.html:102`), and stay two components.
 
 - **A shared renderer takes capabilities, never a variant:** `canEditQuantity`, `canRemove`
   (`shared/components/order-lines/order-lines.component.ts:44`, `:46`) — not `variant: 'cart' | 'detail'`.
@@ -123,7 +142,7 @@ renderer, `<app-order-lines>` (`features/reservation/booking.component.html:25`,
   by a config object. No bespoke filter row.
 - **Data controls and presentation stay separate:** filter facets and sort are config facets and
   search is optional; the **view toggle is not in the filter bar** — it sits in `<app-results-bar>`
-  under it, right of the count (`/history`; the catalog and friends have one layout and no toggle, `DECISIONS.md` 2026-10-15). Never fold the view into the facets or
+  under it, right of the count (`/history`; the catalog and friends have one layout and no toggle). Never fold the view into the facets or
   branch on `key === 'view'` (`AGENTS.md §2` *Data-Driven State*).
 - **A segmented toggle shows its icon and its word at every width** (`<app-view-toggle>`):
   *Lista | Calendario*, *Approva | Rifiuta*. No icon-only or
@@ -170,7 +189,7 @@ different classes**. One class for both pins the panel open whenever the route m
 - Reference: the header's "More" item (`layout/header/header.html:33`), fed by
   `CatalogMenuStateService.isGroupActive` (`core/services/catalog/catalog-menu-state.service.ts:130`).
 - **Verify with `getComputedStyle` on the panel in a live browser.** Unit tests with a mocked DOM passed
-  both times this shipped — the second time (PR #521) on the same dropdown.
+  each time this shipped.
 - **Grep on touch:** before writing a `[class.open]` on a collapsed trigger, grep this file for
   "active-descendant".
 

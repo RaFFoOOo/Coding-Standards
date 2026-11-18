@@ -47,7 +47,7 @@ requires it). Sections, in this order:
 5. **Change-cost pass** — `| # | Essential | Incidental | Gate |` for every task M or larger or
    touching more than 3 files (step 6).
 6. **Not in this sprint, and why** — each rejected candidate with its reason (⏳, ⚖, a decision).
-   A gap on a surface a task already touches is never here: it joins that task (the Tech Lead, 2026-09-29).
+   A gap on a surface a task already touches is never here: it joins that task.
 7. **Gates** — what proves each task, and the sprint gate.
 
 Promoted backlog entries are marked `→ promoted to PLAN_sprint_<N> T<n>` in the same commit.

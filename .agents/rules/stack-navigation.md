@@ -25,8 +25,7 @@ Paths are relative to `{webapp}/src/app/`. §13 answers *is it reachable?*; §13
     account menu does not count: an anonymous visitor sees it empty, or is sent to log in.
   - A page for **one role that already has a hub** may sit one hop from it — `admin/users` and
     `admin/booking-availability` behind `/admin` (`admin.routes.ts:50`, `:39`). That never licenses
-    burying a public page the same way (`/friends` once shipped with only an inline link and a
-    dashboard card — Sprint 30 T6).
+    burying a public page the same way (reached only by an inline link and a dashboard card).
 - **A detail page that no nav entry reaches renders `<app-breadcrumb>` as its first element**, before
   the page header: one crumb per level back to the list (`routerLink`, translated label), ending with
   the current page, unlinked — `BreadcrumbComponent` refuses to link the last crumb. Build the trail as
@@ -38,8 +37,7 @@ Paths are relative to `{webapp}/src/app/`. §13 answers *is it reachable?*; §13
 
 Placement was reversed in **four consecutive sprints (31, 37, 42, 43)** — an admin gear added then
 removed, edit mode made an action then a toggle again. Every rule below is checkable, so it cannot be
-re-argued; where the type table and an invariant disagree, **the invariant wins**. Decisions:
-`DECISIONS.md` 2026-08-02.
+re-argued; where the type table and an invariant disagree, **the invariant wins**.
 
 ### The invariants
 
@@ -84,7 +82,7 @@ to need headings, the row is under capacity — fix that, not the drawer.
 | **Act** | What the business exists to do (catalog → book or order) | Nav row, after any promoted *Learn* item — a guaranteed slot, not guaranteed slot 2 |
 | **Mine** | This user's own state (History) | Nav row, after *Act* — once the state can exist (invariant 3) |
 | **Manage** | Role-exclusive administration (Admin) | Corner cluster — invariant 2 forbids the row |
-| **Shortcut** | A faster path to a destination the row already reaches (cart → checkout) | Corner cluster, only while it beats the row: the cart shows only when non-empty (`layout/header/header-chrome.controller.ts:65`) |
+| **Shortcut** | A faster path to a destination the row already reaches | Corner cluster, only while it beats the row. None today: checkout is the catalog page's action bar, and the row's catalog item carries the selected count |
 | **Learn** | Brochure and trust content (About, Reviews, Friends) | Leads the row when authored into `primary` (invariant 7); otherwise the drawer |
 | **Mode** | Changes how the current page behaves (edit mode) | Corner cluster, only on surfaces where it applies — not a destination |
 | **Session / Preference** | Login, account, logout, language | Corner cluster, fixed |

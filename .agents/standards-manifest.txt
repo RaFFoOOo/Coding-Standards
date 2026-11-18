@@ -1,7 +1,17 @@
 # The standards shared between repositories through the hub. scripts/standards/sync.sh merges
 # exactly these files; anything else is the repository's own. One path or glob per line.
+# A repository's own rules are named .agents/rules/project-*.md and never listed here; a project
+# opts out of a shared file through its own .agents/standards-exclude.
 AGENTS.md
 .agents/standards-manifest.txt
-.agents/rules/*.md
-.agents/skills/*/SKILL.md
+.agents/rules/agent-workarounds.md
+.agents/rules/naming-*.md
+.agents/rules/stack-*.md
+.agents/skills/build/SKILL.md
+.agents/skills/close/SKILL.md
+.agents/skills/ops/SKILL.md
+.agents/skills/plan/SKILL.md
+.agents/skills/review/SKILL.md
+.agents/skills/sync-templates/SKILL.md
+.agents/skills/verify/SKILL.md
 scripts/standards/sync.sh

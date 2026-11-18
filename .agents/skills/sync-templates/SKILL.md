@@ -12,7 +12,11 @@ is what the script cannot decide.
 - **The hub** is the repository holding `.agents/standards-hub`. Every other repository is a
   project. A sync always runs between the hub and one project.
 - **What is shared** is what `.agents/standards-manifest.txt` lists. Anything else is the
-  repository's own, and the sync never reads or writes it.
+  repository's own, and the sync never reads or writes it: a project's own rules are named
+  `.agents/rules/project-*.md` (its environment in `project-environment.md`).
+- **A project opts out** of a shared file it has no use for (a stack it does not run) in its own
+  `.agents/standards-exclude`, one glob per line. The sync never touches an excluded path on either
+  side, and never deletes a hub file just because a project lacks it (`--allow-delete` does, on purpose).
 - **The common ancestor** of each file is its copy at the hub commit named in the project's
   `.agents/standards-version`. A file changed on one side is taken from that side. A file changed on
   both sides is merged, and overlapping edits are left as conflict markers. A project without the
@@ -66,6 +70,8 @@ For every `conflict <path>`, open the file and read both sides:
 - **The same rule worded twice:** keep the shorter wording that still names its check.
 - **A project fact on one side** (a path, a host, a number): it belongs in the project's own
   instructions, not here. Replace it with a placeholder or a concept.
+- **History on one side** (a date, a PR number, a sprint tag, an incident's measurement): state the
+  rule and its check; the incident stays in the project's records. `sync.sh --check` fails it.
 
 Then `grep -rn '^<<<<<<<\|^>>>>>>>' AGENTS.md .agents` must print nothing.
 
