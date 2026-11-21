@@ -16,6 +16,17 @@ Format:
 
 ---
 
+## 2026-11-21 — The hub syncs into the projects by hand, one command, never by itself
+
+**Decision:** the Tech Lead. `scripts/standards/sync-projects.sh`, run in the hub after a merge, opens one PR per
+project that changed; nothing runs it on its own.
+
+- **Why not a workflow:** it would need a token that opens PRs in every private project, stored in this public
+  repository, and the project list would leave its git-ignored file (`scripts/standards/projects.local`) for this
+  repository's configuration. One command after a merge costs less than either.
+- **Why the projects keep their copies:** a session, an agent or CI that sees one repository needs the rules there,
+  and a pinned hub commit lets each project adopt a change in a reviewed PR rather than mid-sprint.
+
 ## 2026-10-18 — One layout, one script: the shared set is merged three ways, and le-cementine is its master copy
 
 **Context:** The hub had not changed since 2026-09-20 and had fallen behind its main consumer.
