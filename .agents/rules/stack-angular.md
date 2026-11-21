@@ -66,7 +66,7 @@ subscriptions and HTTP requests.
 
 A CSS-hidden component still builds its DOM and fires its own requests; `@if` builds nothing.
 
-- **The breakpoint comes from `ViewportService`** (`{webapp}/projects/platform/src/services/ui/viewport.service.ts`), which is
+- **The breakpoint comes from `ViewportService`** (the platform library), which is
   `matchMedia`-backed — never a `resize` listener, never `window.innerWidth` in a component.
 - **Media queries stay correct for layout**, and for hiding an inner element of a component that
   renders anyway. The test: if what you are hiding has its own selector in a template, it is an `@if`.
@@ -77,7 +77,7 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
 ## 2a. Modern Angular Standards [STRICT]
 
 - **`inject()`, never constructor injection**, for services and tokens. A plain class built with
-  `new` is not DI (`{webapp}/projects/ui/src/lib/custom-dropdown/custom-dropdown-keyboard.controller.ts`).
+  `new` is not DI (the UI library's `CustomDropdownKeyboardController`).
 - **Inject the interface token, never the Mock or Http class** — `inject(IOrderService)`. Each token is
   bound per service by `provideByMode` (`app.providers.ts:43`): the Angular form of `AGENTS.md §2`
   *Depend on abstractions*.
@@ -116,7 +116,7 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
   under `services.*` in `environment.*.ts`, wired by `provideByMode` — never one global `useMocks` flag.
 - **Mocks return synthetic data with a realistic `delay()`.**
 - **No secret in a committed mock payload.** A mock that needs one merges it in from
-  `environment.development.ts` after loading — `{webapp}/projects/platform/src/services/tenant/tenant-config/mock-tenant-config.service.ts:99`
+  `environment.development.ts` after loading — the platform library's `MockTenantConfigService`
   (`mockStorageSasTokens`, read through `PLATFORM_ENVIRONMENT`).
 - **[STRICT] Before proposing a persisted value, check whether CSS can derive it** from tokens that
   already ship (`color-mix()`, `calc()`) — no seed, no migration, no backend deploy (`AGENTS.md §1`).
@@ -141,13 +141,13 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
   - ✅ `IOrderService.getAll(): Observable<OrderRequest[]>` (`core/services/order/order-service.interface.ts:17`),
     cached by `OrderStateService`.
   - **Exception — client-side session state may be a `Signal`:** `IAuthService.isAuthenticated`
-    (`{webapp}/projects/platform/src/services/auth/auth-service.interface.ts:16`). The test is ownership: server-owned →
+    (the platform library's `IAuthService`). The test is ownership: server-owned →
     `Observable`, client-projected → `Signal`.
 
 ## 5. Debugging & Reliability
 
 - **One global `HttpInterceptor` catches HTTP errors** (`AGENTS.md §3` *Exception Safety*) and logs the
-  context, input and error together — `{webapp}/projects/platform/src/interceptors/error.interceptor.ts:130`.
+  context, input and error together — the platform library's `errorInterceptor`.
 
 ## 6. Memory Safety & Subscriptions
 
@@ -184,7 +184,7 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
 - **[STRICT] No debounce or delay between an input and the state it changes** — the Angular form of
   `AGENTS.md §3` *What a user's input changes depends on what they did*: no `debounceTime` or
   `setTimeout` on that path, and worst of all on a persisted identity (a route slug, a storage key). A
-  display-only timer is fine — `{webapp}/projects/platform/src/services/ui/toast.service.ts:67` auto-dismisses a toast.
+  display-only timer is fine — `ToastService` (platform library) auto-dismisses a toast.
   - **The tell:** a spec needs `vi.useFakeTimers()` to describe production behaviour.
   - **The number:** a synchronous write of a draft costs a fraction of a millisecond; measure it before
     claiming a debounce saves anything.
@@ -205,10 +205,10 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
 ## 10. Multi-Tenant Architecture [STRICT]
 
 - **Tenant assets resolve at runtime** through `StorageService.getResourceUrl()`
-  (`{webapp}/projects/platform/src/services/tenant/storage/storage.service.ts:96`) — never a hardcoded `assets/` path to a tenant's
+  (platform library) — never a hardcoded `assets/` path to a tenant's
   logo, favicon or image.
 - **Browser storage keys are tenant-prefixed** — `{short}_{tenantId}_{key}`, built in
-  `{webapp}/projects/platform/src/services/persistence/local-persistence.service.ts:23`.
+  the platform library's `LocalPersistenceService`.
 - **Components adapt their behaviour and wording to the tenant's business type.**
 - **[STRICT] A config value that drives behaviour in several components is centralised in one service of
   named signals** — never `config.type === 'x'` in a component or template (`AGENTS.md §2`

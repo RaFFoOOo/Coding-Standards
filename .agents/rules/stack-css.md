@@ -13,9 +13,11 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 ### Tokens
 
 - **Colours are CSS custom properties** (`var(--primary)`), defined in `styles/_theme-variables.scss`.
+- **The scales are a separate, framework-free token package** — shape, elevation, type, spacing,
+  measure. A value on a scale is a token, never a literal; colours stay out of it.
 - **Every theme colour ships with an `-rgb` companion** — `--primary: #79C1B0; --primary-rgb: 121, 193,
   176;` — so transparency is `rgba(var(--primary-rgb), 0.2)`, with no preprocessor function.
-- **Layout constants are global and remapped in one media query** — `styles/_variables.scss`
+- **Layout constants are global and remapped in one media query** — the token package's `base/_layout.scss`
   (`--section-padding`, `--section-title-size`, `--section-gap`, `--section-pad-x`). A component reads
   `var(--section-padding)` and writes no media query of its own for them.
 - **[STRICT] Hero tokens stay on hero surfaces.** `--section-title-size` is sized for landing sections;
@@ -27,7 +29,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 ### Shorthands — a token's arity must fit its slot [STRICT]
 
 - **A multi-value token in a single-value property is dropped silently.** `--section-padding` is
-  `2rem 3rem 3rem` (`styles/_variables.scss:3`), so `top: var(--section-padding)` is discarded.
+  three values (`--section-padding-desktop` in the token package's `base/_layout.scss`), so `top: var(--section-padding)` is discarded.
 - **A multi-value token inside a shorthand is worse: valid CSS with the wrong meaning.**
   ```scss
   // ❌ expands to `padding: 0 2rem 3rem 3rem` — top 0, right 2rem, bottom 3rem, LEFT 3rem
@@ -47,7 +49,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 - **`--header-height` is the header's rendered height.** Re-measure it (`getBoundingClientRect`) after
   any change to the header's padding or logo row. It read 70px against a 77px header: every
   screen-sized section ran 7px under the bottom nav, and the sticky filter bar parked under the header.
-- **One screen is `--screen-content-height`** (`styles/_variables.scss`): the viewport below the
+- **One screen is `--screen-content-height`** (the token package's `base/_layout.scss`): the viewport below the
   header and above the phone's bottom nav. A page carrying the section chips' sticky row sizes anything
   a chip lands on with `--section-screen-height`, the screen minus that row. Never re-derive either
   from `100vh` in a component.
@@ -64,7 +66,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 
 ### One content column, one alignment grammar [STRICT]
 
-- **Every page's content is one column, `--measure-content`** (`styles/_theme-variables.scss`). A page
+- **Every page's content is one column, `--measure-content`** (the token package). A page
   container padded with `--section-pad-x` caps at `--measure-page` (the column plus that padding); one
   padded otherwise caps at `calc(var(--measure-content) + 2 * <its padding>)`. Only the header and
   footer bars read `--measure-chrome`; Home's hero carousel is full-bleed. A page never adds a wider
@@ -92,7 +94,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
   (`color-mix()`, `calc()`) — no seed, migration or backend deploy. Full rule: `stack-angular.md §3`.
 - **Never `!important`.** Fix the specificity instead.
 - **[STRICT] A `:hover` style sits inside `@media (hover: hover)`** — the `hover` mixin
-  (`{webapp}/projects/ui/styles/_hover.scss`). A phone keeps `:hover` on the last control tapped, so a
+  (the token package's `mixins/_hover.scss`). A phone keeps `:hover` on the last control tapped, so a
   hover colour reads as a button stuck pressed; `:focus-visible` stays outside, for the keyboard.
   Check: `scripts/ci/generic/check-touch-hover.sh`.
 - **[STRICT] A component that applies a shared class `@use`s its partial.** View encapsulation emits a

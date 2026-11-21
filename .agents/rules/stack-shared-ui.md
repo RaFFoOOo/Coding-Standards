@@ -3,8 +3,8 @@ paths:
   - "**/*.html"
   - "**/src/app/shared/components/**"
   - "**/projects/ui/**"
-  - "**/src/styles/_forms.scss"
-  - "**/src/styles/_buttons.scss"
+  - "**/base/_forms.scss"
+  - "**/base/_buttons.scss"
 ---
 
 # Shared UI — primitives, controls, overlays and form layout
@@ -14,6 +14,9 @@ headings keep the numbers, so those citations land here. Paths are relative to `
 
 ## 4a. Shared-Surface Inventory — grep before you draw, and before you build [STRICT]
 
+`<tokens>` is the token package's folder: its source where the libraries live, or the installed package
+(`node_modules/<scope>/tokens-scss`) in an app that consumes it.
+
 Every new surface reuses the app's existing primitives. **Run the inventory and record its output** at
 the Mockup Gate (`plan/SKILL.md` step 3), and again before building a surface whose mockup
 predates this rule. Every row is a defect that reached a preview past every gate.
@@ -22,9 +25,9 @@ predates this rule. Every row is a defect that reached a preview past every gate
 |---|---|---|
 | A page's main action — a commit (Save / Continue / Confirm), a decision (Approve / Reject), a jump taken on nearly every visit (a dated list's *Today / Next*) | `grep -rn "app-action-bar" src/app --include=*.html` | `<app-action-bar>`, not a button in the page body: secondary left, primary right, buttons on the content column. A bare `type="submit"` is only for a sub-action — save one card, add a row. Other navigation stays in the page. |
 | A page title and subtitle | `grep -rn "page-header" src/app --include=*.html` | `<header class="page-header">` > `.section-title` + `.intro-text`. Never a hand-rolled heading: the global `h1` is hero-sized (`stack-css.md` *Hero tokens*). |
-| Any button | `grep -n "&--" src/styles/_buttons.scss` | BEM variants — `.btn.btn--primary`, `.btn--confirm`, `.btn--cancel`, `.btn--danger`. `.btn-primary` (one dash) matches nothing and renders a grey box. |
+| Any button | `grep -n "&--" <tokens>/base/_buttons.scss` | BEM variants — `.btn.btn--primary`, `.btn--confirm`, `.btn--cancel`, `.btn--danger`. `.btn-primary` (one dash) matches nothing and renders a grey box. |
 | A form row's column widths | `grep -rho "form-col-[a-z0-9-]*" src/app --include=*.html \| sort \| uniq -c` | Rows are filled `6+6` pairs or `12 → md-4/md-6`. No row leaves an unfilled half on mobile — a lone `col-6` reads as an accident, whatever §14 permits. |
-| A hint under a control | `grep -rn "form-hint" src/styles/_forms.scss` | `.form-hint` as a child of the field it describes, with `aria-describedby` on the `<input>`, not the wrapper. |
+| A hint under a control | `grep -rn "form-hint" <tokens>/base/_forms.scss` | `.form-hint` as a child of the field it describes, with `aria-describedby` on the `<input>`, not the wrapper. |
 | An empty state, badge, dropdown or overlay | §4 and §11 below | The existing primitive. |
 | Photos an owner adds, removes, reorders or replaces | `grep -rn "app-media-strip" src/app --include=*.html` | `<app-media-strip>`, never a new list of thumbnails with its own upload button (§4 *Photos edited in place are one list of rows*). Photos that are a record to look at rather than page content are `<app-photo-carousel>`: a tap opens one full screen (`<app-lightbox>`), ✎ edits them in the same strip. A cap on how many is the strip's `max`. |
 | An alignment, spacing or rhythm rule added to an existing stylesheet | `grep -n "on purpose\|deliberately\|INTERNALLY\|not on desktop\|stays" <that file>.scss` | The decision already recorded there — contradicting it is a regression that passes every gate. The weakest row, since it resolves to prose a reader must weigh; it stays because the check is one grep. |
@@ -38,7 +41,7 @@ predates this rule. Every row is a defect that reached a preview past every gate
    no `@use`; `_shared-sections` (`.page-header`, `.section-title`, `.intro-text`) does.
 
 **Placing a shared component somewhere new, re-check its assumptions there.** `<app-action-bar>` sits
-at `bottom: var(--mobile-nav-height)` (`{webapp}/projects/ui/src/lib/action-bar/action-bar.component.scss:14`) and
+at `bottom: var(--mobile-nav-height)` (the UI library's `ActionBarComponent` styles) and
 relies on `margin-top: auto` in a flex column — neither holds on a route that hides the bottom nav and
 the footer. Measure it where you put it.
 
@@ -102,7 +105,7 @@ between states, and the answer sits where the user looks to act.
 ### Photos edited in place are one list of rows [STRICT]
 
 - **A collection of photos edited in place is `<app-media-strip>`**
-  (`{webapp}/projects/ui/src/lib/media-strip/`): one short row per photo — a 64 px thumbnail that a tap
+  (UI library): one short row per photo — a 64 px thumbnail that a tap
   replaces, its number, its controls, the drag handle at the right edge — and an add bar last that picks
   a file. It never scrolls sideways, so adding is always one tap at the bottom.
 - **The list reports and the host decides.** It emits `reordered`, `removed`, `replaced`, `added` and
@@ -169,8 +172,7 @@ toggle() { this.isOpen.update(v => !v); }
 onDocumentClick(event: Event) { if (!this.eRef.nativeElement.contains(event.target)) this.close(); }
 ```
 
-Reference: `CustomDropdownComponent` (`{webapp}/projects/ui/src/lib/custom-dropdown/custom-dropdown.component.ts:143`
-listener, `:148` trigger). Stopping propagation on an **option** click or a handled key is fine — only
+Reference: `CustomDropdownComponent` (UI library): its `document:click` listener and its trigger. Stopping propagation on an **option** click or a handled key is fine — only
 the trigger must propagate.
 
 ### A panel's open class is not its active-descendant class [STRICT]
@@ -231,7 +233,7 @@ It shipped twice, in two unrelated components, before it became a rule.
 
 ## 14. Compact Forms — 12-Column Grid [STRICT]
 
-- **`.form-row` is a 12-column CSS grid** (`src/styles/_forms.scss`). Two or more fields on one
+- **`.form-row` is a 12-column CSS grid** (`<tokens>/base/_forms.scss`). Two or more fields on one
   conceptual row share a `.form-row`, and every direct `.form-field` child sets its width with
   `.form-col-{n}` — never equal flex distribution, never an unset width.
 - **`n` is `2`, `3`, `4`, `6` or `12`; nothing else exists.** `_forms.scss:122` generates only those, so

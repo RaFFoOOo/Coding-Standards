@@ -34,7 +34,7 @@ one that matters (`AGENTS.md §3` *Dual-Side Validation*).
   npm test -- --include 'src/app/path/to/changed/component/**/*.spec.ts' --watch=false
   ```
   `--include` may repeat and resolves from `src/`, so a library spec needs `../`
-  (`'../projects/<lib>/**/*.spec.ts'`) — a glob that matches nothing still passes, so check the spec
+  (`'../<library folder>/**/*.spec.ts'`) — a glob that matches nothing still passes, so check the spec
   appears in the log. A bare path is read as the project name and fails.
 - **[STRICT] The gate is `npm test` (`ng test`, as CI runs it), never bare `npx vitest run`.** Bare
   vitest skips the builder: it compiles JIT and reads `environment.ts` instead of the build's
@@ -73,7 +73,7 @@ intercept** one on a package import, so only CI fails. Make the mock unnecessary
 
 1. **A value read from `environment`** → take it as a method parameter; the spec passes a literal.
 2. **A third-party class the service constructs** → build it in a `protected` factory method that the
-   spec's subclass overrides — `createSdk` in `{webapp}/projects/platform/src/services/telemetry/app-insights.service.ts:58`.
+   spec's subclass overrides — `createSdk` in the platform library's `AppInsightsService`.
 3. **Module state a spec must reset** (a cache) → export a reset function and call it; **never
    `vi.resetModules()`**. The runner is not isolated, so a reset re-evaluates every module the rest of
    the worker loads, while the TestBed environment keeps the providers from `src/test-providers.testing.ts`.
@@ -86,7 +86,7 @@ has failed.
 ### A domain object in a test comes from its shared builder [STRICT]
 
 - **A spec never writes a whole domain object inline** — `TenantConfig` and `TenantListEntry` come from
-  `aTenantConfig()` / `aTenantListEntry()` (`{webapp}/projects/platform/src/models/tenant-config.testing.ts`), overriding only
+  `aTenantConfig()` / `aTenantListEntry()` (the platform library's `testing` entry), overriding only
   what the test is about. Enforced by `scripts/ci/project/check-test-fixture-builders.sh`.
 - **A partial `{ … } as TenantConfig` stub is allowed**: the cast compiles
   through a new required field, so it causes no churn. It must still carry every field the code
