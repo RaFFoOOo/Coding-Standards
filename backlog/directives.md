@@ -7,9 +7,9 @@ Tech Lead weighed deleting the shared files from the projects and reading the hu
 repository) and kept the copies: a session, an agent or CI that sees one repository needs them there, and a
 pinned hub commit lets each project adopt a rule change in a reviewed PR rather than mid-sprint (2026-11-21).
 
-- [ ] A hub script that runs `sync.sh` hub → each listed project checkout and opens one PR per project that
-      changed, titled with the hub commit; a project with an open sync PR is skipped
-- [ ] Decide where it runs: by hand after a hub merge, or a workflow on push to `main` with a token that can
+- [x] A hub script that runs `sync.sh` hub → each listed project checkout and opens one PR per project that
+      changed, titled with the hub commit; a project with an open sync PR is skipped — `scripts/standards/sync-projects.sh`
+- [ ] Decide where it runs: by hand after a hub merge (today), or a workflow on push to `main` with a token that can
       open PRs in the projects
 
 **Verified 2026-11-21:** `scripts/standards/sync.sh` merges one pair of repositories per run; nothing in

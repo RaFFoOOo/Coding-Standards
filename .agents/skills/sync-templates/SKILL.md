@@ -35,6 +35,10 @@ Both must be local checkouts. One is the hub; say which direction:
 
 A lesson that should reach a third project goes project → hub, then hub → that project.
 
+**Hub → every project at once:** after a hub merge, run `scripts/standards/sync-projects.sh` in the hub. It
+opens one PR per project that changed and leaves a conflicting one on its branch for step 5; its project list
+is the hub's git-ignored `scripts/standards/projects.local`.
+
 ## 2. Check the ground
 ```bash
 git -C <hub> status --short && git -C <project> status --short     # both clean
