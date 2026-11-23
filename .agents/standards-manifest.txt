@@ -15,3 +15,4 @@ AGENTS.md
 .agents/skills/sync-templates/SKILL.md
 .agents/skills/verify/SKILL.md
 scripts/standards/sync.sh
+scripts/ci/generic/check-no-endpoint-literals.sh
