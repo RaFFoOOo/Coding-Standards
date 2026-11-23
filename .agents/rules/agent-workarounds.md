@@ -24,10 +24,12 @@ incidents behind each entry are in the project's archive, never here.
 - **A full clone can turn shallow mid-session**, and every path query then answers with the graft
   commit. Re-check `git rev-list --count HEAD` and `ls .git/shallow` immediately before relying on
   history; fix with `git fetch --unshallow` and recompute.
-- **Another repository's checkout may be another session's working tree.** Switching its branch, committing in
-  it or reinstalling its packages moves the ground under that session (a commit lands on its branch; a checkout
-  takes its branch away). Check `git worktree list` and `git branch --show-current` first, and work in your own
-  worktree (`git worktree add <dir> -b <branch> origin/main`); serve on a port no one else uses.
+- **One session per working tree; another repository's checkout may be another session's.** A `checkout`,
+  a commit or a package reinstall there moves the ground under that session: its branch switches mid-task, a
+  commit lands on the wrong branch, a push sends someone else's work. Before acting, check `git worktree list`
+  and `git branch --show-current`, then work in your own worktree (`git worktree add <dir> -b <branch>
+  origin/main`) and serve on a port no one else uses. Afterwards, `git reflog -10` shows a checkout you did not
+  run. Repair by naming each stray commit with `git branch rescue/<x> <sha>` before moving any branch.
 - **Stacked task PRs conflict after each squash.** Resolve with the branch's own side
   (`git checkout --ours -- <paths>`, run alone), commit, and confirm `git diff --stat origin/<branch> HEAD`
   is empty before pushing.
