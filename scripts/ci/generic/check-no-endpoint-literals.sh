@@ -9,7 +9,8 @@
 #
 # Usage: check-no-endpoint-literals.sh <path>...   (directories are scanned recursively)
 # Scanned: .ts and .json files, except specs and *.testing.ts. Third-party content the browser loads
-# from fixed hosts (fonts in index.html, mock data) is outside the paths a project passes.
+# from fixed hosts (fonts in index.html, mock data) is outside the paths a project passes. A W3C XML
+# namespace (`http://www.w3.org/2000/svg`) names a vocabulary, not a server, so it is not a hit.
 #
 # Exit code: 0 = no literal; 1 = at least one, or no path given.
 
@@ -23,7 +24,7 @@ fi
 PATTERN='[a-z][a-z0-9+.-]*://[A-Za-z0-9]'
 
 hits=$(grep -rnE "$PATTERN" "$@" --include='*.ts' --include='*.json' \
-  --exclude='*.spec.ts' --exclude='*.testing.ts' || true)
+  --exclude='*.spec.ts' --exclude='*.testing.ts' | grep -vE 'https?://www\.w3\.org/[0-9]{4}/' || true)
 
 if [[ -n "$hits" ]]; then
   while IFS= read -r hit; do
