@@ -25,6 +25,11 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 - **[STRICT] A token that is only ever read is a bug.** A `var(--x, fallback)` whose `--x` is defined
   nowhere always renders the fallback, and looks exactly like a working token until someone changes
   it. Grep for the definition of every `var(--x)` you add.
+- **[STRICT] The app defines every token the shared libraries read.** The token package ships
+  `required-tokens.txt`, the libraries' reads with no fallback and no definition of their own; each one gets a
+  default in `styles/_theme-variables.scss`, even when the theme overwrites it at runtime, so a first paint and
+  every test have a value. A missing one drops every rule that reads it, silently. Check:
+  `scripts/ci/generic/check-required-tokens.sh {webapp}` after `npm ci`.
 
 ### Shorthands — a token's arity must fit its slot [STRICT]
 
