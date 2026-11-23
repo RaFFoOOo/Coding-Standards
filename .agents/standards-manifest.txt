@@ -5,6 +5,7 @@
 AGENTS.md
 .agents/standards-manifest.txt
 .agents/rules/agent-workarounds.md
+.agents/rules/backlog.md
 .agents/rules/naming-*.md
 .agents/rules/stack-*.md
 .agents/skills/build/SKILL.md
@@ -16,3 +17,4 @@ AGENTS.md
 .agents/skills/verify/SKILL.md
 scripts/standards/sync.sh
 scripts/ci/generic/check-no-endpoint-literals.sh
+scripts/ci/generic/check-backlog-taxonomy.sh

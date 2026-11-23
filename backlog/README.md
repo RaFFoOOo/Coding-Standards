@@ -1,6 +1,8 @@
 # Backlog
 
-Work that is not in a sprint yet. Replaces `TODO.md`.
+Work that is not in a sprint yet. Replaces `TODO.md`. The format — files by area, markers, the closed category and
+priority sets, the entry shape — is the shared rule `.agents/rules/backlog.md`; `scripts/ci/generic/check-backlog-taxonomy.sh`
+enforces it.
 
 ## Files — pick by what the item changes
 
