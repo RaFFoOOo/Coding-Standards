@@ -113,10 +113,11 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
 
 - **[ARCHITECT REQUIRED] Every API service has a Mock** (`BookingService` → `MockBookingService`).
 - **Each service switches on its own `ServiceMode`** (`'Mock' | 'Http'`, `environments/service-mode.ts:2`)
-  under `services.*` in `environment.*.ts`, wired by `provideByMode` — never one global `useMocks` flag.
+  under `services` in the deployment's runtime configuration, wired by `provideByMode` — never one global
+  `useMocks` flag.
 - **Mocks return synthetic data with a realistic `delay()`.**
 - **No secret in a committed mock payload.** A mock that needs one merges it in from
-  `environment.development.ts` after loading — the platform library's `MockTenantConfigService`
+  the deployment's configuration after loading — the platform library's `MockTenantConfigService`
   (`mockStorageSasTokens`, read through `PLATFORM_ENVIRONMENT`).
 - **[STRICT] Before proposing a persisted value, check whether CSS can derive it** from tokens that
   already ship (`color-mix()`, `calc()`) — no seed, no migration, no backend deploy (`AGENTS.md §1`).
@@ -143,6 +144,27 @@ A CSS-hidden component still builds its DOM and fires its own requests; `@if` bu
   - **Exception — client-side session state may be a `Signal`:** `IAuthService.isAuthenticated`
     (the platform library's `IAuthService`). The test is ownership: server-owned →
     `Observable`, client-projected → `Signal`.
+
+## 3a. Runtime Configuration [STRICT]
+
+The Angular form of `AGENTS.md §3` *Config Separation*: one bundle, every deployment's values at startup.
+
+- **The deploy step writes `/config.json`** from the GitHub environment's variables, with `jq` so no
+  value needs escaping: addresses (API, sign-in authority, storage), switches, `services` modes.
+- **`main.ts` fetches and checks it before `bootstrapApplication`**, then provides it as an
+  `APP_CONFIG` token. Every key is required and none has a default in code: a missing or malformed
+  file stops the app with a plain message, never starts it against an address written in the source.
+- **`environment.ts` keeps only product facts** that are the same everywhere; no `fileReplacements`
+  per deployment, no preview build. Locally `ng serve` reads a git-ignored `config/config.json` copied
+  from the committed `config.example.json` (keys only, no address).
+- **`/config.json` is served `Cache-Control: no-store`** and excluded from the SPA fallback, so a
+  missing file is a 404 and a changed variable takes effect on the next load; the smoke gate checks both.
+- **A switch that must never be on in production** (error diagnostics) is fixed per deploy job, never
+  an editable variable.
+- **Crawler-read HTML** (Open Graph tags) cannot wait for the app, so it stays a deploy-time
+  replacement in `index.html`, still fed by the deployment's variables.
+- **Check:** `scripts/ci/generic/check-no-endpoint-literals.sh {webapp}/src/app {webapp}/src/environments
+  {webapp}/src/main.ts {webapp}/config/config.example.json` in the shared build.
 
 ## 5. Debugging & Reliability
 
