@@ -3,6 +3,7 @@
 ## Add `settingsStandard` — sync an allowlist of settings keys, not the whole file
 
 ⚖
+**Category:** decision · **Priority:** medium
 
 `settings.json` mixes standard-worthy keys with project and personal keys (`model`, `permissions`,
 MCP servers, plugins) that must never be clobbered, so whole-file sync is wrong. The hub would
@@ -20,6 +21,7 @@ is unsafe for JSON, so listing `.claude/settings.json` in the manifest is not th
 ## Decide whether a hooks section belongs in synced agent settings
 
 ⚖
+**Category:** decision · **Priority:** low
 
 A `hooks` section in the synced settings (a lint hook on write/edit, say) would let the hub enforce
 a standard the agent cannot skip. It is also the most invasive thing the hub could push to a spoke.
@@ -31,6 +33,7 @@ a standard the agent cannot skip. It is also the most invasive thing the hub cou
 ## Support Copilot through its own entry point, not a transformation
 
 ⏳ trigger: GitHub Copilot's agent-file conventions stabilise
+**Category:** process · **Priority:** low
 
 The shared files live in `.agents/` for every agent; Claude Code reaches them through two folder links
 in `.claude/`. A third agent should need the same kind of entry point (links, or an instructions file
@@ -43,6 +46,7 @@ that points at `AGENTS.md` and `.agents/`), never a converted copy.
 ## Configure a Playwright MCP server so browser testing is native
 
 🔍
+**Category:** process · **Priority:** low
 
 The `verify` skill drives a browser for its viewport and walk steps, and the hub has no `.mcp.json`
 to make Playwright MCP available.
