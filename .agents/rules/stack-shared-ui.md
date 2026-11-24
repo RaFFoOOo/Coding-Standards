@@ -213,6 +213,23 @@ block the sheet's touch and scroll.
 
 It shipped twice, in two unrelated components, before it became a rule.
 
+### A page a reader never gets lost in [STRICT]
+
+- **Every tenant's public Home ends with `<app-share-link>`** (the UI library's `share-link`), sharing the tenant's
+  public address from `resolvePublicUrl` (the platform library), so a visitor can pass the site on in one tap.
+- **A page with two or more titled sections renders `<app-section-jumps>` under its header**, one jump per section,
+  and each section is an anchor that clears the header and the jumps' sticky row. Dashboards included.
+- **A section's title is an `h2` with the shared `.section-subtitle`**, never a page's own label style; sections are
+  separated as sections, never boxed into cards.
+- **Action and navigation buttons are centred.** A link that takes the reader somewhere is a button
+  (`btn btn--outline`), at least a touch target tall; a name inside content stays a text link.
+- **Editing is entered from the header's ✎** (the platform's `EditModeService` + `EditableSurfaceService`, the UI
+  library's `shell-edit-toggle`) on a route that declares `editableSurface`; Save and Cancel are the action bar's.
+- **No page scrolls sideways at 360 px, even with system text doubled.** Rows shrink and wrap rather than widen the
+  page; `html, body { overflow-x: clip }` is the last safety net, never the fix.
+
+*(unenforced — `verify` §3, walked at 360 px in mobile emulation with normal and doubled system text)*
+
 ## 11. Select / Dropdown / Native-Control Avoidance [STRICT]
 
 - **No native control whose picker the OS draws** — `<select>`, `<input type="color">`, `type="date"`,
