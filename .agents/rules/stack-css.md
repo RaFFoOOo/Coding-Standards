@@ -106,7 +106,7 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
   partial's rules only into components that import it; without the `@use`, the class is silently
   unstyled — right on some surfaces, wrong on the ones missing the import. Example: `.inline-edit-chip`
   from `styles/_inline-edit.scss`. **Exception:** partials that `styles.scss` loads are global and need
-  no `@use` — read its `@use` list rather than assuming (`_forms`, `_buttons`, `_badges` are global;
+  no `@use` — read its `@use` list rather than assuming (`_forms`, `_buttons`, `_status-badge` are global;
   `_shared-sections`, `_inline-edit` are not).
 - **[STRICT] Before adding an alignment, spacing or rhythm rule to an existing stylesheet, grep it for
   the decision already recorded there:**
