@@ -37,7 +37,7 @@ predates this rule. Every row is a defect that reached a preview past every gate
 1. **A class that matches nothing looks exactly like one that works** — lint, `ngc` and the unit suite
    stay green. Only a computed-style assertion on a real build catches it: add `getComputedStyle` /
    `getBoundingClientRect` to the smoke walk, not a "does it render" check.
-2. **Is the partial global?** Read `src/styles.scss`'s `@use` list: `_forms`, `_buttons`, `_badges` need
+2. **Is the partial global?** Read `src/styles.scss`'s `@use` list: `_forms`, `_buttons`, `_status-badge` need
    no `@use`; `_shared-sections` (`.page-header`, `.section-title`, `.intro-text`) does.
 
 **Placing a shared component somewhere new, re-check its assumptions there.** `<app-action-bar>` sits
@@ -63,8 +63,9 @@ Never reserve room for the bar in a page: it publishes its height to `<main>` it
 - **A visual block used in 3 templates becomes a shared primitive before the 4th.**
 - **Empty states use `EmptyStateComponent`** (`[icon]`, `[message]`) — never a fresh
   `<div class="empty-state">`.
-- **Status and source badges are global classes in `src/styles/_badges.scss`** — never redefined in a
-  component stylesheet.
+- **A status is the token package's `.status-badge` with one of five tones** (`badge--neutral · info · success ·
+  warning · danger`, `base/_status-badge.scss`, loaded globally): the app maps each of its statuses to a tone, and
+  never redefines the badge in a component stylesheet.
 
 ### A card's actions: one row, no ground [STRICT]
 
@@ -220,13 +221,15 @@ It shipped twice, in two unrelated components, before it became a rule.
 - **A page with two or more titled sections renders `<app-section-jumps>` under its header**, one jump per section,
   and each section is an anchor that clears the header and the jumps' sticky row. Dashboards included.
 - **A section's title is an `h2` with the shared `.section-subtitle`**, never a page's own label style; sections are
-  separated as sections, never boxed into cards.
+  separated as sections, never boxed into cards. **Not a section:** a hub's destination cards, a list's items, a
+  catalog's groups and a record's fact cards (an order's details) keep their own titles and need no jumps.
 - **Action and navigation buttons are centred.** A link that takes the reader somewhere is a button
   (`btn btn--outline`), at least a touch target tall; a name inside content stays a text link.
 - **Editing is entered from the header's ✎** (the platform's `EditModeService` + `EditableSurfaceService`, the UI
   library's `shell-edit-toggle`) on a route that declares `editableSurface`; Save and Cancel are the action bar's.
 - **No page scrolls sideways at 360 px, even with system text doubled.** Rows shrink and wrap rather than widen the
-  page; `html, body { overflow-x: clip }` is the last safety net, never the fix.
+  page; `html, body { overflow-x: clip }` is the last safety net, never the fix — `clip`, never `hidden`, which
+  makes `body` a scroll container and unsticks every `position: sticky` inside it.
 
 *(unenforced — `verify` §3, walked at 360 px in mobile emulation with normal and doubled system text)*
 
