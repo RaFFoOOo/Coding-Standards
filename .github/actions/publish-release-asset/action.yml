@@ -1,0 +1,60 @@
+name: Publish build artifact to its release
+description: >-
+  Attaches one build artifact of this run to the prerelease build-<sha7> on the built commit,
+  creating the release when the other CD workflow has not. A release asset does not expire, so a
+  later promotion deploys exactly these bytes.
+
+inputs:
+  artifact-name:
+    description: 'Name of the artifact uploaded earlier in this run (dotnet-publish-output, angular-build-output).'
+    required: true
+  github-token:
+    description: 'Token with contents: write on this repository.'
+    required: true
+
+outputs:
+  tag:
+    description: 'The release tag the asset was attached to.'
+    value: ${{ steps.tag.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve the release tag
+      id: tag
+      shell: bash
+      run: echo "tag=build-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+    - name: Download the artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/release-asset/${{ inputs.artifact-name }}
+
+    - name: Zip it, hidden files included
+      shell: bash
+      working-directory: ${{ runner.temp }}/release-asset
+      run: |
+        set -euo pipefail
+        # Zipping the directory's contents keeps dot-folders such as .azurefunctions, without which
+        # the Functions host loads no functions.
+        (cd "${{ inputs.artifact-name }}" && zip -qr "../${{ inputs.artifact-name }}.zip" .)
+        ls -l "${{ inputs.artifact-name }}.zip"
+
+    - name: Create the release if missing, then attach the asset
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ steps.tag.outputs.tag }}
+      working-directory: ${{ runner.temp }}/release-asset
+      run: |
+        set -euo pipefail
+        # Both CD workflows run on a merge that touches both stacks; whichever creates the release
+        # second sees "already exists" and attaches to the one the other made.
+        if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "$TAG" --notes "Built from ${GITHUB_SHA} and smoke-tested on dev. Promote with promote-prod.yml." \
+            || gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null
+        fi
+        gh release upload "$TAG" "${{ inputs.artifact-name }}.zip" --repo "$GITHUB_REPOSITORY" --clobber
+        echo "::notice title=Release asset::${{ inputs.artifact-name }}.zip attached to $TAG"

@@ -1,0 +1,47 @@
+name: Fetch a release asset
+description: >-
+  Downloads one zipped build artifact from a release and unpacks it where the deploy actions read
+  it, then checks the file a deploy needs, so a broken asset fails here and not in Azure.
+
+inputs:
+  tag:
+    description: 'Release tag, e.g. build-31aee1b.'
+    required: true
+  asset:
+    description: 'The artifact name the release holds as <asset>.zip, e.g. angular-build-output.'
+    required: true
+  path:
+    description: 'Directory to unpack into (./dist for the frontend, ./publish for a backend).'
+    required: true
+  required-file:
+    description: 'A file the asset must contain, relative to path, e.g. {webapp}/browser/index.html.'
+    required: true
+  github-token:
+    description: 'Token with contents: read on this repository.'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download and unpack
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        gh release download "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" \
+          --pattern "${{ inputs.asset }}.zip" --dir "$RUNNER_TEMP" --clobber
+        rm -rf "${{ inputs.path }}"
+        mkdir -p "${{ inputs.path }}"
+        unzip -q "$RUNNER_TEMP/${{ inputs.asset }}.zip" -d "${{ inputs.path }}"
+
+    - name: Check the file a deploy needs
+      shell: bash
+      run: |
+        set -euo pipefail
+        required="${{ inputs.path }}/${{ inputs.required-file }}"
+        if [[ ! -e "$required" ]]; then
+          echo "::error title=Release asset incomplete::${{ inputs.asset }}.zip from ${{ inputs.tag }} has no $required"
+          exit 1
+        fi
+        echo "::notice title=Release asset::${{ inputs.asset }} from ${{ inputs.tag }}: $(find "${{ inputs.path }}" -type f | wc -l) files, $required present"
