@@ -19,3 +19,5 @@ scripts/standards/sync.sh
 scripts/ci/generic/check-no-endpoint-literals.sh
 scripts/ci/generic/check-backlog-taxonomy.sh
 scripts/ci/generic/check-required-tokens.sh
+.github/actions/publish-release-asset/action.yml
+.github/actions/fetch-release-asset/action.yml
