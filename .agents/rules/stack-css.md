@@ -74,7 +74,8 @@ about styling lands here. Paths are relative to `{webapp}/src/`.
 - **Every page's content is one column, `--measure-content`** (the token package). A page
   container padded with `--section-pad-x` caps at `--measure-page` (the column plus that padding); one
   padded otherwise caps at `calc(var(--measure-content) + 2 * <its padding>)`. Only the header and
-  footer bars read `--measure-chrome`; Home's hero carousel is full-bleed. A page never adds a wider
+  footer bars read `--measure-chrome`, and the first screen (the UI library's `app-hero`): its carousel and
+  full-bleed photo run the view's width, its split layout `--measure-chrome`. A page never adds a wider
   or narrower container of its own, and a component that renders inside a page never brings a second
   page wrapper (`.owner-workspace`) — that pads the column twice.
 - **A breadcrumb lives inside the page container**, its text on the content's left edge, and on one
