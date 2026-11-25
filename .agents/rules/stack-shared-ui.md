@@ -112,8 +112,11 @@ between states, and the answer sits where the user looks to act.
 - **The list reports and the host decides.** It emits `reordered`, `removed`, `replaced`, `added` and
   `coverRequested`, and owns no photos. Home confirms a removal, the item editor does not; each host's
   draft rules stay in its own controller.
-- **One photo on its own** (an About photo block) is `<app-media-upload frame="natural">`: the photo
-  itself is the control.
+- **One photo or video on its own** (an About block) is `<app-inline-image-edit>` over
+  `<app-media-upload frame="natural">`: the media itself is the control, its replace pill at its foot, and
+  `<app-owner-actions>` under it carries the trash. Its host's `accept` says what it takes: photos, videos or both.
+  A UI-library component edits its media with these or with `<app-media-strip>` (the hero's list), never with a
+  control of its own.
 
 ### An editor never loses what was typed, and an upload is named by an id [STRICT]
 
@@ -219,7 +222,9 @@ It shipped twice, in two unrelated components, before it became a rule.
 - **Every tenant's public Home ends with `<app-share-link>`** (the UI library's `share-link`), sharing the tenant's
   public address from `resolvePublicUrl` (the platform library), so a visitor can pass the site on in one tap.
 - **A page with two or more titled sections renders `<app-section-jumps>` under its header**, one jump per section,
-  and each section is an anchor that clears the header and the jumps' sticky row. Dashboards included.
+  and each section is an anchor that clears the header and the jumps' sticky row. Dashboards included. The jumps are
+  one bar that slides in under the header once the page's header scrolls away, or when it takes keyboard focus; they
+  take no room on the page, so it puts no margin around them.
 - **A section's title is an `h2` with the shared `.section-subtitle`**, never a page's own label style; sections are
   separated as sections, never boxed into cards. **Not a section:** a hub's destination cards, a list's items, a
   catalog's groups and a record's fact cards (an order's details) keep their own titles and need no jumps.
