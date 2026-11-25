@@ -31,6 +31,7 @@ the two project sections below.
 | `/review` | Monthly: recursive review, UX pass, dependency audit, lessons, scans |
 | `/ops` | Deploy, fix a red workflow run, resolve PR comments |
 | `/sync-templates` | Merge the shared standards with the hub, three ways |
+| `/adopt-design-system` | Take a new design-system version: its release notes, checklists, specimens, preview |
 
 ### Placeholders in the shared rules and skills
 The shared files name a project only by placeholder. Read each as its value in this repository, and
@@ -46,6 +47,8 @@ in the hub the values stay empty.
 | `{app}` | the project name (the SPA app registration is `{app}-spa`) |
 | `{dev-rg}` | the dev resource group |
 | `{swa-host}`, `{region}`, `{n}` | the Static Web App host name parts |
+| `{ds-scope}`, `{ds-packages}`, `{ds-ui}` | the design-system packages' npm scope, the packages, the UI package (or its alias) |
+| `{ds-repo}` | the design-system repository's local checkout |
 
 ### Active Sprint
 *A project writes its current sprint here.*

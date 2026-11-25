@@ -8,6 +8,7 @@ AGENTS.md
 .agents/rules/backlog.md
 .agents/rules/naming-*.md
 .agents/rules/stack-*.md
+.agents/skills/adopt-design-system/SKILL.md
 .agents/skills/build/SKILL.md
 .agents/skills/close/SKILL.md
 .agents/skills/ops/SKILL.md
