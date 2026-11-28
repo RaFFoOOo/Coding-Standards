@@ -72,6 +72,8 @@ incidents behind each entry are in the project's archive, never here.
 
 ## AI agents and MCP
 
+- **A structured-question dialog hides the text written just before it.** Put the context the
+  answer needs inside the question itself, and give findings in plain text in a turn of their own.
 - **A chat keeps the tool list it started with.** After a deploy that adds tools, test in a new chat;
   read the server's request log before suspecting the server.
 

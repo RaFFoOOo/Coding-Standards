@@ -1,6 +1,6 @@
 ---
 name: close
-description: Close a sprint in one session — task-table check, the gate in the sprint PR body, backlog sweep, CLAUDE.md pointer, plan archived, merge commit to main. No per-sprint QA report, dependency audit or lessons file.
+description: Close a sprint in one session — task-table check, the gate in the sprint PR body, backlog sweep, CLAUDE.md pointer and resume prompt, plan archived, merge commit to main. No per-sprint QA report, dependency audit or lessons file.
 ---
 
 # close
@@ -37,7 +37,7 @@ npm audit --audit-level=moderate                                    # the level 
 cd ../{services} && dotnet build && dotnet test -c Release                                          # count carries its configuration
 dotnet list package --vulnerable --include-transitive
 ls -1 scripts/ci/*/*.sh | wc -l                                          # derived, never written
-for s in scripts/ci/*/*.sh; do grep -rlq "$(basename "$s")" .github/workflows .github/actions || echo "orphan: $s"; done
+for s in scripts/ci/*/*.sh; do grep -rlq "$(basename "$s")" $(ls -d .github/workflows .github/actions 2>/dev/null) || echo "orphan: $s"; done
 bash scripts/ci/generic/check-log-size.sh                                      # rotate whichever is over (recipe in each file's index)
 ```
 The smoke walk runs on the sprint PR (`ci-angular.yml` at the sprint gate). Paste every number,
@@ -75,6 +75,13 @@ Update `README.md` if setup, secrets, variables, modes or major features changed
 - The previous sprint's block moves verbatim to `archive/SPRINT_HISTORY.md` (newest first) minus
   its "next sprint" pointer. **Current sprint + its predecessor stay inline, nothing older.**
 - Name the next plan if one is committed; `check-log-size.sh` caps the file.
+
+## 6a. `_resume-prompt.md`
+Rewrite the tracked `_resume-prompt.md` at the root so the next session starts with
+`read @_resume-prompt.md`: the date, the next steps in order, what waits on whom, the open questions
+— each pointing to the file that holds the detail, never copying `CLAUDE.md`, `DECISIONS.md` or the
+backlog. Fold in the Tech Lead's own edits to it first; ask about any that conflict with the repo.
+It ships in the close commit.
 
 ## 7. Archive
 ```bash
