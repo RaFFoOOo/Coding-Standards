@@ -17,10 +17,10 @@ behind something the project owns.
 | Concern | Rule | Check |
 |---|---|---|
 | Runtime | The backend is **one container image** (`Dockerfile`, non-root user, health endpoint). No serverless programming model (bindings, durable orchestrations) in the domain. | the image runs locally with `docker compose up` |
-| Local system | `docker compose up` starts **everything**: API, database, object storage emulator, frontend dev server | the README's first command |
+| Local system | `docker compose up` starts the API and a **throwaway PostgreSQL** for the developer loop and the tests; cloud services (object storage, identity) are used for real in the hosted dev environment and replaced by in-process fakes in tests — no emulator | the README's first command |
 | Configuration | Twelve-factor: every host-specific value is an environment variable; one example file (`.env.example`) lists them all, with no secret | settings class fails fast on a missing value |
 | Identity | **Generic OIDC**: issuer, audience and the role claim are configuration. No claim only one provider emits; roles come from the application's own user table | a second issuer works by configuration alone |
-| Files | Object storage behind the storage `Protocol`: S3-compatible, Azure Blob or local disk, chosen by configuration | the tests run on the local adapter |
+| Files | Object storage behind the storage `Protocol`: S3-compatible, Azure Blob or local disk, chosen by configuration | the tests run on an in-process fake |
 | Database | Standard PostgreSQL only: no extension the target hosts may lack without a fallback named in `DECISIONS.md` | migrations run on a plain `postgres` image |
 | Long jobs | A job table plus a worker process from the same image, not a host-specific orchestrator | — |
 | Infrastructure as code | Host-specific code lives in `infra/<host>/` only; nothing outside it names the host | `grep` for the host's SDK outside `infra/` |
